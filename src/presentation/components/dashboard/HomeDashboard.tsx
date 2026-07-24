@@ -51,7 +51,7 @@ const CHART_HEIGHT = "h-[460px] sm:h-[390px] lg:h-[400px]";
 function ChartSkeleton({ className }: { className?: string }) {
     return (
         <div className={cn(CHART_HEIGHT, "rounded-2xl border border-border-base bg-bg-secondary flex items-center justify-center", className)}>
-            <RobotLoader size={64} text="Cargando datos" />
+            <RobotLoader size={64} text="Actualizando datos" />
         </div>
     );
 }

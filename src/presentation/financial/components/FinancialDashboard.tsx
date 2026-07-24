@@ -90,7 +90,7 @@ export function FinancialDashboard() {
         return {};
     }, [filterType, customStartDate, customEndDate]);
 
-    const { kpis: rawKpis, monthly, typeBreakdown, categoryBreakdown: rawCategoryBreakdown, institutionBreakdown: rawInstitutionBreakdown, dailyBreakdown: rawDailyBreakdown, loading, refresh } =
+    const { kpis: rawKpis, monthly, typeBreakdown, categoryBreakdown: rawCategoryBreakdown, institutionBreakdown: rawInstitutionBreakdown, dailyBreakdown: rawDailyBreakdown, loading, refetching, refresh } =
         useFinancialDashboard(startDate, endDate);
 
     const kpis = useMemo(() => (rawKpis && !showCredit ? excludeCreditFromKpis(rawKpis) : rawKpis), [rawKpis, showCredit]);
@@ -265,6 +265,12 @@ export function FinancialDashboard() {
 
 
 
+            {refetching ? (
+                <div className="flex h-[45vh] w-full items-center justify-center">
+                    <RobotLoader text="Actualizando datos" />
+                </div>
+            ) : (
+            <>
             {/* KPI section: hero balance panel + quick summary (all breakpoints) */}
             <div className="space-y-4">
                 <BalanceHeroCard
@@ -344,6 +350,8 @@ export function FinancialDashboard() {
                     </CardContent>
                 </Card>
             </div>
+            </>
+            )}
         </div>
     );
 }
