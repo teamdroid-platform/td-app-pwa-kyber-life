@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { getUnprocessedInboxTransactionsAction, mapInboxTransactionAction, dismissInboxTransactionAction } from "@/app/actions/financial-inbox";
 import { getInstitutionsAction } from "@/app/actions/financial-settings";
-import { getInstitutionMatchInfo } from "@/lib/institution-match";
+import { getInstitutionMatchInfo, INSTITUTION_MATCH_THRESHOLD } from "@/lib/institution-match";
 import { InstitutionMatchBadge } from "./InstitutionMatchBadge";
 import { FinancialScannerTransaction } from "@/domain/entities/financial";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -342,7 +342,18 @@ export function FinancialInbox() {
     const handleConfirm = async (tx: FinancialScannerTransaction) => {
         const editState = editStates[tx.id!];
         const type = (editState?.type as FinancialScannerTransaction["type"]) || DEFAULT_TRANSACTION_TYPE;
-        const merchant = editState?.merchant || tx.merchant;
+        // Persist the resolved institution just like the detail form: when the
+        // merchant wasn't manually edited and confidently matches a stored
+        // institution (score ≥ threshold), save that institution's name (e.g.
+        // "PAYU*AR*UBER" → "Uber") so confirming from the card or the form agree.
+        const editedMerchant = editState?.merchant;
+        const rawMerchant = editedMerchant || tx.merchant;
+        const merchant = (() => {
+            if (editedMerchant) return editedMerchant;
+            if (!institutionsLoaded || !rawMerchant) return rawMerchant;
+            const info = getInstitutionMatchInfo(rawMerchant, institutionNames);
+            return info.matchedName && info.score >= INSTITUTION_MATCH_THRESHOLD ? info.matchedName : rawMerchant;
+        })();
         const amount = editState?.amount !== undefined ? editState.amount : tx.amount;
 
         if (!merchant || merchant.trim() === "") {
@@ -601,6 +612,20 @@ export function FinancialInbox() {
                                 const typeLabel = TYPE_OPTIONS.find(o => o.value === txType)?.label || "Gasto";
                                 const displaySummary = editStates[tx.id!]?.summary || "Sin resumen disponible para este escaneo.";
 
+                                // Institution shown on the card. Mirror the detail form's server-side
+                                // resolution: when the scanned merchant confidently matches a stored
+                                // institution (score ≥ threshold), show that institution's name (e.g.
+                                // "PAYU*AR*UBER" → "Uber") so the card and the form agree. Otherwise
+                                // fall back to the raw merchant. The badge still reflects the match.
+                                const rawMerchantValue = editStates[tx.id!]?.merchant || tx.merchant || "";
+                                const institutionMatchInfo = institutionsLoaded
+                                    ? getInstitutionMatchInfo(rawMerchantValue, institutionNames)
+                                    : null;
+                                const displayInstitution =
+                                    institutionMatchInfo?.matchedName && institutionMatchInfo.score >= INSTITUTION_MATCH_THRESHOLD
+                                        ? institutionMatchInfo.matchedName
+                                        : rawMerchantValue;
+
 
                                 return (
                                     <Card
@@ -700,12 +725,12 @@ export function FinancialInbox() {
                                                                 />
                                                             ) : (
                                                                 <>
-                                                                    <span className="truncate min-w-0" title={editStates[tx.id!]?.merchant || tx.merchant || "Institución por confirmar"}>
-                                                                        {editStates[tx.id!]?.merchant || tx.merchant || "Institución por confirmar"}
+                                                                    <span className="truncate min-w-0" title={displayInstitution || "Institución por confirmar"}>
+                                                                        {displayInstitution || "Institución por confirmar"}
                                                                     </span>
-                                                                    {institutionsLoaded && (editStates[tx.id!]?.merchant || tx.merchant) && (
+                                                                    {institutionMatchInfo && rawMerchantValue && (
                                                                         <InstitutionMatchBadge
-                                                                            info={getInstitutionMatchInfo(editStates[tx.id!]?.merchant || tx.merchant, institutionNames)}
+                                                                            info={institutionMatchInfo}
                                                                             size={13}
                                                                             className="ml-1"
                                                                         />
