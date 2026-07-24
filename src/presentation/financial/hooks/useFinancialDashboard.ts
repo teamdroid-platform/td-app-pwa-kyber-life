@@ -40,9 +40,14 @@ const INITIAL_STATE: DashboardState = {
  */
 export function useFinancialDashboard(startDate?: string, endDate?: string) {
     const [state, setState] = useState<DashboardState>(INITIAL_STATE);
+    // True only while a *user-visible* refetch is in flight (a date/filter change),
+    // so the UI can show an "updating" loader. Background refreshes (realtime /
+    // polling) run silently and do NOT flip this, avoiding a loader flash.
+    const [refetching, setRefetching] = useState(false);
 
-    const fetchData = useCallback(async () => {
+    const fetchData = useCallback(async (silent = false) => {
         setState(prev => ({ ...prev, loading: true, error: null }));
+        if (!silent) setRefetching(true);
         try {
             const [kpiRes, monthlyRes, typeRes, categoryRes, institutionRes, dailyRes] = await Promise.all([
                 getFinancialKPIsAction(startDate, endDate),
@@ -69,16 +74,21 @@ export function useFinancialDashboard(startDate?: string, endDate?: string) {
                 loading: false,
                 error: (err as Error).message,
             }));
+        } finally {
+            if (!silent) setRefetching(false);
         }
     }, [startDate, endDate]);
 
+    // A change in the date range is a user action → show the visible loader.
     useEffect(() => {
-        fetchData();
+        fetchData(false);
     }, [fetchData]);
 
-    const refresh = useCallback(async () => {
-        await fetchData();
+    // `refresh()` defaults to a silent background refetch (realtime / polling),
+    // so it never triggers the "updating" loader. Pass { silent: false } to opt in.
+    const refresh = useCallback(async (opts?: { silent?: boolean }) => {
+        await fetchData(opts?.silent ?? true);
     }, [fetchData]);
 
-    return { ...state, refresh };
+    return { ...state, refetching, refresh };
 }
