@@ -113,8 +113,8 @@ export function FinancialDashboard() {
 
     // Always shows the full detail (real + credit), regardless of the toggle.
     const kpiModalConfig = useMemo(
-        () => (openKpiModal && rawKpis ? buildKpiModalConfig(openKpiModal, rawKpis) : null),
-        [openKpiModal, rawKpis],
+        () => (openKpiModal && rawKpis ? buildKpiModalConfig(openKpiModal, rawKpis, showCredit) : null),
+        [openKpiModal, rawKpis, showCredit],
     );
 
     const totalCategoryExpenses = useMemo(() => {

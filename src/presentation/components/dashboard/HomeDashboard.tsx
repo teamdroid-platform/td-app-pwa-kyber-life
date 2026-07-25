@@ -222,8 +222,8 @@ export function HomeDashboard({ userFirstName }: { userFirstName?: string }) {
     const [openKpiModal, setOpenKpiModal] = useState<KpiModalKind | null>(null);
 
     const kpiModalConfig = useMemo(
-        () => (openKpiModal && fin.kpis ? buildKpiModalConfig(openKpiModal, fin.kpis) : null),
-        [openKpiModal, fin.kpis],
+        () => (openKpiModal && fin.kpis ? buildKpiModalConfig(openKpiModal, fin.kpis, showCredit) : null),
+        [openKpiModal, fin.kpis, showCredit],
     );
 
     const isInitialLoading =
