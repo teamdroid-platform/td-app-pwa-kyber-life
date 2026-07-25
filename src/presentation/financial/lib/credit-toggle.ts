@@ -21,6 +21,20 @@ export function excludeCreditFromKpis(kpis: FinancialKPIs): FinancialKPIs {
     };
 }
 
+/**
+ * Apply the credit-card-paid expenses to the balance, for when the "Incluir
+ * gastos con tarjeta" toggle is ON. By default those expenses are deferred, so
+ * `netBalance` excludes them; with the toggle on the user wants to see the
+ * balance as if the card were already paid, so subtract the credit portion from
+ * it. `totalExpenses` already includes credit in the raw KPIs, so it's left as-is.
+ */
+export function includeCreditInKpis(kpis: FinancialKPIs): FinancialKPIs {
+    return {
+        ...kpis,
+        netBalance: round2(kpis.netBalance - kpis.totalExpensesCredit),
+    };
+}
+
 export function excludeCreditFromCategoryBreakdown(data: CategoryBreakdown[]): CategoryBreakdown[] {
     const reduced = data
         .map((c) => ({ ...c, total: round2(c.total - c.creditTotal), creditTotal: 0 }))

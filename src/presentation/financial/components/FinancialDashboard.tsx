@@ -19,6 +19,7 @@ import { KpiBreakdownModal } from "./KpiBreakdownModal";
 import { buildKpiModalConfig, type KpiModalKind } from "../lib/kpi-modal-config";
 import {
     excludeCreditFromKpis,
+    includeCreditInKpis,
     excludeCreditFromCategoryBreakdown,
     excludeCreditFromInstitutionBreakdown,
     excludeCreditFromDailyBreakdown,
@@ -93,7 +94,10 @@ export function FinancialDashboard() {
     const { kpis: rawKpis, monthly, typeBreakdown, categoryBreakdown: rawCategoryBreakdown, institutionBreakdown: rawInstitutionBreakdown, dailyBreakdown: rawDailyBreakdown, loading, refetching, refresh } =
         useFinancialDashboard(startDate, endDate);
 
-    const kpis = useMemo(() => (rawKpis && !showCredit ? excludeCreditFromKpis(rawKpis) : rawKpis), [rawKpis, showCredit]);
+    const kpis = useMemo(
+        () => (rawKpis ? (showCredit ? includeCreditInKpis(rawKpis) : excludeCreditFromKpis(rawKpis)) : rawKpis),
+        [rawKpis, showCredit],
+    );
     const categoryBreakdown = useMemo(
         () => (showCredit ? rawCategoryBreakdown : excludeCreditFromCategoryBreakdown(rawCategoryBreakdown)),
         [rawCategoryBreakdown, showCredit],

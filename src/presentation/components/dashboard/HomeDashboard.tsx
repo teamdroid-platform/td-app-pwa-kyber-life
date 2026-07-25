@@ -37,7 +37,7 @@ import { RobotLoader } from "@/components/ui/RobotLoader";
 import { MobileCarousel } from "./MobileCarousel";
 import { KpiBreakdownModal } from "@/presentation/financial/components/KpiBreakdownModal";
 import { CreditToggle } from "@/presentation/financial/components/CreditToggle";
-import { excludeCreditFromKpis, excludeCreditFromCategoryBreakdown, excludeCreditFromDailyBreakdown } from "@/presentation/financial/lib/credit-toggle";
+import { excludeCreditFromKpis, includeCreditInKpis, excludeCreditFromCategoryBreakdown, excludeCreditFromDailyBreakdown } from "@/presentation/financial/lib/credit-toggle";
 import { buildKpiModalConfig, type KpiModalKind } from "@/presentation/financial/lib/kpi-modal-config";
 
 /**
@@ -146,7 +146,7 @@ export function HomeDashboard({ userFirstName }: { userFirstName?: string }) {
     const { data: mkt, loading: mktLoading } = useMarketOverview(mktRange.startDate, mktRange.endDate);
 
     const effectiveKpis = useMemo(
-        () => (fin.kpis && !showCredit ? excludeCreditFromKpis(fin.kpis) : fin.kpis),
+        () => (fin.kpis ? (showCredit ? includeCreditInKpis(fin.kpis) : excludeCreditFromKpis(fin.kpis)) : fin.kpis),
         [fin.kpis, showCredit],
     );
     const effectiveCategories = useMemo(
