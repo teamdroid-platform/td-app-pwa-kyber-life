@@ -4,8 +4,8 @@ import { useState, useEffect } from "react";
 import { FinancialInstitution, FinancialInstitutionType } from "@/domain/entities/financial";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Edit2, Trash2, Building2 } from "lucide-react";
-import { createInstitutionAction, updateInstitutionAction, deleteInstitutionAction, createInstitutionTypeAction } from "@/app/actions/financial-settings";
+import { Plus, Edit2, Trash2, Building2, Combine } from "lucide-react";
+import { createInstitutionAction, updateInstitutionAction, deleteInstitutionAction, createInstitutionTypeAction, getInstitutionTransactionCountAction, mergeInstitutionAction } from "@/app/actions/financial-settings";
 import { FormSheet } from "@/components/ui/form-sheet";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -25,6 +25,12 @@ export function InstitutionManager({ initialData, institutionTypes }: Institutio
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [editingId, setEditingId] = useState<UUID | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    // Merge (unify) state
+    const [mergingInst, setMergingInst] = useState<FinancialInstitution | null>(null);
+    const [mergeTargetId, setMergeTargetId] = useState<string>("");
+    const [mergeCount, setMergeCount] = useState<number | null>(null); // null while counting
+    const [isMerging, setIsMerging] = useState(false);
 
     useEffect(() => {
         setInstitutions(initialData);
@@ -113,7 +119,7 @@ export function InstitutionManager({ initialData, institutionTypes }: Institutio
 
     const handleDelete = async (id: UUID) => {
         if (!confirm("¿Seguro que deseas eliminar esta institución?")) return;
-        
+
         try {
             await deleteInstitutionAction(id);
             setInstitutions(institutions.filter(i => i.id !== id));
@@ -122,6 +128,44 @@ export function InstitutionManager({ initialData, institutionTypes }: Institutio
             toast.error("Error al eliminar");
         }
     };
+
+    const handleMergeRequest = async (inst: FinancialInstitution) => {
+        setMergingInst(inst);
+        setMergeTargetId("");
+        setMergeCount(null);
+        try {
+            const count = await getInstitutionTransactionCountAction(inst.id!);
+            setMergeCount(count);
+        } catch {
+            setMergeCount(0);
+        }
+    };
+
+    const handleMergeConfirm = async () => {
+        if (!mergingInst || !mergeTargetId) return;
+        setIsMerging(true);
+        try {
+            const { reassignedCount } = await mergeInstitutionAction(mergingInst.id!, mergeTargetId);
+            const targetName = institutions.find(i => i.id === mergeTargetId)?.name ?? "la institución elegida";
+            setInstitutions(prev => prev.filter(i => i.id !== mergingInst.id));
+            if (reassignedCount > 0) {
+                const noun = reassignedCount === 1 ? "transacción reasignada" : "transacciones reasignadas";
+                toast.success(`Instituciones unificadas. ${reassignedCount} ${noun} a «${targetName}».`);
+            } else {
+                toast.success(`Instituciones unificadas en «${targetName}».`);
+            }
+            setMergingInst(null);
+            setMergeTargetId("");
+            setMergeCount(null);
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : "Error al unificar instituciones");
+        } finally {
+            setIsMerging(false);
+        }
+    };
+
+    // Candidate targets: every other (non-deleted) institution.
+    const mergeTargets = institutions.filter(i => !i.isDeleted && i.id !== mergingInst?.id);
 
     return (
         <Card className="border-none shadow-none bg-transparent">
@@ -215,6 +259,9 @@ export function InstitutionManager({ initialData, institutionTypes }: Institutio
                                         <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-blue-500 hover:bg-blue-500/10" onClick={() => handleOpenDialog(inst)}>
                                             <Edit2 className="w-4 h-4" />
                                         </Button>
+                                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-violet-500 hover:bg-violet-500/10" title="Unificar con otra institución" onClick={() => handleMergeRequest(inst)}>
+                                            <Combine className="w-4 h-4" />
+                                        </Button>
                                         <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-red-500 hover:bg-red-500/10" onClick={() => handleDelete(inst.id!)}>
                                             <Trash2 className="w-4 h-4" />
                                         </Button>
@@ -225,6 +272,50 @@ export function InstitutionManager({ initialData, institutionTypes }: Institutio
                     </div>
                 )}
             </CardContent>
+
+            <FormSheet
+                open={!!mergingInst}
+                onOpenChange={(open) => {
+                    if (!open && !isMerging) {
+                        setMergingInst(null);
+                        setMergeTargetId("");
+                        setMergeCount(null);
+                    }
+                }}
+                title="Unificar institución"
+                description={mergingInst ? `Fusiona «${mergingInst.name}» con otra institución. Todas sus transacciones pasarán a la institución elegida y «${mergingInst.name}» será eliminada.` : ""}
+                bodyClassName="space-y-4 py-4"
+                footer={
+                    <Button
+                        className="w-full"
+                        variant="destructive"
+                        onClick={handleMergeConfirm}
+                        disabled={!mergeTargetId || isMerging}
+                    >
+                        {isMerging ? "Unificando..." : "Unificar y eliminar"}
+                    </Button>
+                }
+            >
+                <Field label="Fusionar con">
+                    <Select value={mergeTargetId} onValueChange={setMergeTargetId} disabled={isMerging}>
+                        <SelectTrigger>
+                            <SelectValue placeholder={mergeTargets.length > 0 ? "Elige la institución destino" : "No hay otra institución"} />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {mergeTargets.map(t => (
+                                <SelectItem key={t.id} value={t.id!}>{t.name}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </Field>
+                <p className="text-xs text-muted-foreground">
+                    {mergeCount === null
+                        ? "Comprobando transacciones asociadas…"
+                        : mergeCount > 0
+                            ? `Se reasignarán ${mergeCount} ${mergeCount === 1 ? "transacción" : "transacciones"} a la institución elegida.`
+                            : "Esta institución no tiene transacciones asociadas."}
+                </p>
+            </FormSheet>
         </Card>
     );
 }

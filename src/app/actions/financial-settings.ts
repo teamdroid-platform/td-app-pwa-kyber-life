@@ -54,6 +54,18 @@ export async function deleteInstitutionAction(id: UUID) {
     revalidatePath("/financial/settings");
 }
 
+export async function getInstitutionTransactionCountAction(id: UUID) {
+    const user = await getRequiredUser();
+    return financialSettingsService.getInstitutionTransactionCount(user.id, id);
+}
+
+export async function mergeInstitutionAction(sourceId: UUID, targetId: UUID) {
+    const user = await getRequiredUser();
+    const result = await financialSettingsService.mergeInstitution(user.id, sourceId, targetId);
+    revalidatePath("/financial/settings");
+    return result;
+}
+
 export async function getAccountsAction() {
     const user = await getRequiredUser();
     return financialSettingsService.getAccounts(user.id);

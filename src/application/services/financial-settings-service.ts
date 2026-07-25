@@ -79,7 +79,7 @@ export class FinancialSettingsService {
         if (!existing || existing.ownerUserId !== userId) {
             throw new Error("Institution not found or access denied");
         }
-        
+
         // Soft delete
         const updated: FinancialInstitution = {
             ...existing,
@@ -87,6 +87,41 @@ export class FinancialSettingsService {
             updatedAt: new Date().toISOString()
         };
         await this.institutionRepo.update(updated);
+    }
+
+    /** How many of the user's transactions are linked to this institution. */
+    async getInstitutionTransactionCount(userId: UUID, institutionId: UUID): Promise<number> {
+        const existing = await this.institutionRepo.findById(institutionId);
+        if (!existing || existing.ownerUserId !== userId) {
+            throw new Error("Institution not found or access denied");
+        }
+        return this.transactionRepo.countByInstitutionId(userId, institutionId);
+    }
+
+    /**
+     * Merge (unify) one institution into another: every transaction linked to
+     * `sourceId` is reassigned to `targetId`, then the source institution is
+     * removed. Both must belong to the user and be different. Returns how many
+     * transactions were reassigned.
+     */
+    async mergeInstitution(userId: UUID, sourceId: UUID, targetId: UUID): Promise<{ reassignedCount: number }> {
+        if (sourceId === targetId) {
+            throw new Error("No se puede fusionar una institución consigo misma");
+        }
+
+        const source = await this.institutionRepo.findById(sourceId);
+        if (!source || source.ownerUserId !== userId) {
+            throw new Error("Institution not found or access denied");
+        }
+
+        const target = await this.institutionRepo.findById(targetId);
+        if (!target || target.ownerUserId !== userId) {
+            throw new Error("La institución destino no existe o no tienes acceso");
+        }
+
+        const reassignedCount = await this.transactionRepo.reassignInstitution(userId, sourceId, targetId);
+        await this.institutionRepo.delete(sourceId);
+        return { reassignedCount };
     }
 
     // --- Accounts ---
