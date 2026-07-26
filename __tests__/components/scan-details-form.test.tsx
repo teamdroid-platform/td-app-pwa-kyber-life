@@ -3,7 +3,7 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { useRouter } from "next/navigation";
 import { ScanDetailsForm } from "@/presentation/financial/components/ScanDetailsForm";
 import { mapInboxTransactionAction, dismissInboxTransactionAction } from "@/app/actions/financial-inbox";
-import { getInstitutionsAction, getAccountsAction, getCategoriesAction, getInstitutionTypesAction } from "@/app/actions/financial-settings";
+import { getTransactionFormOptionsAction } from "@/app/actions/financial-settings";
 import { getUniqueTagsAction } from "@/app/actions/financial-transactions";
 import type { FinancialScannerTransaction } from "@/domain/entities/financial";
 
@@ -21,10 +21,7 @@ jest.mock("@/app/actions/financial-transactions", () => ({
 }));
 
 jest.mock("@/app/actions/financial-settings", () => ({
-    getInstitutionsAction: jest.fn(),
-    getAccountsAction: jest.fn(),
-    getCategoriesAction: jest.fn(),
-    getInstitutionTypesAction: jest.fn(),
+    getTransactionFormOptionsAction: jest.fn(),
     updateInstitutionAction: jest.fn(),
     createInstitutionAction: jest.fn(),
     createCategoryAction: jest.fn(),
@@ -54,14 +51,14 @@ const SCAN: FinancialScannerTransaction = {
 
 async function renderForm() {
     (useRouter as jest.Mock).mockReturnValue({ push: jest.fn(), replace: jest.fn() });
-    (getInstitutionsAction as jest.Mock).mockResolvedValue([]);
-    (getAccountsAction as jest.Mock).mockResolvedValue([]);
-    (getCategoriesAction as jest.Mock).mockResolvedValue([]);
-    (getInstitutionTypesAction as jest.Mock).mockResolvedValue([]);
+    (getTransactionFormOptionsAction as jest.Mock).mockResolvedValue({
+        success: true,
+        data: { institutions: [], accounts: [], categories: [], institutionTypes: [] },
+    });
     (getUniqueTagsAction as jest.Mock).mockResolvedValue({ success: true, data: [] });
 
     render(<ScanDetailsForm initialData={SCAN} resolvedInstitutionName="TACA WEB USA PA VI" />);
-    await waitFor(() => expect(getInstitutionsAction).toHaveBeenCalled());
+    await waitFor(() => expect(getTransactionFormOptionsAction).toHaveBeenCalled());
 }
 
 function expandSection(label: string) {

@@ -86,8 +86,10 @@ export class SupabaseFinancialCategoryRepository implements IFinancialCategoryRe
             .or(`owner_user_id.eq.${userId},owner_user_id.is.null`)
             .order('name', { ascending: true });
 
-        if (error || !data) return [];
-        return data.map(row => this.mapToEntity(row));
+        // Surface failures instead of returning an empty list: callers must be
+        // able to tell "this user has no categories" from "the query failed".
+        if (error) throw new Error(`Error loading financial categories: ${error.message}`);
+        return (data ?? []).map(row => this.mapToEntity(row));
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

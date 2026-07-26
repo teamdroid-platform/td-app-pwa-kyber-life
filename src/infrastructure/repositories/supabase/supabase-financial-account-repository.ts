@@ -87,8 +87,10 @@ export class SupabaseFinancialAccountRepository implements IFinancialAccountRepo
             .eq('owner_user_id', userId)
             .order('name', { ascending: true });
 
-        if (error || !data) return [];
-        return data.map(row => this.mapToEntity(row));
+        // Surface failures instead of returning an empty list: callers must be
+        // able to tell "this user has no accounts" from "the query failed".
+        if (error) throw new Error(`Error loading financial accounts: ${error.message}`);
+        return (data ?? []).map(row => this.mapToEntity(row));
     }
 
     async findByInstitutionId(institutionId: UUID): Promise<FinancialAccount[]> {

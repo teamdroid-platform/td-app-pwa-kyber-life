@@ -2,10 +2,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Bell, BellRing, CheckCheck, Loader2 } from "lucide-react";
+import { Bell, BellRing, Check, CheckCheck, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { cn } from "@/lib/utils";
+import { SwipeToDismiss } from "@/components/ui/swipe-to-dismiss";
 import {
     listNotificationsAction,
     getUnreadNotificationCountAction,
@@ -50,9 +50,11 @@ export function NotificationBell({ userId }: { userId: string }) {
     const [loading, setLoading] = useState(true);
     const push = usePushSubscription(userId);
 
+    // The bell only ever lists pending notifications: once one is read it is
+    // dismissed for good and never shows up here again.
     const refresh = useCallback(async () => {
         const [listResult, countResult] = await Promise.all([
-            listNotificationsAction(20),
+            listNotificationsAction(20, true),
             getUnreadNotificationCountAction(),
         ]);
         if (listResult.success) setNotifications(listResult.data as NotificationItem[]);
@@ -65,18 +67,21 @@ export function NotificationBell({ userId }: { userId: string }) {
 
     useNotificationsRealtime(userId, refresh);
 
+    /** Mark as read + drop it from the list (reading dismisses it permanently). */
+    const dismiss = useCallback(async (id: string) => {
+        setNotifications((prev) => prev.filter((n) => n.id !== id));
+        setUnreadCount((c) => Math.max(0, c - 1));
+        await markNotificationReadAction(id);
+    }, []);
+
     const handleSelect = async (item: NotificationItem) => {
         setOpen(false);
-        if (!item.isRead) {
-            setNotifications((prev) => prev.map((n) => (n.id === item.id ? { ...n, isRead: true } : n)));
-            setUnreadCount((c) => Math.max(0, c - 1));
-            await markNotificationReadAction(item.id);
-        }
+        await dismiss(item.id);
         router.push(entityHref(item));
     };
 
     const handleMarkAllRead = async () => {
-        setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+        setNotifications([]);
         setUnreadCount(0);
         await markAllNotificationsReadAction();
     };
@@ -119,36 +124,49 @@ export function NotificationBell({ userId }: { userId: string }) {
                         </div>
                     ) : notifications.length === 0 ? (
                         <p className="px-4 py-8 text-center text-sm text-text-tertiary">
-                            No tienes notificaciones todavía.
+                            No tienes notificaciones pendientes.
                         </p>
                     ) : (
                         notifications.map((item) => (
-                            <button
+                            <SwipeToDismiss
                                 key={item.id}
-                                onClick={() => handleSelect(item)}
-                                className={cn(
-                                    "w-full text-left px-4 py-3 border-b border-border-base/60 last:border-b-0 hover:bg-bg-hover transition-colors flex items-start gap-3",
-                                    !item.isRead && "bg-accent-primary/5",
-                                )}
+                                onDismiss={() => void dismiss(item.id)}
+                                className="border-b border-border-base/60 last:border-b-0"
+                                background={
+                                    <span className="flex items-center gap-1.5 text-xs font-medium text-accent-success">
+                                        <Check className="h-4 w-4" />
+                                        Marcar como leída
+                                    </span>
+                                }
                             >
-                                <span
-                                    className={cn(
-                                        "mt-1.5 h-2 w-2 shrink-0 rounded-full",
-                                        item.isRead ? "bg-transparent" : "bg-accent-primary",
-                                    )}
-                                />
-                                <span className="flex-1 min-w-0">
-                                    <span className="block text-sm font-medium text-text-primary truncate">
-                                        {item.title}
-                                    </span>
-                                    <span className="block text-xs text-text-secondary line-clamp-2 mt-0.5">
-                                        {item.message}
-                                    </span>
-                                    <span className="block text-[11px] text-text-tertiary mt-1">
-                                        {relativeTime(item.createdAt)}
-                                    </span>
-                                </span>
-                            </button>
+                                <div className="group flex items-stretch bg-accent-primary/5">
+                                    <button
+                                        onClick={() => handleSelect(item)}
+                                        className="flex-1 min-w-0 text-left px-4 py-3 hover:bg-bg-hover transition-colors flex items-start gap-3"
+                                    >
+                                        <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-accent-primary" />
+                                        <span className="flex-1 min-w-0">
+                                            <span className="block text-sm font-medium text-text-primary truncate">
+                                                {item.title}
+                                            </span>
+                                            <span className="block text-xs text-text-secondary line-clamp-2 mt-0.5">
+                                                {item.message}
+                                            </span>
+                                            <span className="block text-[11px] text-text-tertiary mt-1">
+                                                {relativeTime(item.createdAt)}
+                                            </span>
+                                        </span>
+                                    </button>
+                                    <button
+                                        onClick={() => void dismiss(item.id)}
+                                        title="Marcar como leída"
+                                        aria-label={`Marcar como leída: ${item.title}`}
+                                        className="shrink-0 px-3 text-text-tertiary hover:text-accent-success hover:bg-bg-hover transition-all opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100"
+                                    >
+                                        <Check className="h-4 w-4" />
+                                    </button>
+                                </div>
+                            </SwipeToDismiss>
                         ))
                     )}
                 </div>
