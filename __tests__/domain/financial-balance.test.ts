@@ -1,4 +1,4 @@
-import { computeNetBalance, sumCreditExpenses } from "@/domain/services/financial-balance";
+import { computeNetBalance, sumCreditExpenses, transactionTypeBucket } from "@/domain/services/financial-balance";
 import type { FinancialTransaction } from "@/domain/entities/financial";
 
 type Tx = Pick<FinancialTransaction, "type" | "amount" | "paidWithCredit" | "categoryName">;
@@ -35,6 +35,21 @@ describe("financial-balance", () => {
 
         it("returns 0 when there is no credit spending", () => {
             expect(sumCreditExpenses([income(1000), cashExpense(200), withdrawal(50)])).toBe(0);
+        });
+    });
+
+    describe("transactionTypeBucket", () => {
+        it("maps raw types to the four coarse buckets", () => {
+            expect(transactionTypeBucket("INCOME")).toBe("income");
+            expect(transactionTypeBucket("DEPOSIT")).toBe("income");
+            expect(transactionTypeBucket("REFUND")).toBe("income");
+            expect(transactionTypeBucket("WITHDRAWAL")).toBe("withdrawal");
+            expect(transactionTypeBucket("TRANSFER")).toBe("transfer");
+            expect(transactionTypeBucket("OTHER")).toBe("transfer");
+            expect(transactionTypeBucket("EXPENSE")).toBe("expense");
+            expect(transactionTypeBucket("PAYMENT")).toBe("expense");
+            expect(transactionTypeBucket("FEE")).toBe("expense");
+            expect(transactionTypeBucket("TAX")).toBe("expense");
         });
     });
 
