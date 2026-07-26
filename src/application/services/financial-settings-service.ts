@@ -7,10 +7,25 @@ import {
     IFinancialCategoryRepository,
     IFinancialTransactionRepository
 } from "@/domain/repositories/financial";
+import { transactionTypeBucket } from "../../domain/services/financial-balance";
+import { FinancialTransaction } from "../../domain/entities/financial";
 import { randomUUID } from "crypto";
 
 /** Name of the base ("system") category orphaned transactions fall back to. */
 const FALLBACK_CATEGORY_NAME = "otros";
+
+/** Per-entity transaction counts, split by coarse type bucket plus the total. */
+export interface TransactionTypeCounts {
+    income: number;
+    expense: number;
+    transfer: number;
+    withdrawal: number;
+    total: number;
+}
+
+function emptyCounts(): TransactionTypeCounts {
+    return { income: 0, expense: 0, transfer: 0, withdrawal: 0, total: 0 };
+}
 
 export class FinancialSettingsService {
     constructor(
@@ -278,5 +293,39 @@ export class FinancialSettingsService {
     private async findFallbackCategory(userId: UUID): Promise<FinancialCategory | undefined> {
         const all = await this.categoryRepo.findAllBaseAndUser(userId);
         return all.find(c => c.ownerUserId === null && c.name.trim().toLowerCase() === FALLBACK_CATEGORY_NAME);
+    }
+
+    // --- Transaction stats (settings cards) ---
+
+    /**
+     * Transaction counts per category, split by type bucket + total, keyed by
+     * category id. Counts the same set the transactions list shows (excludes
+     * DELETED/ARCHIVED). Meant to be loaded in the background.
+     */
+    async getCategoryTransactionStats(userId: UUID): Promise<Record<string, TransactionTypeCounts>> {
+        const transactions = await this.transactionRepo.findByOwnerId(userId);
+        return this.groupTypeCounts(transactions, t => t.categoryId);
+    }
+
+    /** Transaction counts per institution, split by type bucket + total, keyed by institution id. */
+    async getInstitutionTransactionStats(userId: UUID): Promise<Record<string, TransactionTypeCounts>> {
+        const transactions = await this.transactionRepo.findByOwnerId(userId);
+        return this.groupTypeCounts(transactions, t => t.institutionId);
+    }
+
+    private groupTypeCounts(
+        transactions: FinancialTransaction[],
+        keyOf: (t: FinancialTransaction) => UUID | null | undefined,
+    ): Record<string, TransactionTypeCounts> {
+        const out: Record<string, TransactionTypeCounts> = {};
+        for (const t of transactions) {
+            if (t.status === "DELETED" || t.status === "ARCHIVED") continue;
+            const key = keyOf(t);
+            if (!key) continue;
+            const bucket = (out[key] ??= emptyCounts());
+            bucket[transactionTypeBucket(t.type)] += 1;
+            bucket.total += 1;
+        }
+        return out;
     }
 }
