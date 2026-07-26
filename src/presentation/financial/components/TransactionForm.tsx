@@ -12,8 +12,9 @@ import { AccordionField } from "@/components/ui/accordion-field";
 import { Switch } from "@/components/ui/switch";
 import { DateTimeStepInput } from "@/components/ui/datetime-step-input";
 import { createTransactionAction } from "@/app/actions/financial-transactions";
-import { getInstitutionsAction, getAccountsAction, getCategoriesAction, getInstitutionTypesAction, updateInstitutionAction } from "@/app/actions/financial-settings";
-import { FinancialTransactionType, FinancialInstitution, FinancialInstitutionType, FinancialCategory } from "@/domain/entities/financial";
+import { updateInstitutionAction } from "@/app/actions/financial-settings";
+import { useTransactionFormOptions } from "../hooks/useTransactionFormOptions";
+import { FinancialTransactionType } from "@/domain/entities/financial";
 import { financialOfflineStore } from "@/infrastructure/offline/financial-offline-store";
 import { InstitutionPicker, type PendingInstitutionEdit } from "./InstitutionPicker";
 import { CategoryPicker } from "./CategoryPicker";
@@ -102,10 +103,18 @@ export function TransactionForm() {
     const [categoryName, setCategoryName] = useState("");
     const [paidWithCredit, setPaidWithCredit] = useState(false);
 
-    const [institutions, setInstitutions] = useState<FinancialInstitution[]>([]);
-    const [institutionTypes, setInstitutionTypes] = useState<FinancialInstitutionType[]>([]);
-    const [accountsList, setAccountsList] = useState<string[]>([]);
-    const [categories, setCategories] = useState<FinancialCategory[]>([]);
+    // Pickers' options come from a single resilient loader (see the hook): a
+    // partial failure used to leave them silently empty.
+    const {
+        institutions,
+        institutionTypes,
+        accounts,
+        categories,
+        error: optionsError,
+        setInstitutions,
+        setCategories,
+    } = useTransactionFormOptions();
+    const accountsList = accounts.map(a => a.name);
 
     const [institutionQuery, setInstitutionQuery] = useState("");
     const [categoryQuery, setCategoryQuery] = useState("");
@@ -115,22 +124,11 @@ export function TransactionForm() {
 
     const creditEligible = CREDIT_ELIGIBLE_TYPES.includes(type);
 
-    // Load draft and lists on mount
+    // Load the saved draft on mount (the pickers' options load on their own, so
+    // a settings failure can no longer take the draft down with it).
     useEffect(() => {
         const loadDraftAndData = async () => {
             try {
-                const [instRes, accRes, catRes, typesRes] = await Promise.all([
-                    getInstitutionsAction(),
-                    getAccountsAction(),
-                    getCategoriesAction(),
-                    getInstitutionTypesAction(),
-                ]);
-
-                setInstitutions(instRes);
-                setAccountsList(accRes.map(a => a.name));
-                setCategories(catRes.filter(c => !c.isDeleted));
-                setInstitutionTypes(typesRes);
-
                 const drafts = await financialOfflineStore.drafts.getAll();
                 const latestDraft = drafts.length > 0 ? drafts[drafts.length - 1] : null;
 
@@ -166,11 +164,16 @@ export function TransactionForm() {
                     }
                 }
             } catch (e) {
-                console.error("Failed to load transaction draft or settings", e);
+                console.error("Failed to load transaction draft", e);
             }
         };
         loadDraftAndData();
     }, []);
+
+    // Never let a failed load look like "you have no categories/institutions".
+    useEffect(() => {
+        if (optionsError) toast.error("No se pudieron cargar categorías e instituciones. Reintenta.");
+    }, [optionsError]);
 
     // Save draft when values change (debounced).
     useEffect(() => {

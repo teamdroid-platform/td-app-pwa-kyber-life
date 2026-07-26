@@ -2,7 +2,7 @@ import React from "react";
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { useRouter } from "next/navigation";
 import { TransactionForm } from "@/presentation/financial/components/TransactionForm";
-import { getInstitutionsAction, getAccountsAction, getCategoriesAction, getInstitutionTypesAction } from "@/app/actions/financial-settings";
+import { getTransactionFormOptionsAction } from "@/app/actions/financial-settings";
 import type { FinancialInstitution, FinancialCategory } from "@/domain/entities/financial";
 
 jest.mock("next/navigation", () => ({
@@ -14,10 +14,7 @@ jest.mock("@/app/actions/financial-transactions", () => ({
 }));
 
 jest.mock("@/app/actions/financial-settings", () => ({
-    getInstitutionsAction: jest.fn(),
-    getAccountsAction: jest.fn(),
-    getCategoriesAction: jest.fn(),
-    getInstitutionTypesAction: jest.fn(),
+    getTransactionFormOptionsAction: jest.fn(),
     updateInstitutionAction: jest.fn(),
     createInstitutionAction: jest.fn(),
     createCategoryAction: jest.fn(),
@@ -62,15 +59,15 @@ const CATEGORIES = [
 
 async function renderForm() {
     (useRouter as jest.Mock).mockReturnValue({ push: jest.fn(), back: jest.fn() });
-    (getInstitutionsAction as jest.Mock).mockResolvedValue(INSTITUTIONS);
-    (getAccountsAction as jest.Mock).mockResolvedValue([]);
-    (getCategoriesAction as jest.Mock).mockResolvedValue(CATEGORIES);
-    (getInstitutionTypesAction as jest.Mock).mockResolvedValue([]);
+    (getTransactionFormOptionsAction as jest.Mock).mockResolvedValue({
+        success: true,
+        data: { institutions: INSTITUTIONS, accounts: [], categories: CATEGORIES, institutionTypes: [] },
+    });
 
     render(<TransactionForm />);
 
     // Wait for the async settings load (Promise.all in the mount effect) to resolve.
-    await waitFor(() => expect(getInstitutionsAction).toHaveBeenCalled());
+    await waitFor(() => expect(getTransactionFormOptionsAction).toHaveBeenCalled());
 }
 
 function expandSection(label: string) {
@@ -147,13 +144,13 @@ describe("TransactionForm — Institución / Categoría suggestions", () => {
 
     it("guides the user to create the first institution when none exist yet", async () => {
         (useRouter as jest.Mock).mockReturnValue({ push: jest.fn(), back: jest.fn() });
-        (getInstitutionsAction as jest.Mock).mockResolvedValue([]);
-        (getAccountsAction as jest.Mock).mockResolvedValue([]);
-        (getCategoriesAction as jest.Mock).mockResolvedValue(CATEGORIES);
-        (getInstitutionTypesAction as jest.Mock).mockResolvedValue([]);
+        (getTransactionFormOptionsAction as jest.Mock).mockResolvedValue({
+            success: true,
+            data: { institutions: [], accounts: [], categories: CATEGORIES, institutionTypes: [] },
+        });
 
         render(<TransactionForm />);
-        await waitFor(() => expect(getInstitutionsAction).toHaveBeenCalled());
+        await waitFor(() => expect(getTransactionFormOptionsAction).toHaveBeenCalled());
 
         expandSection("Institución");
 
