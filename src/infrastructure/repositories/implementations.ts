@@ -176,6 +176,18 @@ export class InMemoryFinancialTransactionRepository extends InMemoryRepository<F
         }
         return affected.length;
     }
+
+    async countByInstitutionId(userId: UUID, institutionId: UUID): Promise<number> {
+        return (await this.findByOwnerId(userId)).filter(t => t.institutionId === institutionId).length;
+    }
+
+    async reassignInstitution(userId: UUID, fromInstitutionId: UUID, toInstitutionId: UUID | null): Promise<number> {
+        const affected = (await this.findByOwnerId(userId)).filter(t => t.institutionId === fromInstitutionId);
+        for (const t of affected) {
+            await this.update({ ...t, institutionId: toInstitutionId, updatedAt: new Date().toISOString() });
+        }
+        return affected.length;
+    }
 }
 
 export class InMemoryUserRepository extends InMemoryRepository<User> implements IUserRepository {

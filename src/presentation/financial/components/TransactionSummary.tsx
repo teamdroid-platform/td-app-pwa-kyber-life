@@ -4,7 +4,7 @@ import { useMemo, useState, useEffect } from "react";
 import { AreaChart, Area, ResponsiveContainer, YAxis, XAxis, Tooltip, CartesianGrid, PieChart, Pie, Cell, BarChart, Bar, LabelList } from 'recharts';
 import { ChevronDown, BarChart2, TrendingUp, TrendingDown, Wallet, ArrowRightLeft, Scale, PieChart as PieChartIcon, BarChart3 as BarChartIcon, type LucideIcon } from "lucide-react";
 import type { FinancialTransaction, FinancialTransactionType } from "@/domain/entities/financial";
-import { computeNetBalance } from "@/domain/services/financial-balance";
+import { computeNetBalance, sumCreditExpenses } from "@/domain/services/financial-balance";
 import { cn } from "@/lib/utils";
 import {
     Select,
@@ -160,10 +160,12 @@ export function TransactionSummary({ transactions }: TransactionSummaryProps) {
         // Ordenar cronológicamente para el gráfico
         const chartData = Object.values(chartDataMap).sort((a, b) => a.timestamp - b.timestamp);
 
-        // Single source of truth for "Balance", shared with the rest of the module.
-        // Credit-card-paid expenses never affect it either way, so this is
-        // identical whether computed from the full or the filtered list.
-        const finalBalance = computeNetBalance(effectiveTransactions);
+        // Balance defers credit-card-paid expenses by default. With the "Incluir
+        // TC" toggle ON, the user wants those expenses to count against the
+        // balance too, so subtract them; OFF keeps them deferred (excluded).
+        const finalBalance = Math.round(
+            (computeNetBalance(effectiveTransactions) - (showCredit ? sumCreditExpenses(transactions) : 0)) * 100,
+        ) / 100;
 
         return {
             balance: finalBalance,
@@ -174,7 +176,7 @@ export function TransactionSummary({ transactions }: TransactionSummaryProps) {
             totalOther: otherSum,
             totalWithdrawal: withdrawalSum
         };
-    }, [effectiveTransactions, viewMode]);
+    }, [effectiveTransactions, viewMode, transactions, showCredit]);
 
     if (transactions.length === 0) return null;
 
