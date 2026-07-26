@@ -26,22 +26,25 @@ export function TransactionCountSummary({ counts, loading, className }: Transact
         return <span className={cn("text-[11px] text-muted-foreground/70", className)}>Sin transacciones</span>;
     }
 
-    const active = TYPE_BUCKET_ORDER.filter((b) => (counts![b] ?? 0) > 0);
-
     return (
         <div className={cn("flex items-center gap-x-2 gap-y-1 flex-wrap", className)}>
-            {active.map((b) => {
+            {/* Show every type bucket, even when a type has 0. */}
+            {TYPE_BUCKET_ORDER.map((b) => {
                 const meta = TYPE_BUCKET_META[b];
                 const Icon = meta.icon;
+                const n = counts![b] ?? 0;
                 return (
                     <span
                         key={b}
-                        title={`${meta.label}: ${counts![b]}`}
-                        className="inline-flex items-center gap-0.5 text-[11px] font-semibold tabular-nums"
+                        title={`${meta.label}: ${n}`}
+                        className={cn(
+                            "inline-flex items-center gap-0.5 text-[11px] font-semibold tabular-nums",
+                            n === 0 && "opacity-40",
+                        )}
                         style={{ color: meta.color }}
                     >
                         <Icon className="w-3 h-3 shrink-0" />
-                        {counts![b]}
+                        {n}
                     </span>
                 );
             })}

@@ -18,7 +18,7 @@ import * as Icons from "lucide-react";
 import { normalizeForMatch } from "@/lib/institution-match";
 import { SettingsListControls } from "./SettingsListControls";
 import { TransactionCountSummary } from "./TransactionCountSummary";
-import { sortSettingsItems, type SettingsSortMode } from "../../lib/transaction-type-buckets";
+import { sortSettingsItems, type SettingsSortMode, type SortDirection } from "../../lib/transaction-type-buckets";
 
 interface CategoryManagerProps {
     initialData: FinancialCategory[];
@@ -38,6 +38,7 @@ export function CategoryManager({ initialData }: CategoryManagerProps) {
     // Search / sort + background transaction stats
     const [query, setQuery] = useState("");
     const [sort, setSort] = useState<SettingsSortMode>("name");
+    const [direction, setDirection] = useState<SortDirection>("asc");
     const [stats, setStats] = useState<Record<string, TransactionTypeCounts> | null>(null);
 
     // Load per-category transaction counts in the background so the initial
@@ -148,10 +149,10 @@ export function CategoryManager({ initialData }: CategoryManagerProps) {
         const nq = normalizeForMatch(query);
         const matched = nq ? visibleCategories.filter(c => normalizeForMatch(c.name).includes(nq)) : visibleCategories;
         return {
-            myCategories: sortSettingsItems(matched.filter(c => c.ownerUserId !== null), sort, stats),
-            systemCategories: sortSettingsItems(matched.filter(c => c.ownerUserId === null), sort, stats),
+            myCategories: sortSettingsItems(matched.filter(c => c.ownerUserId !== null), sort, stats, direction),
+            systemCategories: sortSettingsItems(matched.filter(c => c.ownerUserId === null), sort, stats, direction),
         };
-    }, [visibleCategories, query, sort, stats]);
+    }, [visibleCategories, query, sort, stats, direction]);
 
     const resolveIcon = (name?: string | null): LucideIcon => {
         if (name && name in Icons) {
@@ -167,14 +168,14 @@ export function CategoryManager({ initialData }: CategoryManagerProps) {
         return (
             <div key={cat.id} className="p-4 border rounded-xl bg-card shadow-sm flex flex-col gap-3 group hover:border-primary/50 hover:shadow-md transition-all">
                 <div className="flex justify-between items-start gap-2">
-                    <div className="flex items-center gap-3 min-w-0">
+                    <div className="flex items-start gap-3 min-w-0">
                         <div
                             className="w-11 h-11 shrink-0 rounded-full flex items-center justify-center opacity-90 shadow-sm"
                             style={{ backgroundColor: `${cat.color || '#3b82f6'}25`, color: cat.color || '#3b82f6' }}
                         >
                             <IconComponent className="w-5 h-5" />
                         </div>
-                        <h3 className="font-semibold text-base text-card-foreground truncate" title={cat.name}>
+                        <h3 className="font-semibold text-base text-card-foreground leading-snug break-words" title={cat.name}>
                             {cat.name}
                         </h3>
                     </div>
@@ -263,6 +264,8 @@ export function CategoryManager({ initialData }: CategoryManagerProps) {
                     onQueryChange={setQuery}
                     sort={sort}
                     onSortChange={setSort}
+                    direction={direction}
+                    onDirectionChange={setDirection}
                     placeholder="Buscar categoría…"
                 />
 

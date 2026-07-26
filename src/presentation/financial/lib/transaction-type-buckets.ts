@@ -14,6 +14,7 @@ export const TYPE_BUCKET_META: Record<TransactionTypeBucket, { label: string; co
 };
 
 export type SettingsSortMode = "name" | "count" | "type";
+export type SortDirection = "asc" | "desc";
 
 export const SETTINGS_SORT_OPTIONS: { value: SettingsSortMode; label: string }[] = [
     { value: "name", label: "Nombre" },
@@ -36,34 +37,36 @@ function dominantRank(counts?: TransactionTypeCounts): number {
 }
 
 /**
- * Sort settings entities (categories / institutions) by the chosen mode:
- *   - "name":  alphabetical.
- *   - "count": by total transactions (desc), name as tiebreak.
- *   - "type":  grouped by dominant type bucket, then total (desc), then name.
- * Falls back to name while stats are still loading.
+ * Sort settings entities (categories / institutions) by the chosen mode, in the
+ * given direction. The comparators define the *ascending* order:
+ *   - "name":  A→Z.
+ *   - "count": fewest → most total transactions (name as tiebreak).
+ *   - "type":  by dominant type bucket, then fewest → most, then name.
+ * `direction: "desc"` reverses the result. Falls back to name while stats load.
  */
 export function sortSettingsItems<T extends { id?: string | null; name: string }>(
     items: T[],
     mode: SettingsSortMode,
     statsById: Record<string, TransactionTypeCounts> | null,
+    direction: SortDirection = "asc",
 ): T[] {
     const byName = (a: T, b: T) => a.name.localeCompare(b.name, "es", { sensitivity: "base" });
-    const sorted = [...items];
     const countOf = (t: T) => (t.id && statsById ? statsById[t.id]?.total ?? 0 : 0);
 
-    if (mode === "name" || !statsById) return sorted.sort(byName);
-
-    if (mode === "count") {
-        return sorted.sort((a, b) => countOf(b) - countOf(a) || byName(a, b));
+    let cmp: (a: T, b: T) => number;
+    if (mode === "name" || !statsById) {
+        cmp = byName;
+    } else if (mode === "count") {
+        cmp = (a, b) => countOf(a) - countOf(b) || byName(a, b);
+    } else {
+        cmp = (a, b) => {
+            const ra = dominantRank(a.id ? statsById[a.id] : undefined);
+            const rb = dominantRank(b.id ? statsById[b.id] : undefined);
+            if (ra !== rb) return ra - rb;
+            return countOf(a) - countOf(b) || byName(a, b);
+        };
     }
 
-    // "type"
-    return sorted.sort((a, b) => {
-        const sa = a.id ? statsById[a.id] : undefined;
-        const sb = b.id ? statsById[b.id] : undefined;
-        const ra = dominantRank(sa);
-        const rb = dominantRank(sb);
-        if (ra !== rb) return ra - rb;
-        return (sb?.total ?? 0) - (sa?.total ?? 0) || byName(a, b);
-    });
+    const sorted = [...items].sort(cmp);
+    return direction === "desc" ? sorted.reverse() : sorted;
 }
