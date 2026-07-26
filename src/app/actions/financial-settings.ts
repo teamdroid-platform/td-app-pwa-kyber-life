@@ -59,6 +59,16 @@ export async function getInstitutionTransactionCountAction(id: UUID) {
     return financialSettingsService.getInstitutionTransactionCount(user.id, id);
 }
 
+export async function getInstitutionTransactionStatsAction() {
+    const user = await getRequiredUser();
+    return financialSettingsService.getInstitutionTransactionStats(user.id);
+}
+
+export async function getCategoryTransactionStatsAction() {
+    const user = await getRequiredUser();
+    return financialSettingsService.getCategoryTransactionStats(user.id);
+}
+
 export async function mergeInstitutionAction(sourceId: UUID, targetId: UUID) {
     const user = await getRequiredUser();
     const result = await financialSettingsService.mergeInstitution(user.id, sourceId, targetId);

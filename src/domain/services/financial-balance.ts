@@ -26,6 +26,24 @@ export function isOtherType(type: FinancialTransactionType): boolean {
     return type === "TRANSFER" || type === "OTHER";
 }
 
+/** The four coarse buckets used across the UI (tabs, summary, settings counts). */
+export type TransactionTypeBucket = "income" | "expense" | "transfer" | "withdrawal";
+
+/**
+ * Map a raw transaction type to its coarse bucket, matching the visual grouping
+ * used everywhere else (income/expense/transfer/withdrawal):
+ *   - income:     INCOME, DEPOSIT, REFUND
+ *   - withdrawal: WITHDRAWAL
+ *   - transfer:   TRANSFER, OTHER
+ *   - expense:    everything else (EXPENSE, PAYMENT, FEE, TAX)
+ */
+export function transactionTypeBucket(type: FinancialTransactionType): TransactionTypeBucket {
+    if (isIncomeType(type)) return "income";
+    if (isWithdrawalType(type)) return "withdrawal";
+    if (isOtherType(type)) return "transfer";
+    return "expense";
+}
+
 type BalanceTransaction = Pick<FinancialTransaction, "type" | "amount" | "categoryId" | "categoryName" | "paidWithCredit">;
 
 function resolveCategoryName(t: BalanceTransaction, categoryNameById?: ReadonlyMap<string, string>): string | undefined {

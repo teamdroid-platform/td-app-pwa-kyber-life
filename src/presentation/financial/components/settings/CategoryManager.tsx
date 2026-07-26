@@ -1,11 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
+import Link from "next/link";
 import { FinancialCategory } from "@/domain/entities/financial";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Edit2, Trash2, Tags, Lock, UserRound, type LucideIcon } from "lucide-react";
-import { createCategoryAction, updateCategoryAction, deleteCategoryAction, getCategoryTransactionCountAction } from "@/app/actions/financial-settings";
+import { Plus, Edit2, Trash2, Tags, Lock, UserRound, ArrowUpRight, type LucideIcon } from "lucide-react";
+import { createCategoryAction, updateCategoryAction, deleteCategoryAction, getCategoryTransactionCountAction, getCategoryTransactionStatsAction } from "@/app/actions/financial-settings";
+import type { TransactionTypeCounts } from "@/application/services/financial-settings-service";
 import { FormSheet } from "@/components/ui/form-sheet";
 import { ConfirmationModal } from "@/components/ui/confirmation-modal";
 import { Field } from "@/components/ui/field";
@@ -13,6 +15,10 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { UUID } from "@/domain/core";
 import * as Icons from "lucide-react";
+import { normalizeForMatch } from "@/lib/institution-match";
+import { SettingsListControls } from "./SettingsListControls";
+import { TransactionCountSummary } from "./TransactionCountSummary";
+import { sortSettingsItems, type SettingsSortMode, type SortDirection } from "../../lib/transaction-type-buckets";
 
 interface CategoryManagerProps {
     initialData: FinancialCategory[];
@@ -28,6 +34,22 @@ export function CategoryManager({ initialData }: CategoryManagerProps) {
     const [deletingCat, setDeletingCat] = useState<FinancialCategory | null>(null);
     const [deleteCount, setDeleteCount] = useState<number | null>(null); // null while counting
     const [isDeleting, setIsDeleting] = useState(false);
+
+    // Search / sort + background transaction stats
+    const [query, setQuery] = useState("");
+    const [sort, setSort] = useState<SettingsSortMode>("name");
+    const [direction, setDirection] = useState<SortDirection>("asc");
+    const [stats, setStats] = useState<Record<string, TransactionTypeCounts> | null>(null);
+
+    // Load per-category transaction counts in the background so the initial
+    // render (names + actions) is never blocked.
+    useEffect(() => {
+        let active = true;
+        getCategoryTransactionStatsAction()
+            .then((res) => { if (active) setStats(res); })
+            .catch(() => { if (active) setStats({}); });
+        return () => { active = false; };
+    }, []);
 
     useEffect(() => {
         setCategories(initialData);
@@ -120,10 +142,17 @@ export function CategoryManager({ initialData }: CategoryManagerProps) {
             : "¿Seguro que deseas eliminar esta categoría? Esta acción no se puede deshacer.";
 
     // Split into user-owned vs. system (base) categories so each group is shown
-    // under its own heading and the user can tell them apart at a glance.
+    // under its own heading and the user can tell them apart at a glance. Apply
+    // the name search + the chosen sort within each group.
     const visibleCategories = categories.filter(c => !c.isDeleted);
-    const myCategories = visibleCategories.filter(c => c.ownerUserId !== null);
-    const systemCategories = visibleCategories.filter(c => c.ownerUserId === null);
+    const { myCategories, systemCategories } = useMemo(() => {
+        const nq = normalizeForMatch(query);
+        const matched = nq ? visibleCategories.filter(c => normalizeForMatch(c.name).includes(nq)) : visibleCategories;
+        return {
+            myCategories: sortSettingsItems(matched.filter(c => c.ownerUserId !== null), sort, stats, direction),
+            systemCategories: sortSettingsItems(matched.filter(c => c.ownerUserId === null), sort, stats, direction),
+        };
+    }, [visibleCategories, query, sort, stats, direction]);
 
     const resolveIcon = (name?: string | null): LucideIcon => {
         if (name && name in Icons) {
@@ -135,17 +164,18 @@ export function CategoryManager({ initialData }: CategoryManagerProps) {
     const renderCategoryCard = (cat: FinancialCategory) => {
         const IconComponent = resolveIcon(cat.icon);
         const isSystem = cat.ownerUserId === null;
+        const counts = cat.id && stats ? stats[cat.id] : undefined;
         return (
-            <div key={cat.id} className="p-5 border rounded-xl bg-card shadow-sm flex flex-col gap-2 group hover:border-primary/50 hover:shadow-md transition-all">
-                <div className="flex justify-between items-start">
-                    <div className="flex items-center gap-4 min-w-0">
+            <div key={cat.id} className="p-4 border rounded-xl bg-card shadow-sm flex flex-col gap-3 group hover:border-primary/50 hover:shadow-md transition-all">
+                <div className="flex justify-between items-start gap-2">
+                    <div className="flex items-start gap-3 min-w-0">
                         <div
-                            className="w-12 h-12 shrink-0 rounded-full flex items-center justify-center opacity-90 shadow-sm"
+                            className="w-11 h-11 shrink-0 rounded-full flex items-center justify-center opacity-90 shadow-sm"
                             style={{ backgroundColor: `${cat.color || '#3b82f6'}25`, color: cat.color || '#3b82f6' }}
                         >
-                            <IconComponent className="w-6 h-6" />
+                            <IconComponent className="w-5 h-5" />
                         </div>
-                        <h3 className="font-semibold text-base text-card-foreground truncate">
+                        <h3 className="font-semibold text-base text-card-foreground leading-snug break-words" title={cat.name}>
                             {cat.name}
                         </h3>
                     </div>
@@ -154,14 +184,26 @@ export function CategoryManager({ initialData }: CategoryManagerProps) {
                             <Lock className="w-4 h-4" />
                         </span>
                     ) : (
-                        <div className="flex gap-1 shrink-0 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-blue-500 hover:bg-blue-500/10" onClick={() => handleOpenDialog(cat)}>
+                        <div className="flex gap-0.5 shrink-0 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-blue-500 hover:bg-blue-500/10" title="Editar" onClick={() => handleOpenDialog(cat)}>
                                 <Edit2 className="w-4 h-4" />
                             </Button>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-red-500 hover:bg-red-500/10" onClick={() => handleDeleteRequest(cat)}>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-red-500 hover:bg-red-500/10" title="Eliminar" onClick={() => handleDeleteRequest(cat)}>
                                 <Trash2 className="w-4 h-4" />
                             </Button>
                         </div>
+                    )}
+                </div>
+                <div className="flex items-center justify-between gap-2 pt-2.5 border-t border-border/40">
+                    <TransactionCountSummary counts={counts} loading={stats === null} className="min-w-0" />
+                    {counts && counts.total > 0 && (
+                        <Link
+                            href={`/financial/transactions?categoryId=${cat.id}&range=all`}
+                            className="shrink-0 inline-flex items-center gap-1 text-xs font-medium text-accent-primary hover:underline"
+                            title="Ver transacciones de esta categoría"
+                        >
+                            Ver <ArrowUpRight className="w-3.5 h-3.5" />
+                        </Link>
                     )}
                 </div>
             </div>
@@ -217,6 +259,16 @@ export function CategoryManager({ initialData }: CategoryManagerProps) {
                 </div>
             </CardHeader>
             <CardContent className="px-0 space-y-8">
+                <SettingsListControls
+                    query={query}
+                    onQueryChange={setQuery}
+                    sort={sort}
+                    onSortChange={setSort}
+                    direction={direction}
+                    onDirectionChange={setDirection}
+                    placeholder="Buscar categoría…"
+                />
+
                 {/* ── Mis categorías (creadas por el usuario) ───────────── */}
                 <section className="space-y-4">
                     <div className="flex items-center gap-2">
@@ -225,6 +277,9 @@ export function CategoryManager({ initialData }: CategoryManagerProps) {
                         <span className="text-xs text-muted-foreground">({myCategories.length})</span>
                     </div>
                     {myCategories.length === 0 ? (
+                        query ? (
+                            <p className="text-center text-sm text-muted-foreground py-8">Ninguna categoría propia coincide con «{query}».</p>
+                        ) : (
                         <div className="text-center py-10 text-muted-foreground border border-dashed rounded-xl bg-muted/30">
                             <Tags className="w-9 h-9 mx-auto mb-3 opacity-20" />
                             <p className="font-medium text-foreground">Aún no has creado categorías propias</p>
@@ -234,6 +289,7 @@ export function CategoryManager({ initialData }: CategoryManagerProps) {
                                 Crear categoría
                             </Button>
                         </div>
+                        )
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                             {myCategories.map(renderCategoryCard)}
