@@ -1,20 +1,32 @@
 "use client";
 
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, ArrowUpDown } from "lucide-react";
-import { SETTINGS_SORT_OPTIONS, type SettingsSortMode } from "../../lib/transaction-type-buckets";
+import { Search, ArrowUpDown, ArrowDownNarrowWide, ArrowUpNarrowWide } from "lucide-react";
+import { SETTINGS_SORT_OPTIONS, type SettingsSortMode, type SortDirection } from "../../lib/transaction-type-buckets";
 
 interface SettingsListControlsProps {
     query: string;
     onQueryChange: (value: string) => void;
     sort: SettingsSortMode;
     onSortChange: (value: SettingsSortMode) => void;
+    direction: SortDirection;
+    onDirectionChange: (value: SortDirection) => void;
     placeholder?: string;
 }
 
-/** Shared search-by-name + sort toolbar for the settings list managers. */
-export function SettingsListControls({ query, onQueryChange, sort, onSortChange, placeholder = "Buscar por nombre…" }: SettingsListControlsProps) {
+/** Shared search-by-name + sort (with asc/desc direction) toolbar for the settings managers. */
+export function SettingsListControls({
+    query,
+    onQueryChange,
+    sort,
+    onSortChange,
+    direction,
+    onDirectionChange,
+    placeholder = "Buscar por nombre…",
+}: SettingsListControlsProps) {
+    const isAsc = direction === "asc";
     return (
         <div className="flex items-center gap-2 mb-5">
             <div className="relative flex-1 min-w-0">
@@ -28,7 +40,7 @@ export function SettingsListControls({ query, onQueryChange, sort, onSortChange,
                 />
             </div>
             <Select value={sort} onValueChange={(v) => onSortChange(v as SettingsSortMode)}>
-                <SelectTrigger className="h-9 w-[130px] sm:w-[190px] shrink-0 rounded-lg bg-muted/40 border-border/40" aria-label="Ordenar">
+                <SelectTrigger className="h-9 w-[120px] sm:w-[180px] shrink-0 rounded-lg bg-muted/40 border-border/40" aria-label="Ordenar por">
                     <ArrowUpDown className="w-3.5 h-3.5 mr-1 text-muted-foreground shrink-0" />
                     <SelectValue />
                 </SelectTrigger>
@@ -38,6 +50,17 @@ export function SettingsListControls({ query, onQueryChange, sort, onSortChange,
                     ))}
                 </SelectContent>
             </Select>
+            <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-9 w-9 shrink-0 rounded-lg bg-muted/40 border-border/40"
+                onClick={() => onDirectionChange(isAsc ? "desc" : "asc")}
+                aria-label={isAsc ? "Orden ascendente (cambiar a descendente)" : "Orden descendente (cambiar a ascendente)"}
+                title={isAsc ? "Ascendente" : "Descendente"}
+            >
+                {isAsc ? <ArrowUpNarrowWide className="w-4 h-4" /> : <ArrowDownNarrowWide className="w-4 h-4" />}
+            </Button>
         </div>
     );
 }

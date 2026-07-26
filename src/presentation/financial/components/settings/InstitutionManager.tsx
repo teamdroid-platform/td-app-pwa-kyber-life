@@ -18,7 +18,7 @@ import * as Icons from "lucide-react";
 import { normalizeForMatch } from "@/lib/institution-match";
 import { SettingsListControls } from "./SettingsListControls";
 import { TransactionCountSummary } from "./TransactionCountSummary";
-import { sortSettingsItems, type SettingsSortMode } from "../../lib/transaction-type-buckets";
+import { sortSettingsItems, type SettingsSortMode, type SortDirection } from "../../lib/transaction-type-buckets";
 
 interface InstitutionManagerProps {
     initialData: FinancialInstitution[];
@@ -41,6 +41,7 @@ export function InstitutionManager({ initialData, institutionTypes }: Institutio
     // Search / sort + background transaction stats
     const [query, setQuery] = useState("");
     const [sort, setSort] = useState<SettingsSortMode>("name");
+    const [direction, setDirection] = useState<SortDirection>("asc");
     const [stats, setStats] = useState<Record<string, TransactionTypeCounts> | null>(null);
 
     // Load per-institution transaction counts in the background so the initial
@@ -192,8 +193,8 @@ export function InstitutionManager({ initialData, institutionTypes }: Institutio
     const visibleInstitutions = useMemo(() => {
         const nq = normalizeForMatch(query);
         const filtered = nq ? activeInstitutions.filter(i => normalizeForMatch(i.name).includes(nq)) : activeInstitutions;
-        return sortSettingsItems(filtered, sort, stats);
-    }, [activeInstitutions, query, sort, stats]);
+        return sortSettingsItems(filtered, sort, stats, direction);
+    }, [activeInstitutions, query, sort, stats, direction]);
 
     return (
         <Card className="border-none shadow-none bg-transparent">
@@ -271,6 +272,8 @@ export function InstitutionManager({ initialData, institutionTypes }: Institutio
                         onQueryChange={setQuery}
                         sort={sort}
                         onSortChange={setSort}
+                        direction={direction}
+                        onDirectionChange={setDirection}
                         placeholder="Buscar institución…"
                     />
                     {visibleInstitutions.length === 0 ? (
@@ -287,13 +290,13 @@ export function InstitutionManager({ initialData, institutionTypes }: Institutio
                             return (
                                 <div key={inst.id} className="p-4 border rounded-xl bg-card shadow-sm flex flex-col gap-3 group hover:border-primary/50 hover:shadow-md transition-all">
                                     <div className="flex items-start justify-between gap-2">
-                                        <div className="flex items-center gap-3 min-w-0">
+                                        <div className="flex items-start gap-3 min-w-0">
                                             <div className="w-11 h-11 shrink-0 rounded-full bg-primary/10 flex items-center justify-center text-primary">
                                                 <IconComponent className="w-5 h-5" />
                                             </div>
                                             <div className="min-w-0">
-                                                <h3 className="font-semibold text-base text-card-foreground truncate" title={inst.name}>{inst.name}</h3>
-                                                <p className="text-xs text-muted-foreground mt-0.5 capitalize truncate">{label}</p>
+                                                <h3 className="font-semibold text-base text-card-foreground leading-snug break-words" title={inst.name}>{inst.name}</h3>
+                                                <p className="text-xs text-muted-foreground mt-0.5 capitalize">{label}</p>
                                             </div>
                                         </div>
                                         <div className="flex gap-0.5 shrink-0 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity">
