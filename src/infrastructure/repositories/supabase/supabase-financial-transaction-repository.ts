@@ -139,6 +139,31 @@ export class SupabaseFinancialTransactionRepository implements IFinancialTransac
         return data?.length ?? 0;
     }
 
+    async countByInstitutionId(userId: UUID, institutionId: UUID): Promise<number> {
+        const supabase = await createClient();
+        const { count, error } = await supabase
+            .from('financial_transactions')
+            .select('id', { count: 'exact', head: true })
+            .eq('owner_user_id', userId)
+            .eq('institution_id', institutionId);
+
+        if (error) throw new Error(`Error counting transactions by institution: ${error.message}`);
+        return count ?? 0;
+    }
+
+    async reassignInstitution(userId: UUID, fromInstitutionId: UUID, toInstitutionId: UUID | null): Promise<number> {
+        const supabase = await createClient();
+        const { data, error } = await supabase
+            .from('financial_transactions')
+            .update({ institution_id: toInstitutionId, updated_at: new Date().toISOString() })
+            .eq('owner_user_id', userId)
+            .eq('institution_id', fromInstitutionId)
+            .select('id');
+
+        if (error) throw new Error(`Error reassigning transactions institution: ${error.message}`);
+        return data?.length ?? 0;
+    }
+
     async findRecent(userId: UUID, limit: number): Promise<FinancialTransaction[]> {
         const supabase = await createClient();
         const { data, error } = await supabase

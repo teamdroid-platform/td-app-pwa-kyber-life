@@ -25,6 +25,13 @@ export interface IFinancialTransactionRepository extends IRepository<FinancialTr
      * `toCategoryId` (or null to un-categorize). Returns how many were updated.
      */
     reassignCategory(userId: UUID, fromCategoryId: UUID, toCategoryId: UUID | null): Promise<number>;
+    /** Number of transactions owned by the user that reference the given institution. */
+    countByInstitutionId(userId: UUID, institutionId: UUID): Promise<number>;
+    /**
+     * Move every transaction owned by the user from `fromInstitutionId` to
+     * `toInstitutionId` (or null). Returns how many were updated.
+     */
+    reassignInstitution(userId: UUID, fromInstitutionId: UUID, toInstitutionId: UUID | null): Promise<number>;
 }
 
 export interface ScanExecutionDateFilter {

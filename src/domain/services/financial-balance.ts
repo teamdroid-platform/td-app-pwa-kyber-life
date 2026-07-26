@@ -79,3 +79,25 @@ export function computeNetBalance(
 
     return Math.round(balance * 100) / 100;
 }
+
+/**
+ * Total of expenses paid with a credit card — the amount {@link computeNetBalance}
+ * defers from the available balance. Subtract it from the net balance to get the
+ * balance "as if the card were already paid" (the "Incluir gastos con tarjeta"
+ * toggle ON). Only expense-like transactions can be `paidWithCredit`; income,
+ * withdrawals and transfers are ignored.
+ */
+export function sumCreditExpenses(transactions: readonly BalanceTransaction[]): number {
+    let sum = 0;
+    for (const t of transactions) {
+        if (
+            t.paidWithCredit &&
+            !isIncomeType(t.type) &&
+            !isWithdrawalType(t.type) &&
+            t.type !== "TRANSFER"
+        ) {
+            sum += Number(t.amount);
+        }
+    }
+    return Math.round(sum * 100) / 100;
+}
