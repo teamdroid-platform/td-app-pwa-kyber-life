@@ -9,11 +9,13 @@ function formatZodError(error: z.ZodError): string {
     return error.issues.map((e: z.ZodIssue) => `${e.path.join(".")}: ${e.message}`).join("; ");
 }
 
-export async function listNotificationsAction(limit?: number) {
+export async function listNotificationsAction(limit?: number, unreadOnly?: boolean) {
     try {
-        const validated = listNotificationsSchema.parse({ limit });
+        const validated = listNotificationsSchema.parse({ limit, unreadOnly });
         const userId = await requireUserId();
-        const data = await notificationService.listRecent(userId, validated.limit);
+        const data = validated.unreadOnly
+            ? await notificationService.listUnread(userId, validated.limit)
+            : await notificationService.listRecent(userId, validated.limit);
         return { success: true, data };
     } catch (error) {
         if (error instanceof z.ZodError) {

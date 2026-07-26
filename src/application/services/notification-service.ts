@@ -9,6 +9,15 @@ export class NotificationService {
         return this.notificationRepo.findByOwnerId(userId, limit);
     }
 
+    /**
+     * Pending notifications only. Once a notification is read (tapped, swiped
+     * away or marked read in bulk) it is dismissed for good and never listed
+     * again — this is what the bell shows.
+     */
+    async listUnread(userId: UUID, limit = 20): Promise<Notification[]> {
+        return this.notificationRepo.findByOwnerId(userId, limit, { unreadOnly: true });
+    }
+
     async unreadCount(userId: UUID): Promise<number> {
         return this.notificationRepo.countUnread(userId);
     }

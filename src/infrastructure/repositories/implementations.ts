@@ -1,6 +1,6 @@
 import { InMemoryRepository } from "./in-memory-repository";
 import { User, Supermarket, Category, Unit, GenericItem, BrandProduct, Template, TemplateItem, Purchase, PurchaseLine, PriceObservation, PasswordResetToken, FinancialTransaction, FinancialTransactionAuditLog, FinancialScanExecution, FinancialScannerTransaction, FinancialInstitution, FinancialInstitutionType, FinancialAccount, FinancialCategory, Notification, PushSubscription } from "@/domain/entities";
-import { IUserRepository, ISupermarketRepository, ICategoryRepository, IUnitRepository, IGenericItemRepository, IBrandProductRepository, ITemplateRepository, ITemplateItemRepository, IPurchaseRepository, IPurchaseLineRepository, IPriceObservationRepository, IPasswordResetTokenRepository, IFinancialTransactionRepository, IFinancialTransactionAuditLogRepository, IFinancialScanExecutionRepository, IFinancialScannerTransactionRepository, IFinancialInstitutionTypeRepository, IFinancialInstitutionRepository, IFinancialAccountRepository, IFinancialCategoryRepository, INotificationRepository, IPushSubscriptionRepository } from "@/domain/repositories";
+import { IUserRepository, ISupermarketRepository, ICategoryRepository, IUnitRepository, IGenericItemRepository, IBrandProductRepository, ITemplateRepository, ITemplateItemRepository, IPurchaseRepository, IPurchaseLineRepository, IPriceObservationRepository, IPasswordResetTokenRepository, IFinancialTransactionRepository, IFinancialTransactionAuditLogRepository, IFinancialScanExecutionRepository, IFinancialScannerTransactionRepository, IFinancialInstitutionTypeRepository, IFinancialInstitutionRepository, IFinancialAccountRepository, IFinancialCategoryRepository, INotificationRepository, IPushSubscriptionRepository, NotificationQueryOptions } from "@/domain/repositories";
 import { UUID } from "@/domain/core";
 import { PaginationParams, PaginatedResult, TransactionSearchFilters } from "@/domain/pagination";
 
@@ -373,9 +373,9 @@ export class InMemoryPriceObservationRepository implements IPriceObservationRepo
 }
 
 export class InMemoryNotificationRepository extends InMemoryRepository<Notification> implements INotificationRepository {
-    async findByOwnerId(userId: UUID, limit = 20): Promise<Notification[]> {
+    async findByOwnerId(userId: UUID, limit = 20, options?: NotificationQueryOptions): Promise<Notification[]> {
         return (await this.findAll())
-            .filter(n => n.ownerUserId === userId)
+            .filter(n => n.ownerUserId === userId && (!options?.unreadOnly || !n.isRead))
             .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
             .slice(0, limit);
     }

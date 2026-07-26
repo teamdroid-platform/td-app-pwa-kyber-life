@@ -54,6 +54,26 @@ describe("NotificationService", () => {
         });
     });
 
+    describe("listUnread", () => {
+        it("asks the repository for unread notifications only", async () => {
+            const pending = [buildNotification()];
+            notificationRepoMock.findByOwnerId.mockResolvedValue(pending);
+
+            const result = await service.listUnread(mockUserId, 10);
+
+            expect(notificationRepoMock.findByOwnerId).toHaveBeenCalledWith(mockUserId, 10, { unreadOnly: true });
+            expect(result).toEqual(pending);
+        });
+
+        it("defaults to a limit of 20 when not provided", async () => {
+            notificationRepoMock.findByOwnerId.mockResolvedValue([]);
+
+            await service.listUnread(mockUserId);
+
+            expect(notificationRepoMock.findByOwnerId).toHaveBeenCalledWith(mockUserId, 20, { unreadOnly: true });
+        });
+    });
+
     describe("unreadCount", () => {
         it("returns the repository's unread count", async () => {
             notificationRepoMock.countUnread.mockResolvedValue(3);
