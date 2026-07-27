@@ -106,6 +106,41 @@ export async function getCategoriesAction() {
     return financialSettingsService.getCategories(user.id);
 }
 
+/**
+ * Everything the transaction forms need to populate their pickers, in ONE
+ * server action.
+ *
+ * Why a single call: each server action is its own HTTP request, so firing four
+ * of them in parallel from the client means four independent `auth.getUser()`
+ * calls. With an expired access token they all try to refresh at once and — as
+ * Supabase rotates (one-time-uses) the refresh token — the losers fail with
+ * "Unauthorized", which used to blank out the pickers. Bundled here, the refresh
+ * happens once per request and `React.cache` shares it across the four reads.
+ */
+export async function getTransactionFormOptionsAction() {
+    try {
+        const user = await getRequiredUser();
+        const [institutions, accounts, categories, institutionTypes] = await Promise.all([
+            financialSettingsService.getInstitutions(user.id),
+            financialSettingsService.getAccounts(user.id),
+            financialSettingsService.getCategories(user.id),
+            financialSettingsService.getInstitutionTypes(user.id),
+        ]);
+        return {
+            success: true as const,
+            data: {
+                institutions,
+                accounts,
+                categories: categories.filter(c => !c.isDeleted),
+                institutionTypes,
+            },
+        };
+    } catch (error) {
+        console.error("Error loading transaction form options:", error);
+        return { success: false as const, error: (error as Error).message };
+    }
+}
+
 export async function createCategoryAction(data: Partial<FinancialCategory>) {
     const user = await getRequiredUser();
     const result = await financialSettingsService.createCategory(user.id, data);

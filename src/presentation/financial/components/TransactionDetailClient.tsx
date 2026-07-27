@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { FinancialTransaction, FinancialInstitution, FinancialInstitutionType, FinancialCategory, FinancialTransactionType } from "@/domain/entities/financial";
+import { FinancialTransaction, FinancialTransactionType } from "@/domain/entities/financial";
 import { getTransactionDisplayTitle } from "@/lib/financial-utils";
 import { AuditTrail } from "./AuditTrail";
 import { DuplicateResolver } from "./DuplicateResolver";
@@ -20,7 +20,8 @@ import { DateTimeStepInput } from "@/components/ui/datetime-step-input";
 import { useScrollFieldIntoView } from "@/hooks/use-scroll-field-into-view";
 import { toast } from "sonner";
 import { updateTransactionAction, getUniqueTagsAction } from "@/app/actions/financial-transactions";
-import { getInstitutionsAction, getAccountsAction, getCategoriesAction, getInstitutionTypesAction, updateInstitutionAction } from "@/app/actions/financial-settings";
+import { updateInstitutionAction } from "@/app/actions/financial-settings";
+import { useTransactionFormOptions } from "../hooks/useTransactionFormOptions";
 import { InstitutionPicker, type PendingInstitutionEdit } from "./InstitutionPicker";
 import { CategoryPicker } from "./CategoryPicker";
 import { TransactionTypeChips } from "./TransactionTypeChips";
@@ -132,10 +133,31 @@ export function TransactionDetailClient({ initialTransaction }: TransactionDetai
         setExpandedSection((cur) => (cur === id ? null : id));
     };
 
-    const [institutions, setInstitutions] = useState<FinancialInstitution[]>([]);
-    const [institutionTypes, setInstitutionTypes] = useState<FinancialInstitutionType[]>([]);
-    const [accountsList, setAccountsList] = useState<string[]>([]);
-    const [categories, setCategories] = useState<FinancialCategory[]>([]);
+    // Pickers' options come from a single resilient loader (see the hook): a
+    // partial failure used to leave them silently empty.
+    const {
+        institutions,
+        institutionTypes,
+        accounts,
+        categories,
+        error: optionsError,
+        setInstitutions,
+        setCategories,
+    } = useTransactionFormOptions((opts) => {
+        const instName = opts.institutions.find(i => i.id === transaction.institutionId)?.name || transaction.merchant || "";
+        const accName = opts.accounts.find(a => a.id === transaction.accountId)?.name || "";
+        const catName = opts.categories.find(c => c.id === transaction.categoryId)?.name || "";
+
+        setDisplayNames({ institution: instName, account: accName, category: catName });
+        setEditState(prev => ({
+            ...prev,
+            merchant: instName,
+            institutionName: instName,
+            accountName: accName,
+            categoryName: catName,
+        }));
+    });
+    const accountsList = accounts.map(a => a.name);
 
     const [institutionQuery, setInstitutionQuery] = useState("");
     const [categoryQuery, setCategoryQuery] = useState("");
@@ -156,44 +178,13 @@ export function TransactionDetailClient({ initialTransaction }: TransactionDetai
                 setSuggestions(res.data as string[]);
             }
         };
-        const fetchSettings = async () => {
-            try {
-                const [instRes, accRes, catRes, typesRes] = await Promise.all([
-                    getInstitutionsAction(),
-                    getAccountsAction(),
-                    getCategoriesAction(),
-                    getInstitutionTypesAction(),
-                ]);
-
-                setInstitutions(instRes);
-                setAccountsList(accRes.map(a => a.name));
-                setCategories(catRes.filter(c => !c.isDeleted));
-                setInstitutionTypes(typesRes);
-
-                const instName = instRes.find(i => i.id === transaction.institutionId)?.name || transaction.merchant || "";
-                const accName = accRes.find(a => a.id === transaction.accountId)?.name || "";
-                const catName = catRes.find(c => c.id === transaction.categoryId)?.name || "";
-
-                setDisplayNames({
-                    institution: instName,
-                    account: accName,
-                    category: catName,
-                });
-
-                setEditState(prev => ({
-                    ...prev,
-                    merchant: instName,
-                    institutionName: instName,
-                    accountName: accName,
-                    categoryName: catName,
-                }));
-            } catch (e) {
-                console.error("Failed to fetch settings", e);
-            }
-        };
         fetchTags();
-        fetchSettings();
     }, [transaction]);
+
+    // Never let a failed load look like "you have no categories/institutions".
+    useEffect(() => {
+        if (optionsError) toast.error("No se pudieron cargar categorías e instituciones. Reintenta.");
+    }, [optionsError]);
 
     const [editState, setEditState] = useState({
         description: transaction.description || "",

@@ -1,5 +1,5 @@
 import type { Notification } from "@/domain/entities/notification";
-import type { INotificationRepository } from "@/domain/repositories/notification";
+import type { INotificationRepository, NotificationQueryOptions } from "@/domain/repositories/notification";
 import type { UUID } from "@/domain/core";
 import { createClient } from "@/infrastructure/supabase/server";
 
@@ -64,12 +64,17 @@ export class SupabaseNotificationRepository implements INotificationRepository {
         if (error) throw error;
     }
 
-    async findByOwnerId(userId: UUID, limit = 20): Promise<Notification[]> {
+    async findByOwnerId(userId: UUID, limit = 20, options?: NotificationQueryOptions): Promise<Notification[]> {
         const supabase = await createClient();
-        const { data, error } = await supabase
+        let query = supabase
             .from(this.tableName)
             .select('*')
-            .eq('owner_user_id', userId)
+            .eq('owner_user_id', userId);
+
+        // Read notifications are dismissed for good — the bell only lists pending ones.
+        if (options?.unreadOnly) query = query.eq('is_read', false);
+
+        const { data, error } = await query
             .order('created_at', { ascending: false })
             .limit(limit);
 

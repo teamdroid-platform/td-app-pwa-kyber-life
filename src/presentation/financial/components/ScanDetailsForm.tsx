@@ -3,9 +3,10 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { FinancialScannerTransaction, FinancialInstitution, FinancialInstitutionType, FinancialCategory } from "@/domain/entities/financial";
+import { FinancialScannerTransaction } from "@/domain/entities/financial";
 import { mapInboxTransactionAction, dismissInboxTransactionAction } from "@/app/actions/financial-inbox";
-import { getInstitutionsAction, getAccountsAction, getCategoriesAction, getInstitutionTypesAction, updateInstitutionAction } from "@/app/actions/financial-settings";
+import { updateInstitutionAction } from "@/app/actions/financial-settings";
+import { useTransactionFormOptions } from "../hooks/useTransactionFormOptions";
 import { getUniqueTagsAction } from "@/app/actions/financial-transactions";
 import { useScrollFieldIntoView } from "@/hooks/use-scroll-field-into-view";
 import { Input } from "@/components/ui/input";
@@ -103,10 +104,18 @@ export function ScanDetailsForm({ initialData, resolvedInstitutionName, institut
         paidWithCredit: false,
     }));
 
-    const [institutions, setInstitutions] = useState<FinancialInstitution[]>([]);
-    const [institutionTypes, setInstitutionTypes] = useState<FinancialInstitutionType[]>([]);
-    const [accountsList, setAccountsList] = useState<string[]>([]);
-    const [categories, setCategories] = useState<FinancialCategory[]>([]);
+    // Pickers' options come from a single resilient loader (see the hook): a
+    // partial failure used to leave them silently empty.
+    const {
+        institutions,
+        institutionTypes,
+        accounts,
+        categories,
+        error: optionsError,
+        setInstitutions,
+        setCategories,
+    } = useTransactionFormOptions();
+    const accountsList = accounts.map((a) => a.name);
     const [tagSuggestions, setTagSuggestions] = useState<string[]>([]);
 
     const [institutionQuery, setInstitutionQuery] = useState("");
@@ -119,31 +128,24 @@ export function ScanDetailsForm({ initialData, resolvedInstitutionName, institut
 
     useEffect(() => {
         let mounted = true;
-        async function loadOptions() {
+        async function loadTags() {
             try {
-                const [insts, accs, cats, typesRes, tagsRes] = await Promise.all([
-                    getInstitutionsAction(),
-                    getAccountsAction(),
-                    getCategoriesAction(),
-                    getInstitutionTypesAction(),
-                    getUniqueTagsAction(),
-                ]);
-                if (mounted) {
-                    setInstitutions(insts);
-                    setAccountsList(accs.map((a) => a.name));
-                    setCategories(cats.filter((c) => !c.isDeleted));
-                    setInstitutionTypes(typesRes);
-                    if (tagsRes.success && Array.isArray(tagsRes.data)) {
-                        setTagSuggestions(tagsRes.data as string[]);
-                    }
+                const tagsRes = await getUniqueTagsAction();
+                if (mounted && tagsRes.success && Array.isArray(tagsRes.data)) {
+                    setTagSuggestions(tagsRes.data as string[]);
                 }
             } catch (error) {
-                console.error("Error loading options:", error);
+                console.error("Error loading tags:", error);
             }
         }
-        loadOptions();
+        loadTags();
         return () => { mounted = false; };
     }, []);
+
+    // Never let a failed load look like "you have no categories/institutions".
+    useEffect(() => {
+        if (optionsError) toast.error("No se pudieron cargar categorías e instituciones. Reintenta.");
+    }, [optionsError]);
 
     const handleChange = <K extends keyof typeof formData>(field: K, value: (typeof formData)[K]) => {
         setFormData((prev) => ({ ...prev, [field]: value }));
