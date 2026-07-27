@@ -1,7 +1,19 @@
 # Análisis de rendimiento — Carga de los Dashboards
 
-> Análisis estático de la cadena de carga (cliente → server actions → servicios → repositorios → Postgres) de `/financial`, `/dashboard` y `/financial/transactions`.
-> No incluye mediciones en producción: al final se indica qué instrumentar para confirmar cada hipótesis.
+> Análisis de la cadena de carga (cliente → server actions → servicios → repositorios → Postgres) de `/financial`, `/dashboard` y `/financial/transactions`.
+
+## 0. Verificación contra la base real (actualización)
+
+El análisis original se hizo de forma estática, sobre el código y las migraciones del repo. Al contrastarlo después con el proyecto real, **dos supuestos cambiaron** y conviene leer el resto del documento con esto en mente:
+
+| Supuesto original | Realidad medida |
+|---|---|
+| Faltaba el índice `(owner_user_id, date DESC)` | **Ya existía** en la base (`idx_financial_transactions_owner_date`), igual que otros índices ausentes de las migraciones del repo. El esquema vivo ha derivado del versionado. |
+| El volumen hacía costosas las lecturas completas | **301 transacciones (736 kB)** y 508 del escáner. A ese tamaño Postgres resuelve cualquiera de estas consultas de forma trivial. |
+
+**Conclusión revisada:** a día de hoy el cuello de botella **no es la base de datos** sino el **número de round-trips** (B3) y, en menor medida, el volumen de datos serializados por respuesta (B1/B2). La Fase 2 (una sola acción y una sola lectura) es la que produce la mejora perceptible; la Fase 1 quedó reducida a los índices realmente ausentes (dos FK sin indexar y el compuesto del escáner), valiosos como higiene y de cara al crecimiento, no como ganancia inmediata.
+
+Los cuellos de botella B1/B2 siguen siendo correctos como **problema de diseño** —el coste crece sin techo con el historial—, pero su impacto *actual* es pequeño.
 
 ---
 
