@@ -20,6 +20,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { defaultHubCustomRange } from "@/lib/date-range";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
 
 // ─── Date Preset Helpers ─────────────────────────────────────
 
@@ -192,12 +193,19 @@ export function TransactionFilters({ categories = [], institutions = [] }: Trans
         setDatePopoverOpen(false);
     };
 
-    const handleCustomApply = () => {
-        if (!customFrom || !customTo) return;
-        const from = new Date(`${customFrom}T00:00:00`).toISOString();
-        const to = new Date(`${customTo}T23:59:59`).toISOString();
+    /**
+     * Applies as soon as a complete range is picked — same behaviour as the
+     * dashboards' filters, so there is no separate "Aplicar" step.
+     */
+    const handleCustomRangeChange = (nextFrom: string, nextTo: string) => {
+        setCustomFrom(nextFrom);
+        setCustomTo(nextTo);
+        if (!nextFrom || !nextTo) return;
         setActivePreset("custom");
-        applyDateFilter(from, to);
+        applyDateFilter(
+            new Date(`${nextFrom}T00:00:00`).toISOString(),
+            new Date(`${nextTo}T23:59:59`).toISOString(),
+        );
         setDatePopoverOpen(false);
     };
 
@@ -370,29 +378,12 @@ export function TransactionFilters({ categories = [], institutions = [] }: Trans
                             </SelectContent>
                         </Select>
                         {activePreset === "custom" && (
-                            <div className="grid grid-cols-2 gap-2 pt-1">
-                                <Input
-                                    type="date"
-                                    aria-label="Desde"
-                                    value={customFrom}
-                                    onChange={(e) => setCustomFrom(e.target.value)}
-                                    className="h-10 rounded-xl bg-muted/40 border-border/40 text-xs"
+                            <div className="pt-1">
+                                <DateRangePicker
+                                    start={customFrom}
+                                    end={customTo}
+                                    onChange={handleCustomRangeChange}
                                 />
-                                <Input
-                                    type="date"
-                                    aria-label="Hasta"
-                                    value={customTo}
-                                    onChange={(e) => setCustomTo(e.target.value)}
-                                    className="h-10 rounded-xl bg-muted/40 border-border/40 text-xs"
-                                />
-                                <Button
-                                    size="sm"
-                                    className="col-span-2 rounded-xl"
-                                    disabled={!customFrom || !customTo}
-                                    onClick={handleCustomApply}
-                                >
-                                    Aplicar rango
-                                </Button>
                             </div>
                         )}
                         <p className="text-[11px] text-muted-foreground pt-0.5">
@@ -531,46 +522,12 @@ export function TransactionFilters({ categories = [], institutions = [] }: Trans
                                 <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
                                     Personalizado
                                 </p>
-                                <div className="grid grid-cols-2 gap-2">
-                                    <div className="space-y-1">
-                                        <label htmlFor="date-filter-from" className="text-[11px] font-medium text-muted-foreground">
-                                            Desde
-                                        </label>
-                                        <Input
-                                            id="date-filter-from"
-                                            type="date"
-                                            value={customFrom}
-                                            onChange={(e) => {
-                                                setCustomFrom(e.target.value);
-                                                setActivePreset("custom");
-                                            }}
-                                            className="h-9 text-sm bg-bg-primary"
-                                        />
-                                    </div>
-                                    <div className="space-y-1">
-                                        <label htmlFor="date-filter-to" className="text-[11px] font-medium text-muted-foreground">
-                                            Hasta
-                                        </label>
-                                        <Input
-                                            id="date-filter-to"
-                                            type="date"
-                                            value={customTo}
-                                            onChange={(e) => {
-                                                setCustomTo(e.target.value);
-                                                setActivePreset("custom");
-                                            }}
-                                            className="h-9 text-sm bg-bg-primary"
-                                        />
-                                    </div>
-                                </div>
-                                <Button
-                                    size="sm"
-                                    className="w-full rounded-lg"
-                                    disabled={!customFrom || !customTo}
-                                    onClick={handleCustomApply}
-                                >
-                                    Aplicar rango
-                                </Button>
+                                <DateRangePicker
+                                    start={customFrom}
+                                    end={customTo}
+                                    onChange={handleCustomRangeChange}
+                                    className="bg-bg-primary"
+                                />
                             </div>
                         </PopoverContent>
                     </Popover>

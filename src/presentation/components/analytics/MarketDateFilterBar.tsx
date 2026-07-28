@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { defaultHubCustomRange } from "@/lib/date-range";
 
 export type FilterType = "all" | "today" | "week" | "month" | "custom";
@@ -156,14 +156,11 @@ export function MarketDateFilterBar() {
         }
     };
 
-    const handleCustomDateChange = (type: 'start' | 'end', value: string) => {
-        if (type === 'start') {
-            setCustomStartDate(value);
-            updateFilter("custom", value, customEndDate);
-        } else {
-            setCustomEndDate(value);
-            updateFilter("custom", customStartDate, value);
-        }
+    /** The picker emits a complete range, so both ends move together. */
+    const handleCustomRangeChange = (from: string, to: string) => {
+        setCustomStartDate(from);
+        setCustomEndDate(to);
+        updateFilter("custom", from, to);
     };
 
     return (
@@ -211,22 +208,13 @@ export function MarketDateFilterBar() {
             </div>
 
             {filterType === "custom" && (
-                <div className="flex items-center gap-2 w-full sm:w-auto animate-in fade-in slide-in-from-top-1">
-                    <div className="flex items-center gap-2 w-full bg-bg-2 p-1 rounded-xl border border-border/40">
-                        <Input
-                            type="date"
-                            value={customStartDate}
-                            onChange={(e) => handleCustomDateChange('start', e.target.value)}
-                            className="h-8 text-xs bg-bg-1 border-border/50 rounded-lg focus-visible:ring-1 focus-visible:ring-offset-0"
-                        />
-                        <span className="text-muted-foreground/50 text-xs font-medium">a</span>
-                        <Input
-                            type="date"
-                            value={customEndDate}
-                            onChange={(e) => handleCustomDateChange('end', e.target.value)}
-                            className="h-8 text-xs bg-bg-1 border-border/50 rounded-lg focus-visible:ring-1 focus-visible:ring-offset-0"
-                        />
-                    </div>
+                <div className="w-full sm:w-auto sm:min-w-[280px] animate-in fade-in slide-in-from-top-1">
+                    <DateRangePicker
+                        start={customStartDate}
+                        end={customEndDate}
+                        onChange={handleCustomRangeChange}
+                        className="bg-bg-2 text-xs"
+                    />
                 </div>
             )}
         </div>

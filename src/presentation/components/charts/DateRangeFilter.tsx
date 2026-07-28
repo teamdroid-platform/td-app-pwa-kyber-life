@@ -1,7 +1,7 @@
 "use client";
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { RangeFilterType } from "@/lib/date-range";
@@ -54,6 +54,12 @@ export function DateRangeFilter({
     presets = DEFAULT_PRESETS,
     className,
 }: DateRangeFilterProps) {
+    // The picker emits a complete range, so both ends are updated together.
+    const handleRangeChange = (from: string, to: string) => {
+        onCustomStartChange(from);
+        onCustomEndChange(to);
+    };
+
     return (
         <div className={cn("flex flex-col w-full", className)}>
             {/* Mobile: Select + Date Inputs if custom */}
@@ -78,18 +84,11 @@ export function DateRangeFilter({
                         >
                             <X className="h-4 w-4" />
                         </button>
-                        <Input
-                            type="date"
-                            value={customStart}
-                            onChange={(e) => onCustomStartChange(e.target.value)}
-                            className="h-full px-1 text-xs bg-background border-border/50 rounded-lg focus-visible:ring-1 focus-visible:ring-offset-0 flex-1"
-                        />
-                        <span className="text-muted-foreground/50 text-[10px] font-medium shrink-0">a</span>
-                        <Input
-                            type="date"
-                            value={customEnd}
-                            onChange={(e) => onCustomEndChange(e.target.value)}
-                            className="h-full px-1 text-xs bg-background border-border/50 rounded-lg focus-visible:ring-1 focus-visible:ring-offset-0 flex-1"
+                        <DateRangePicker
+                            start={customStart}
+                            end={customEnd}
+                            onChange={handleRangeChange}
+                            className="h-full flex-1 border-border/50 bg-background text-xs"
                         />
                     </div>
                 )}
@@ -121,18 +120,11 @@ export function DateRangeFilter({
                         >
                             <X className="h-4 w-4" />
                         </button>
-                        <Input
-                            type="date"
-                            value={customStart}
-                            onChange={(e) => onCustomStartChange(e.target.value)}
-                            className="h-full text-xs bg-background border-border/50 rounded-lg focus-visible:ring-1 focus-visible:ring-offset-0 flex-1"
-                        />
-                        <span className="text-muted-foreground/50 text-xs font-medium shrink-0">a</span>
-                        <Input
-                            type="date"
-                            value={customEnd}
-                            onChange={(e) => onCustomEndChange(e.target.value)}
-                            className="h-full text-xs bg-background border-border/50 rounded-lg focus-visible:ring-1 focus-visible:ring-offset-0 flex-1"
+                        <DateRangePicker
+                            start={customStart}
+                            end={customEnd}
+                            onChange={handleRangeChange}
+                            className="h-full flex-1 border-border/50 bg-background text-xs"
                         />
                     </div>
                 )}

@@ -7,6 +7,7 @@ import { CategoryPieChart } from "./CategoryPieChart";
 import { InstitutionBarChart } from "./InstitutionBarChart";
 import { useFinancialDashboard } from "../hooks/useFinancialDashboard";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { useFinancialRealtime } from "../hooks/useFinancialRealtime";
 import { Filter, ChevronDown } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -252,22 +253,15 @@ export function FinancialDashboard() {
                         </div>
 
                         {filterType === "custom" && (
-                            <div className="flex items-center gap-2 w-full sm:w-auto animate-in fade-in slide-in-from-top-1">
-                                <div className="flex items-center gap-2 w-full bg-muted/20 p-1 rounded-xl border border-border/40">
-                                    <Input
-                                        type="date"
-                                        value={customStartDate}
-                                        onChange={(e) => setCustomStartDate(e.target.value)}
-                                        className="h-8 text-xs bg-background border-border/50 rounded-lg focus-visible:ring-1 focus-visible:ring-offset-0"
-                                    />
-                                    <span className="text-muted-foreground/50 text-xs font-medium">a</span>
-                                    <Input
-                                        type="date"
-                                        value={customEndDate}
-                                        onChange={(e) => setCustomEndDate(e.target.value)}
-                                        className="h-8 text-xs bg-background border-border/50 rounded-lg focus-visible:ring-1 focus-visible:ring-offset-0"
-                                    />
-                                </div>
+                            <div className="w-full sm:w-auto sm:min-w-[280px] animate-in fade-in slide-in-from-top-1">
+                                <DateRangePicker
+                                    start={customStartDate}
+                                    end={customEndDate}
+                                    onChange={(from, to) => {
+                                        setCustomStartDate(from);
+                                        setCustomEndDate(to);
+                                    }}
+                                />
                             </div>
                         )}
                     </div>
