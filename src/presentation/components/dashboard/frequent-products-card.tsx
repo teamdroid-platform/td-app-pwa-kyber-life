@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { LineChart, Line, YAxis, ResponsiveContainer, Tooltip } from "recharts";
+import { useChartTooltipDismiss } from "@/hooks/use-chart-tooltip-dismiss";
 import { Package, ChevronDown, Loader2, TrendingUp, TrendingDown } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -41,6 +42,9 @@ function ProductRow({
     expanded: boolean;
     onToggle: () => void;
 }) {
+    // On touch there is no "mouse leave" to close the tooltip, so make it dismissable.
+    const { containerRef, tooltipActive, handlePointerDown } = useChartTooltipDismiss();
+
     const avgPrice = history.length > 0
         ? history.reduce((sum, p) => sum + p.price, 0) / history.length
         : null;
@@ -58,7 +62,7 @@ function ProductRow({
     }, [history]);
 
     return (
-        <div className="overflow-hidden border-b border-border-base last:border-b-0">
+        <div ref={containerRef} onPointerDown={handlePointerDown} className="overflow-hidden border-b border-border-base last:border-b-0">
             <button
                 type="button"
                 onClick={onToggle}
@@ -142,6 +146,7 @@ function ProductRow({
                                     <LineChart data={history} margin={{ top: 6, right: 4, left: 4, bottom: 0 }}>
                                         <YAxis hide domain={["dataMin", "dataMax"]} />
                                         <Tooltip
+                                            active={tooltipActive}
                                             contentStyle={{
                                                 backgroundColor: "var(--bg-secondary)",
                                                 borderRadius: "10px",

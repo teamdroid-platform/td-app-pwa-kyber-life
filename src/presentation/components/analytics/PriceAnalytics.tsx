@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { getPriceAnalyticsAction, getGenericPriceAnalyticsAction } from "@/app/actions/analytics";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { useChartTooltipDismiss } from "@/hooks/use-chart-tooltip-dismiss";
 import { Search, Tag, Package, Loader2, ChevronDown, X, TrendingUp, Store } from "lucide-react";
 import { BrandProduct, GenericItem } from "@/domain/entities";
 import { cn } from "@/lib/utils";
@@ -22,6 +23,9 @@ interface AnalyticsData {
 }
 
 export function PriceAnalytics({ searchableProducts, searchableGenericItems }: PriceAnalyticsProps) {
+    // On touch there is no "mouse leave" to close the tooltip, so make it dismissable.
+    const { containerRef, tooltipActive, handlePointerDown } = useChartTooltipDismiss();
+
     const [mode, setMode] = useState<SearchMode>("generic");
     const [selectedItem, setSelectedItem] = useState<{ id: string; name: string; subtitle?: string } | null>(null);
     const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null);
@@ -143,7 +147,7 @@ export function PriceAnalytics({ searchableProducts, searchableGenericItems }: P
     }, [analyticsData]);
 
     return (
-        <Card className="bg-bg-primary rounded-3xl shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] border border-border-base h-full flex flex-col">
+        <Card ref={containerRef} onPointerDown={handlePointerDown} className="bg-bg-primary rounded-3xl shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] border border-border-base h-full flex flex-col">
             <CardContent className="pt-6 space-y-3 flex-1 flex flex-col">
                 <div>
                     <CardTitle className="text-lg font-bold text-text-primary">Análisis de Precios</CardTitle>
@@ -337,6 +341,7 @@ export function PriceAnalytics({ searchableProducts, searchableGenericItems }: P
                                                 domain={[0, 'auto']}
                                             />
                                             <Tooltip
+                                                active={tooltipActive}
                                                 contentStyle={{
                                                     backgroundColor: 'var(--bg-secondary)',
                                                     borderRadius: '12px',

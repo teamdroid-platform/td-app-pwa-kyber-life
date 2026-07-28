@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
+import { useChartTooltipDismiss } from "@/hooks/use-chart-tooltip-dismiss";
 import { Loader2, Search, ChevronDown, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getAllProductsPriceHistories } from "@/app/dashboard/actions";
@@ -11,6 +12,9 @@ interface PriceHistoryCardProps {
 }
 
 export function PriceHistoryCard({ initialProducts }: PriceHistoryCardProps) {
+    // On touch there is no "mouse leave" to close the tooltip, so make it dismissable.
+    const { containerRef, tooltipActive, handlePointerDown } = useChartTooltipDismiss();
+
     const [selectedProduct, setSelectedProduct] = useState<string>("all");
     const [allData, setAllData] = useState<Record<string, { date: string, price: number }[]>>({});
     const [loading, setLoading] = useState(false);
@@ -113,7 +117,7 @@ export function PriceHistoryCard({ initialProducts }: PriceHistoryCardProps) {
         : sortedProducts.find(p => p.id === selectedProduct)?.name ?? "Todos los productos";
 
     return (
-        <div className="bg-bg-primary rounded-3xl p-6 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] border border-border-base h-full flex flex-col overflow-hidden">
+        <div ref={containerRef} onPointerDown={handlePointerDown} className="bg-bg-primary rounded-3xl p-6 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] border border-border-base h-full flex flex-col overflow-hidden">
             {/* Header */}
             <div className="mb-3">
                 <h3 className="text-lg font-bold text-text-primary">Histórico Precios</h3>
@@ -232,6 +236,7 @@ export function PriceHistoryCard({ initialProducts }: PriceHistoryCardProps) {
                             tickFormatter={(val) => `$${val}`}
                         />
                         <Tooltip
+                            active={tooltipActive}
                             contentStyle={{
                                 backgroundColor: 'var(--bg-secondary)',
                                 borderRadius: '12px',

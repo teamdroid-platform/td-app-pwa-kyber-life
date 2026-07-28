@@ -7,12 +7,14 @@ import { CategoryPieChart } from "./CategoryPieChart";
 import { InstitutionBarChart } from "./InstitutionBarChart";
 import { useFinancialDashboard } from "../hooks/useFinancialDashboard";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
+import { PeriodFilter } from "@/components/ui/period-filter";
+import { formatRangeLabel as formatDayRangeLabel } from "@/components/ui/range-calendar";
 import { useFinancialRealtime } from "../hooks/useFinancialRealtime";
 import { Filter, ChevronDown } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
 import { RobotLoader } from "@/components/ui/RobotLoader";
-import { defaultHubCustomRange } from "@/lib/date-range";
+import { defaultHubCustomRange, STANDARD_PERIOD_PRESETS } from "@/lib/date-range";
 import { cn } from "@/lib/utils";
 import { BalanceHeroCard } from "./BalanceHeroCard";
 import { QuickSummary } from "./QuickSummary";
@@ -37,6 +39,11 @@ function formatRangeLabel(filterType: string, startISO?: string, endISO?: string
     const end = fmt(endISO);
     return start === end ? start : `${start} – ${end}`;
 }
+
+const DASHBOARD_TABS = [
+    ...STANDARD_PERIOD_PRESETS,
+    { id: "custom" as const, label: "Personalizado" },
+];
 
 export function FinancialDashboard() {
     const [filterType, setFilterType] = useState<"all" | "today" | "week" | "month" | "custom">("custom");
@@ -209,36 +216,29 @@ export function FinancialDashboard() {
                         "flex-col xl:flex-row items-start xl:items-center gap-4 w-full",
                         filtersExpanded ? "flex animate-in fade-in slide-in-from-top-4" : "hidden sm:flex",
                     )}>
-                        {/* Mobile Filter (Select) */}
+                        {/* Mobile: presets and the custom range in one control */}
                         <div className="w-full sm:hidden">
-                            <Select value={filterType} onValueChange={(v: any) => setFilterType(v)}>
-                                <SelectTrigger className="w-full bg-muted/40 border-border/40 rounded-xl h-10 font-medium">
-                                    <SelectValue placeholder="Seleccionar período" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">Todo el tiempo</SelectItem>
-                                    <SelectItem value="today">Hoy</SelectItem>
-                                    <SelectItem value="week">Semana</SelectItem>
-                                    <SelectItem value="month">Mes</SelectItem>
-                                    <SelectItem value="custom">Personalizado</SelectItem>
-                                </SelectContent>
-                            </Select>
+                            <PeriodFilter
+                                value={filterType}
+                                onChange={(v) => setFilterType(v as typeof filterType)}
+                                presets={STANDARD_PERIOD_PRESETS}
+                                customId="custom"
+                                customStart={customStartDate}
+                                customEnd={customEndDate}
+                                onCustomRangeChange={(from, to) => {
+                                    setCustomStartDate(from);
+                                    setCustomEndDate(to);
+                                    setFilterType("custom");
+                                }}
+                            />
                         </div>
 
-                        {/* Desktop Filter (Tabs) */}
+                        {/* Desktop Filter (Tabs) — the custom tab shows the range itself */}
                         <div className="hidden sm:flex items-center p-1 bg-muted/40 border border-border/40 rounded-xl w-full">
-                            {(
-                                [
-                                    { id: 'all', label: 'Todo el tiempo' },
-                                    { id: 'today', label: 'Hoy' },
-                                    { id: 'week', label: 'Semana' },
-                                    { id: 'month', label: 'Mes' },
-                                    { id: 'custom', label: 'Personalizado' }
-                                ] as const
-                            ).map((tab) => (
+                            {DASHBOARD_TABS.map((tab) => (
                                 <button
                                     key={tab.id}
-                                    onClick={() => setFilterType(tab.id as any)}
+                                    onClick={() => setFilterType(tab.id)}
                                     className={`
                                         flex-1 relative px-4 py-1.5 text-sm font-medium transition-all duration-200 rounded-lg whitespace-nowrap
                                         ${filterType === tab.id
@@ -246,28 +246,24 @@ export function FinancialDashboard() {
                                             : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'}
                                     `}
                                 >
-                                    {tab.label}
+                                    {tab.id === "custom"
+                                        ? (formatDayRangeLabel(customStartDate, customEndDate) ?? tab.label)
+                                        : tab.label}
                                 </button>
                             ))}
                         </div>
 
+                        {/* Desktop only: adjust the range once "custom" is active. */}
                         {filterType === "custom" && (
-                            <div className="flex items-center gap-2 w-full sm:w-auto animate-in fade-in slide-in-from-top-1">
-                                <div className="flex items-center gap-2 w-full bg-muted/20 p-1 rounded-xl border border-border/40">
-                                    <Input
-                                        type="date"
-                                        value={customStartDate}
-                                        onChange={(e) => setCustomStartDate(e.target.value)}
-                                        className="h-8 text-xs bg-background border-border/50 rounded-lg focus-visible:ring-1 focus-visible:ring-offset-0"
-                                    />
-                                    <span className="text-muted-foreground/50 text-xs font-medium">a</span>
-                                    <Input
-                                        type="date"
-                                        value={customEndDate}
-                                        onChange={(e) => setCustomEndDate(e.target.value)}
-                                        className="h-8 text-xs bg-background border-border/50 rounded-lg focus-visible:ring-1 focus-visible:ring-offset-0"
-                                    />
-                                </div>
+                            <div className="hidden sm:block w-full sm:w-auto sm:min-w-[260px] animate-in fade-in slide-in-from-top-1">
+                                <DateRangePicker
+                                    start={customStartDate}
+                                    end={customEndDate}
+                                    onChange={(from, to) => {
+                                        setCustomStartDate(from);
+                                        setCustomEndDate(to);
+                                    }}
+                                />
                             </div>
                         )}
                     </div>
