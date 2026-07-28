@@ -68,6 +68,32 @@ export interface TypeBreakdown {
     percentage: number;
 }
 
+/**
+ * Data every dashboard block derives from, read **once** per request.
+ *
+ * Each block used to start with its own `findByOwnerId(userId)` — six full
+ * reads of the user's whole history per dashboard load. Passing this context
+ * around lets {@link FinancialDashboardService.getDashboardOverview} do a single
+ * narrowed read and derive all six blocks from it, while the individual methods
+ * still work standalone (they load their own data when no context is given).
+ */
+export interface DashboardContext {
+    /** Transactions already narrowed by range + active status. */
+    active: FinancialTransaction[];
+    categories: Awaited<ReturnType<IFinancialCategoryRepository["findAllBaseAndUser"]>>;
+    institutions: Awaited<ReturnType<IFinancialInstitutionRepository["findByOwnerId"]>>;
+    pendingCount: number;
+}
+
+export interface DashboardOverview {
+    kpis: FinancialKPIs;
+    monthly: MonthlyBreakdown[];
+    typeBreakdown: TypeBreakdown[];
+    categoryBreakdown: CategoryBreakdown[];
+    institutionBreakdown: InstitutionBreakdown[];
+    dailyBreakdown: DailyBreakdown[];
+}
+
 export class FinancialDashboardService {
     constructor(
         private transactionRepo: IFinancialTransactionRepository,
@@ -75,10 +101,50 @@ export class FinancialDashboardService {
         private institutionRepo: IFinancialInstitutionRepository,
         private scannerRepo?: IFinancialScannerTransactionRepository
     ) {}
-    async getKPIs(userId: UUID, startDate?: Date, endDate?: Date): Promise<FinancialKPIs> {
-        const transactions = await this.transactionRepo.findByOwnerId(userId);
-        const confirmed = this.filterActive(transactions, startDate, endDate);
-        let pendingCount = 0;
+
+    /**
+     * Every dashboard block from a **single** narrowed read, instead of the six
+     * independent full-history reads the separate getters used to trigger.
+     */
+    async getDashboardOverview(
+        userId: UUID,
+        startDate?: Date,
+        endDate?: Date,
+        monthsBack = 6,
+    ): Promise<DashboardOverview> {
+        const ctx = await this.buildContext(userId, startDate, endDate);
+        return {
+            kpis: await this.getKPIs(userId, startDate, endDate, ctx),
+            monthly: await this.getMonthlyBreakdown(userId, monthsBack, startDate, endDate, ctx),
+            typeBreakdown: await this.getTypeBreakdown(userId, startDate, endDate, ctx),
+            categoryBreakdown: await this.getCategoryBreakdown(userId, startDate, endDate, ctx),
+            institutionBreakdown: await this.getInstitutionBreakdown(userId, startDate, endDate, ctx),
+            dailyBreakdown: await this.getDailyBreakdown(userId, startDate, endDate, ctx),
+        };
+    }
+
+    /** One read of each source, shared by every block of a dashboard load. */
+    private async buildContext(userId: UUID, startDate?: Date, endDate?: Date): Promise<DashboardContext> {
+        const [active, categories, institutions] = await Promise.all([
+            this.transactionRepo.findForDashboard(userId, { startDate, endDate }),
+            this.categoryRepo.findAllBaseAndUser(userId),
+            this.institutionRepo.findByOwnerId(userId),
+        ]);
+        return { active, categories, institutions, pendingCount: await this.countPending(userId, startDate, endDate) };
+    }
+
+    /** Transactions for a block: from the shared context, or read on demand. */
+    private async loadActive(
+        userId: UUID,
+        startDate?: Date,
+        endDate?: Date,
+        ctx?: DashboardContext,
+    ): Promise<FinancialTransaction[]> {
+        if (ctx) return ctx.active;
+        return this.transactionRepo.findForDashboard(userId, { startDate, endDate });
+    }
+
+    private async countPending(userId: UUID, startDate?: Date, endDate?: Date): Promise<number> {
         if (this.scannerRepo) {
             let pendingScannerTxs = await this.scannerRepo.findUnprocessedByOwnerId(userId);
             if (startDate || endDate) {
@@ -90,19 +156,24 @@ export class FinancialDashboardService {
                     return true;
                 });
             }
-            pendingCount = pendingScannerTxs.length;
-        } else {
-            let pending = this.filterPending(transactions);
-            if (startDate || endDate) {
-                pending = pending.filter(t => {
-                    const tDate = new Date(t.date);
-                    if (startDate && tDate < startDate) return false;
-                    if (endDate && tDate > endDate) return false;
-                    return true;
-                });
-            }
-            pendingCount = pending.length;
+            return pendingScannerTxs.length;
         }
+
+        let pending = this.filterPending(await this.transactionRepo.findByOwnerId(userId));
+        if (startDate || endDate) {
+            pending = pending.filter(t => {
+                const tDate = new Date(t.date);
+                if (startDate && tDate < startDate) return false;
+                if (endDate && tDate > endDate) return false;
+                return true;
+            });
+        }
+        return pending.length;
+    }
+
+    async getKPIs(userId: UUID, startDate?: Date, endDate?: Date, ctx?: DashboardContext): Promise<FinancialKPIs> {
+        const confirmed = await this.loadActive(userId, startDate, endDate, ctx);
+        const pendingCount = ctx ? ctx.pendingCount : await this.countPending(userId, startDate, endDate);
 
         const totalIncome = confirmed
             .filter(t => isIncomeType(t.type))
@@ -124,7 +195,7 @@ export class FinancialDashboardService {
             .filter(t => !isIncomeType(t.type) && !isWithdrawalType(t.type) && t.type !== "TRANSFER" && t.paidWithCredit)
             .reduce((sum, t) => sum + Number(t.amount), 0);
 
-        const categories = await this.categoryRepo.findAllBaseAndUser(userId);
+        const categories = ctx?.categories ?? await this.categoryRepo.findAllBaseAndUser(userId);
         const categoryNameById = new Map(categories.map(c => [c.id!, c.name]));
         const netBalance = computeNetBalance(confirmed, categoryNameById);
 
@@ -157,9 +228,8 @@ export class FinancialDashboardService {
         };
     }
 
-    async getMonthlyBreakdown(userId: UUID, monthsBack: number = 6, startDate?: Date, endDate?: Date): Promise<MonthlyBreakdown[]> {
-        const transactions = await this.transactionRepo.findByOwnerId(userId);
-        const confirmed = this.filterActive(transactions, startDate, endDate);
+    async getMonthlyBreakdown(userId: UUID, monthsBack: number = 6, startDate?: Date, endDate?: Date, ctx?: DashboardContext): Promise<MonthlyBreakdown[]> {
+        const confirmed = await this.loadActive(userId, startDate, endDate, ctx);
 
         const months: MonthlyBreakdown[] = [];
 
@@ -249,9 +319,8 @@ export class FinancialDashboardService {
         return months;
     }
 
-    async getTypeBreakdown(userId: UUID, startDate?: Date, endDate?: Date): Promise<TypeBreakdown[]> {
-        const transactions = await this.transactionRepo.findByOwnerId(userId);
-        const confirmed = this.filterActive(transactions, startDate, endDate);
+    async getTypeBreakdown(userId: UUID, startDate?: Date, endDate?: Date, ctx?: DashboardContext): Promise<TypeBreakdown[]> {
+        const confirmed = await this.loadActive(userId, startDate, endDate, ctx);
 
         const groups: Record<string, { total: number; count: number }> = {};
         let grandTotal = 0;
@@ -278,13 +347,12 @@ export class FinancialDashboardService {
             .sort((a, b) => b.total - a.total);
     }
 
-    async getCategoryBreakdown(userId: UUID, startDate?: Date, endDate?: Date): Promise<CategoryBreakdown[]> {
-        const transactions = await this.transactionRepo.findByOwnerId(userId);
+    async getCategoryBreakdown(userId: UUID, startDate?: Date, endDate?: Date, ctx?: DashboardContext): Promise<CategoryBreakdown[]> {
         // Category breakdown is about spending: keep strictly expense-type transactions,
         // excluding income, transfers and withdrawals (same definition as the "Gastos" KPI).
-        const confirmed = this.filterActive(transactions, startDate, endDate)
+        const confirmed = (await this.loadActive(userId, startDate, endDate, ctx))
             .filter(t => !isIncomeType(t.type) && !isWithdrawalType(t.type) && t.type !== "TRANSFER");
-        const categories = await this.categoryRepo.findAllBaseAndUser(userId);
+        const categories = ctx?.categories ?? await this.categoryRepo.findAllBaseAndUser(userId);
         const catMap = new Map(categories.map(c => [c.id, c]));
 
         const groups: Record<string, { total: number; creditTotal: number; count: number }> = {};
@@ -320,12 +388,10 @@ export class FinancialDashboardService {
             .sort((a, b) => b.total - a.total);
     }
 
-    async getInstitutionBreakdown(userId: UUID, startDate?: Date, endDate?: Date): Promise<InstitutionBreakdown[]> {
-        const transactions = await this.transactionRepo.findByOwnerId(userId);
-        // Only active transactions, generally expenses and income. We use absolute amounts for total volume?
-        // Or we group expenses? Let's group all transaction counts/amounts as volume.
-        const confirmed = this.filterActive(transactions, startDate, endDate);
-        const institutions = await this.institutionRepo.findByOwnerId(userId);
+    async getInstitutionBreakdown(userId: UUID, startDate?: Date, endDate?: Date, ctx?: DashboardContext): Promise<InstitutionBreakdown[]> {
+        // Group all active transactions as volume, using absolute amounts.
+        const confirmed = await this.loadActive(userId, startDate, endDate, ctx);
+        const institutions = ctx?.institutions ?? await this.institutionRepo.findByOwnerId(userId);
         const instMap = new Map(institutions.map(i => [i.id, i]));
 
         const groups: Record<string, { total: number; creditTotal: number; count: number }> = {};
@@ -361,9 +427,8 @@ export class FinancialDashboardService {
             .sort((a, b) => b.total - a.total);
     }
 
-    async getDailyBreakdown(userId: UUID, startDate?: Date, endDate?: Date): Promise<DailyBreakdown[]> {
-        const transactions = await this.transactionRepo.findByOwnerId(userId);
-        const confirmed = this.filterActive(transactions, startDate, endDate);
+    async getDailyBreakdown(userId: UUID, startDate?: Date, endDate?: Date, ctx?: DashboardContext): Promise<DailyBreakdown[]> {
+        const confirmed = await this.loadActive(userId, startDate, endDate, ctx);
 
         const groups: Record<string, DailyBreakdown> = {};
 
@@ -435,22 +500,8 @@ export class FinancialDashboardService {
         });
     }
 
-    private filterActive(transactions: FinancialTransaction[], startDate?: Date, endDate?: Date): FinancialTransaction[] {
-        return transactions.filter(t => {
-            if (t.status !== "CONFIRMED" && t.status !== "REVIEWED" && t.status !== "MANUAL") {
-                return false;
-            }
-            if (startDate || endDate) {
-                const tDate = new Date(t.date);
-                // Zero out time components for consistent date-only comparison if needed,
-                // but since tDate is parsed from DB (usually midnight UTC if date only),
-                // we should just compare them. Assuming startDate/endDate are startOfDay/endOfDay.
-                if (startDate && tDate < startDate) return false;
-                if (endDate && tDate > endDate) return false;
-            }
-            return true;
-        });
-    }
+    // Range + active-status narrowing now happens in SQL (`findForDashboard`),
+    // so the former in-memory `filterActive` is gone.
 
     private filterPending(transactions: FinancialTransaction[]): FinancialTransaction[] {
         return transactions.filter(t => t.status === "DETECTED");

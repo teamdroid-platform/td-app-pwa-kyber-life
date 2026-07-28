@@ -12,8 +12,21 @@ import {
     FinancialTransactionAuditLog
 } from "../entities/financial";
 
+export interface DashboardRangeFilter {
+    startDate?: Date;
+    endDate?: Date;
+    /** Statuses to keep. Defaults to the "active" ones the dashboards read. */
+    statuses?: string[];
+}
+
 export interface IFinancialTransactionRepository extends IRepository<FinancialTransaction> {
     findByOwnerId(userId: UUID): Promise<FinancialTransaction[]>;
+    /**
+     * Transactions for the dashboards, already narrowed **in SQL** by owner,
+     * date range and status — instead of pulling the whole history and
+     * filtering it in memory.
+     */
+    findForDashboard(userId: UUID, filter?: DashboardRangeFilter): Promise<FinancialTransaction[]>;
     findRecent(userId: UUID, limit: number): Promise<FinancialTransaction[]>;
     search(userId: UUID, query: string, filters?: TransactionSearchFilters): Promise<FinancialTransaction[]>;
     findPaginated(userId: UUID, filters: TransactionSearchFilters, pagination: PaginationParams): Promise<PaginatedResult<FinancialTransaction>>;

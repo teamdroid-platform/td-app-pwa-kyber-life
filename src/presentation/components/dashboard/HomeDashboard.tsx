@@ -24,6 +24,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { computeDateRange, defaultHubCustomRange, type RangeFilterType } from "@/lib/date-range";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { DateRangeFilter, HUB_PRESETS } from "@/presentation/components/charts/DateRangeFilter";
 import { RankBarChart } from "@/presentation/components/charts/RankBarChart";
 import { SpendTrendChart } from "@/presentation/components/charts/SpendTrendChart";
@@ -133,13 +134,21 @@ export function HomeDashboard({ userFirstName }: { userFirstName?: string }) {
     // the user opts into seeing credit-card-paid transactions too.
     const [showCredit, setShowCredit] = useState(false);
 
+    // Only the hand-typed dates are debounced: a date input emits every partial
+    // value while typing (year 0002, 0202, …) and each one would refetch. The
+    // presets are deliberate clicks, so they still apply instantly.
+    const debouncedFinStart = useDebouncedValue(finStart);
+    const debouncedFinEnd = useDebouncedValue(finEnd);
+    const debouncedMktStart = useDebouncedValue(mktStart);
+    const debouncedMktEnd = useDebouncedValue(mktEnd);
+
     const finRange = useMemo(
-        () => computeDateRange(finFilterType, finStart, finEnd),
-        [finFilterType, finStart, finEnd],
+        () => computeDateRange(finFilterType, debouncedFinStart, debouncedFinEnd),
+        [finFilterType, debouncedFinStart, debouncedFinEnd],
     );
     const mktRange = useMemo(
-        () => computeDateRange(mktFilterType, mktStart, mktEnd),
-        [mktFilterType, mktStart, mktEnd],
+        () => computeDateRange(mktFilterType, debouncedMktStart, debouncedMktEnd),
+        [mktFilterType, debouncedMktStart, debouncedMktEnd],
     );
 
     const { data: fin, loading: finLoading } = useFinancialOverview(finRange.startDate, finRange.endDate);

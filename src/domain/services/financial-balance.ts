@@ -26,6 +26,12 @@ export function isOtherType(type: FinancialTransactionType): boolean {
     return type === "TRANSFER" || type === "OTHER";
 }
 
+/**
+ * Statuses the dashboards consider "active" (i.e. real, countable money).
+ * Single source of truth shared by the SQL narrowing and the in-memory filter.
+ */
+export const DASHBOARD_ACTIVE_STATUSES = ["CONFIRMED", "REVIEWED", "MANUAL"] as const;
+
 /** The four coarse buckets used across the UI (tabs, summary, settings counts). */
 export type TransactionTypeBucket = "income" | "expense" | "transfer" | "withdrawal";
 

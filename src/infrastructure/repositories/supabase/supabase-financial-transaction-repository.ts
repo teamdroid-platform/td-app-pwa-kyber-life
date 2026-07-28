@@ -1,8 +1,9 @@
-import type { IFinancialTransactionRepository } from "@/domain/repositories/financial";
+import type { IFinancialTransactionRepository, DashboardRangeFilter } from "@/domain/repositories/financial";
 import type { FinancialTransaction } from "@/domain/entities/financial";
 import type { UUID } from "@/domain/core";
 import type { PaginationParams, PaginatedResult, TransactionSearchFilters } from "@/domain/pagination";
 import { createClient } from "@/infrastructure/supabase/server";
+import { DASHBOARD_ACTIVE_STATUSES } from "@/domain/services/financial-balance";
 
 export class SupabaseFinancialTransactionRepository implements IFinancialTransactionRepository {
     async create(entity: FinancialTransaction): Promise<FinancialTransaction> {
@@ -112,6 +113,24 @@ export class SupabaseFinancialTransactionRepository implements IFinancialTransac
 
         if (error || !data) return [];
         return data.map(row => this.mapToEntity(row));
+    }
+
+    async findForDashboard(userId: UUID, filter?: DashboardRangeFilter): Promise<FinancialTransaction[]> {
+        const supabase = await createClient();
+        let query = supabase
+            .from('financial_transactions')
+            .select('*')
+            .eq('owner_user_id', userId)
+            .in('status', filter?.statuses ?? DASHBOARD_ACTIVE_STATUSES);
+
+        // Narrow the range in SQL so a 30-day view doesn't transfer years of history.
+        if (filter?.startDate) query = query.gte('date', filter.startDate.toISOString());
+        if (filter?.endDate) query = query.lte('date', filter.endDate.toISOString());
+
+        const { data, error } = await query.order('date', { ascending: false });
+
+        if (error) throw new Error(`Error loading dashboard transactions: ${error.message}`);
+        return (data ?? []).map(row => this.mapToEntity(row));
     }
 
     async countByCategoryId(userId: UUID, categoryId: UUID): Promise<number> {
