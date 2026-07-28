@@ -39,7 +39,22 @@ describe("FinancialDashboardService", () => {
             findByFingerprint: jest.fn(),
             findRecent: jest.fn(),
             findPaginated: jest.fn(),
+            findForDashboard: jest.fn(),
         } as any;
+
+        // The dashboards now narrow by range + active status in SQL. Mirror that
+        // here on top of whatever `findByOwnerId` is stubbed with, so each test
+        // keeps describing its scenario with one raw transaction list.
+        transactionRepo.findForDashboard.mockImplementation(async (userId: string, filter?: { startDate?: Date; endDate?: Date; statuses?: string[] }) => {
+            const all: FinancialTransaction[] = await transactionRepo.findByOwnerId(userId);
+            const statuses = filter?.statuses ?? ["CONFIRMED", "REVIEWED", "MANUAL"];
+            return (all ?? []).filter((t) => {
+                if (!statuses.includes(t.status)) return false;
+                if (filter?.startDate && new Date(t.date) < filter.startDate) return false;
+                if (filter?.endDate && new Date(t.date) > filter.endDate) return false;
+                return true;
+            });
+        });
 
         categoryRepo = {
             findAllBaseAndUser: jest.fn(),
@@ -49,6 +64,7 @@ describe("FinancialDashboardService", () => {
         institutionRepo = {
             findByOwnerId: jest.fn(),
         } as any;
+        institutionRepo.findByOwnerId.mockResolvedValue([]);
 
         service = new FinancialDashboardService(transactionRepo, categoryRepo, institutionRepo);
     });
@@ -442,6 +458,54 @@ describe("FinancialDashboardService", () => {
             expect(kpis.totalWithdrawals).toBe(100);
             expect(kpis.totalTransfers).toBe(200);
             expect(kpis.avgTransactionAmount).toBe(150); // (100 + 200) / 2
+        });
+    });
+
+    describe("getDashboardOverview", () => {
+        const transactions: FinancialTransaction[] = [
+            { ...baseTransaction, id: "1", type: "INCOME", amount: 1000, status: "CONFIRMED" },
+            { ...baseTransaction, id: "2", type: "EXPENSE", amount: 400, status: "CONFIRMED" },
+            { ...baseTransaction, id: "3", type: "EXPENSE", amount: 999, status: "REJECTED" }, // ignored
+        ];
+
+        it("reads the transactions once for every block", async () => {
+            transactionRepo.findByOwnerId.mockResolvedValue(transactions);
+
+            await service.getDashboardOverview(mockUserId);
+
+            // Previously each of the six blocks issued its own full read.
+            expect(transactionRepo.findForDashboard).toHaveBeenCalledTimes(1);
+            expect(categoryRepo.findAllBaseAndUser).toHaveBeenCalledTimes(1);
+            expect(institutionRepo.findByOwnerId).toHaveBeenCalledTimes(1);
+        });
+
+        it("returns every block, consistent with the individual getters", async () => {
+            transactionRepo.findByOwnerId.mockResolvedValue(transactions);
+            institutionRepo.findByOwnerId.mockResolvedValue([]);
+
+            const overview = await service.getDashboardOverview(mockUserId);
+
+            expect(overview.kpis.totalIncome).toBe(1000);
+            expect(overview.kpis.totalExpenses).toBe(400);
+            expect(overview.kpis).toEqual(await service.getKPIs(mockUserId));
+            expect(overview.typeBreakdown).toEqual(await service.getTypeBreakdown(mockUserId));
+            expect(overview.categoryBreakdown).toEqual(await service.getCategoryBreakdown(mockUserId));
+            expect(overview.institutionBreakdown).toEqual(await service.getInstitutionBreakdown(mockUserId));
+            expect(overview.dailyBreakdown).toEqual(await service.getDailyBreakdown(mockUserId));
+            expect(overview.monthly).toEqual(await service.getMonthlyBreakdown(mockUserId));
+        });
+
+        it("pushes the range and the active statuses down to the repository", async () => {
+            transactionRepo.findByOwnerId.mockResolvedValue(transactions);
+            const start = new Date("2026-06-22T00:00:00.000Z");
+            const end = new Date("2026-07-21T23:59:59.999Z");
+
+            await service.getDashboardOverview(mockUserId, start, end);
+
+            expect(transactionRepo.findForDashboard).toHaveBeenCalledWith(mockUserId, {
+                startDate: start,
+                endDate: end,
+            });
         });
     });
 });

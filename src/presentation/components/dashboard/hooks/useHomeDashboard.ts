@@ -1,11 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import {
-    getDailyBreakdownAction,
-    getCategoryBreakdownAction,
-    getFinancialKPIsAction,
-} from "@/app/actions/financial-dashboard";
+import { getDashboardOverviewAction } from "@/app/actions/financial-dashboard";
 import { getMarketDailySpendAction, getMarketTopProductsAction } from "@/app/actions/analytics";
 import type {
     DailyBreakdown,
@@ -42,19 +38,17 @@ export function useFinancialOverview(startDate?: string, endDate?: string) {
     const [data, setData] = useState<FinancialOverviewData>(EMPTY_FINANCIAL);
     const [loading, setLoading] = useState(true);
 
+    // One server action for all three blocks: they used to be three parallel
+    // requests, each re-reading the user's whole transaction history.
     const fetchAll = useCallback(async () => {
         setLoading(true);
         try {
-            const [kpis, daily, categories] = await Promise.all([
-                getFinancialKPIsAction(startDate, endDate),
-                getDailyBreakdownAction(startDate, endDate),
-                getCategoryBreakdownAction(startDate, endDate),
-            ]);
-            setData({
-                kpis: kpis.success && kpis.data ? kpis.data : null,
-                daily: daily.success && daily.data ? daily.data : [],
-                categories: categories.success && categories.data ? categories.data : [],
-            });
+            const result = await getDashboardOverviewAction(startDate, endDate);
+            setData(
+                result.success
+                    ? { kpis: result.data.kpis, daily: result.data.dailyBreakdown, categories: result.data.categoryBreakdown }
+                    : EMPTY_FINANCIAL,
+            );
         } finally {
             setLoading(false);
         }

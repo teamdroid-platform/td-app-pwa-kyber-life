@@ -6,6 +6,7 @@ import { UnifiedTrendChart } from "./UnifiedTrendChart";
 import { CategoryPieChart } from "./CategoryPieChart";
 import { InstitutionBarChart } from "./InstitutionBarChart";
 import { useFinancialDashboard } from "../hooks/useFinancialDashboard";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useFinancialRealtime } from "../hooks/useFinancialRealtime";
 import { Filter, ChevronDown } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -53,6 +54,12 @@ export function FinancialDashboard() {
     // values behind that number.
     const [openKpiModal, setOpenKpiModal] = useState<KpiModalKind | null>(null);
 
+    // Only the hand-typed dates are debounced: a date input emits every partial
+    // value while typing (year 0002, 0202, …) and each one would refetch. The
+    // preset tabs are deliberate clicks, so they still apply instantly.
+    const debouncedStartDate = useDebouncedValue(customStartDate);
+    const debouncedEndDate = useDebouncedValue(customEndDate);
+
     const { startDate, endDate } = useMemo(() => {
         const now = new Date();
         if (filterType === "all") return { startDate: undefined, endDate: undefined };
@@ -83,13 +90,13 @@ export function FinancialDashboard() {
 
         if (filterType === "custom") {
             return {
-                startDate: customStartDate ? new Date(customStartDate + "T00:00:00").toISOString() : undefined,
-                endDate: customEndDate ? new Date(customEndDate + "T23:59:59").toISOString() : undefined
+                startDate: debouncedStartDate ? new Date(debouncedStartDate + "T00:00:00").toISOString() : undefined,
+                endDate: debouncedEndDate ? new Date(debouncedEndDate + "T23:59:59").toISOString() : undefined
             };
         }
 
         return {};
-    }, [filterType, customStartDate, customEndDate]);
+    }, [filterType, debouncedStartDate, debouncedEndDate]);
 
     const { kpis: rawKpis, monthly, typeBreakdown, categoryBreakdown: rawCategoryBreakdown, institutionBreakdown: rawInstitutionBreakdown, dailyBreakdown: rawDailyBreakdown, loading, refetching, refresh } =
         useFinancialDashboard(startDate, endDate);

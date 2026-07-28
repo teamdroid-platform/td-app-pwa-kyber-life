@@ -1,8 +1,9 @@
 import { InMemoryRepository } from "./in-memory-repository";
 import { User, Supermarket, Category, Unit, GenericItem, BrandProduct, Template, TemplateItem, Purchase, PurchaseLine, PriceObservation, PasswordResetToken, FinancialTransaction, FinancialTransactionAuditLog, FinancialScanExecution, FinancialScannerTransaction, FinancialInstitution, FinancialInstitutionType, FinancialAccount, FinancialCategory, Notification, PushSubscription } from "@/domain/entities";
-import { IUserRepository, ISupermarketRepository, ICategoryRepository, IUnitRepository, IGenericItemRepository, IBrandProductRepository, ITemplateRepository, ITemplateItemRepository, IPurchaseRepository, IPurchaseLineRepository, IPriceObservationRepository, IPasswordResetTokenRepository, IFinancialTransactionRepository, IFinancialTransactionAuditLogRepository, IFinancialScanExecutionRepository, IFinancialScannerTransactionRepository, IFinancialInstitutionTypeRepository, IFinancialInstitutionRepository, IFinancialAccountRepository, IFinancialCategoryRepository, INotificationRepository, IPushSubscriptionRepository, NotificationQueryOptions } from "@/domain/repositories";
+import { IUserRepository, ISupermarketRepository, ICategoryRepository, IUnitRepository, IGenericItemRepository, IBrandProductRepository, ITemplateRepository, ITemplateItemRepository, IPurchaseRepository, IPurchaseLineRepository, IPriceObservationRepository, IPasswordResetTokenRepository, IFinancialTransactionRepository, IFinancialTransactionAuditLogRepository, IFinancialScanExecutionRepository, IFinancialScannerTransactionRepository, IFinancialInstitutionTypeRepository, IFinancialInstitutionRepository, IFinancialAccountRepository, IFinancialCategoryRepository, INotificationRepository, IPushSubscriptionRepository, NotificationQueryOptions, DashboardRangeFilter } from "@/domain/repositories";
 import { UUID } from "@/domain/core";
 import { PaginationParams, PaginatedResult, TransactionSearchFilters } from "@/domain/pagination";
+import { DASHBOARD_ACTIVE_STATUSES } from "@/domain/services/financial-balance";
 
 export class InMemoryFinancialTransactionAuditLogRepository extends InMemoryRepository<FinancialTransactionAuditLog> implements IFinancialTransactionAuditLogRepository {
     async findByTransactionId(transactionId: UUID): Promise<FinancialTransactionAuditLog[]> {
@@ -90,6 +91,15 @@ export class InMemoryFinancialTransactionRepository extends InMemoryRepository<F
     }
     async findRecent(userId: UUID, limit: number): Promise<FinancialTransaction[]> {
         return (await this.findByOwnerId(userId)).slice(0, limit);
+    }
+    async findForDashboard(userId: UUID, filter?: DashboardRangeFilter): Promise<FinancialTransaction[]> {
+        const statuses: readonly string[] = filter?.statuses ?? DASHBOARD_ACTIVE_STATUSES;
+        return (await this.findByOwnerId(userId)).filter(t => {
+            if (!statuses.includes(t.status)) return false;
+            if (filter?.startDate && new Date(t.date) < filter.startDate) return false;
+            if (filter?.endDate && new Date(t.date) > filter.endDate) return false;
+            return true;
+        });
     }
     async search(userId: UUID, query: string, filters?: TransactionSearchFilters): Promise<FinancialTransaction[]> {
         return this.applyFilters(await this.findByOwnerId(userId), query, filters);
