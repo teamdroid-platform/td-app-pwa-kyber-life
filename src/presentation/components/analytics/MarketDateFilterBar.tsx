@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
-import { defaultHubCustomRange } from "@/lib/date-range";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
+import { PeriodFilter } from "@/components/ui/period-filter";
+import { formatRangeLabel } from "@/components/ui/range-calendar";
+import { defaultHubCustomRange, STANDARD_PERIOD_PRESETS } from "@/lib/date-range";
 
 export type FilterType = "all" | "today" | "week" | "month" | "custom";
 
@@ -156,44 +157,36 @@ export function MarketDateFilterBar() {
         }
     };
 
-    const handleCustomDateChange = (type: 'start' | 'end', value: string) => {
-        if (type === 'start') {
-            setCustomStartDate(value);
-            updateFilter("custom", value, customEndDate);
-        } else {
-            setCustomEndDate(value);
-            updateFilter("custom", customStartDate, value);
-        }
+    /** The picker emits a complete range, so both ends move together. */
+    const handleCustomRangeChange = (from: string, to: string) => {
+        setCustomStartDate(from);
+        setCustomEndDate(to);
+        updateFilter("custom", from, to);
     };
 
     return (
         <div className="flex flex-col xl:flex-row items-start xl:items-center gap-4 flex-1 w-full mb-6">
             {/* Mobile Filter (Select) */}
             <div className="w-full sm:hidden">
-                <Select value={filterType} onValueChange={(v: FilterType) => handleTypeChange(v)}>
-                    <SelectTrigger className="w-full bg-bg-2 border-border/40 rounded-xl h-10 font-medium text-text-1">
-                        <SelectValue placeholder="Seleccionar período" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="all">Todo el tiempo</SelectItem>
-                        <SelectItem value="today">Hoy</SelectItem>
-                        <SelectItem value="week">Semana</SelectItem>
-                        <SelectItem value="month">Mes</SelectItem>
-                        <SelectItem value="custom">Personalizado</SelectItem>
-                    </SelectContent>
-                </Select>
+                <PeriodFilter
+                    value={filterType}
+                    onChange={(v) => handleTypeChange(v as FilterType)}
+                    presets={STANDARD_PERIOD_PRESETS}
+                    customId={"custom" as FilterType}
+                    customStart={customStartDate}
+                    customEnd={customEndDate}
+                    onCustomRangeChange={handleCustomRangeChange}
+                    className="bg-bg-2 text-text-1"
+                />
             </div>
 
             {/* Desktop Filter (Tabs) */}
             <div className="hidden sm:flex items-center p-1 bg-bg-2 border border-border/40 rounded-xl w-full">
                 {(
                     [
-                        { id: 'all', label: 'Todo el tiempo' },
-                        { id: 'today', label: 'Hoy' },
-                        { id: 'week', label: 'Semana' },
-                        { id: 'month', label: 'Mes' },
-                        { id: 'custom', label: 'Personalizado' }
-                    ] as const
+                        ...STANDARD_PERIOD_PRESETS,
+                        { id: 'custom' as const, label: formatRangeLabel(customStartDate, customEndDate) ?? 'Personalizado' },
+                    ]
                 ).map((tab) => (
                     <button
                         key={tab.id}
@@ -211,22 +204,13 @@ export function MarketDateFilterBar() {
             </div>
 
             {filterType === "custom" && (
-                <div className="flex items-center gap-2 w-full sm:w-auto animate-in fade-in slide-in-from-top-1">
-                    <div className="flex items-center gap-2 w-full bg-bg-2 p-1 rounded-xl border border-border/40">
-                        <Input
-                            type="date"
-                            value={customStartDate}
-                            onChange={(e) => handleCustomDateChange('start', e.target.value)}
-                            className="h-8 text-xs bg-bg-1 border-border/50 rounded-lg focus-visible:ring-1 focus-visible:ring-offset-0"
-                        />
-                        <span className="text-muted-foreground/50 text-xs font-medium">a</span>
-                        <Input
-                            type="date"
-                            value={customEndDate}
-                            onChange={(e) => handleCustomDateChange('end', e.target.value)}
-                            className="h-8 text-xs bg-bg-1 border-border/50 rounded-lg focus-visible:ring-1 focus-visible:ring-offset-0"
-                        />
-                    </div>
+                <div className="w-full sm:w-auto sm:min-w-[280px] animate-in fade-in slide-in-from-top-1">
+                    <DateRangePicker
+                        start={customStartDate}
+                        end={customEndDate}
+                        onChange={handleCustomRangeChange}
+                        className="bg-bg-2 text-xs"
+                    />
                 </div>
             )}
         </div>

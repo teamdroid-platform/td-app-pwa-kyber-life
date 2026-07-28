@@ -1,6 +1,7 @@
 "use client";
 
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { useChartTooltipDismiss } from "@/hooks/use-chart-tooltip-dismiss";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "lucide-react";
 
@@ -9,8 +10,11 @@ interface StatsAreaChartProps {
 }
 
 export function StatsAreaChart({ data }: StatsAreaChartProps) {
+    // On touch there is no "mouse leave" to close the tooltip, so make it dismissable.
+    const { containerRef, tooltipActive, handlePointerDown } = useChartTooltipDismiss();
+
     return (
-        <div className="bg-bg-primary rounded-3xl p-6 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] border border-border-base h-full flex flex-col">
+        <div ref={containerRef} onPointerDown={handlePointerDown} className="bg-bg-primary rounded-3xl p-6 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] border border-border-base h-full flex flex-col">
             <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
                 <div>
                     <h3 className="text-lg font-bold text-text-primary">Estadísticas</h3>
@@ -67,6 +71,7 @@ export function StatsAreaChart({ data }: StatsAreaChartProps) {
                             tick={{ fill: 'var(--text-tertiary)', fontSize: 12 }}
                         />
                         <Tooltip
+                            active={tooltipActive}
                             contentStyle={{
                                 backgroundColor: 'var(--bg-secondary)',
                                 borderRadius: '12px',

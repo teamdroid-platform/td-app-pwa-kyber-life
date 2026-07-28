@@ -1,32 +1,26 @@
 "use client";
 
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
+import { PeriodFilter } from "@/components/ui/period-filter";
+import { formatRangeLabel } from "@/components/ui/range-calendar";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { RangeFilterType } from "@/lib/date-range";
+import { STANDARD_PERIOD_PRESETS, type RangeFilterType } from "@/lib/date-range";
 
 export interface DateRangePreset {
     id: RangeFilterType;
     label: string;
 }
 
-export const DEFAULT_PRESETS: DateRangePreset[] = [
-    { id: "all", label: "Todo el tiempo" },
-    { id: "today", label: "Hoy" },
-    { id: "week", label: "Semana" },
-    { id: "month", label: "Mes" },
+const STANDARD_WITH_CUSTOM: DateRangePreset[] = [
+    ...STANDARD_PERIOD_PRESETS,
     { id: "custom", label: "Personalizado" },
 ];
 
-/** Presets for the main dashboard hub. */
-export const HUB_PRESETS: DateRangePreset[] = [
-    { id: "all", label: "Todos" },
-    { id: "today", label: "Hoy" },
-    { id: "week", label: "Semana" },
-    { id: "month", label: "Mes" },
-    { id: "custom", label: "Personalizado" },
-];
+export const DEFAULT_PRESETS = STANDARD_WITH_CUSTOM;
+
+/** Kept for the hub's call sites; the options are the standard ones. */
+export const HUB_PRESETS = STANDARD_WITH_CUSTOM;
 
 interface DateRangeFilterProps {
     value: RangeFilterType;
@@ -44,6 +38,9 @@ interface DateRangeFilterProps {
  * main dashboard hub: a Select on mobile, a segmented tab bar on desktop, and
  * inline date inputs when "Personalizado" is selected.
  */
+/** Presets without the custom entry: the period control appends the range itself. */
+const withoutCustom = (presets: DateRangePreset[]) => presets.filter((p) => p.id !== "custom");
+
 export function DateRangeFilter({
     value,
     onChange,
@@ -54,45 +51,25 @@ export function DateRangeFilter({
     presets = DEFAULT_PRESETS,
     className,
 }: DateRangeFilterProps) {
+    // The picker emits a complete range, so both ends are updated together.
+    const handleRangeChange = (from: string, to: string) => {
+        onCustomStartChange(from);
+        onCustomEndChange(to);
+    };
+
     return (
         <div className={cn("flex flex-col w-full", className)}>
-            {/* Mobile: Select + Date Inputs if custom */}
+            {/* Mobile: one control holding both the presets and the range */}
             <div className="flex flex-col gap-2 w-full sm:hidden h-10">
-                {value !== "custom" ? (
-                    <Select value={value} onValueChange={(v) => onChange(v as RangeFilterType)}>
-                        <SelectTrigger className="w-full bg-muted/40 border-border/40 rounded-xl h-10 font-medium">
-                            <SelectValue placeholder="Seleccionar período" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {presets.map((p) => (
-                                <SelectItem key={p.id} value={p.id}>{p.label}</SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                ) : (
-                    <div className="flex items-center gap-1 w-full h-10 animate-in fade-in slide-in-from-top-1 bg-muted/20 p-1 rounded-xl border border-border/40">
-                        <button
-                            onClick={() => onChange("all")}
-                            className="flex items-center justify-center h-full px-2 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-lg transition-colors shrink-0"
-                            title="Volver a los filtros predefinidos"
-                        >
-                            <X className="h-4 w-4" />
-                        </button>
-                        <Input
-                            type="date"
-                            value={customStart}
-                            onChange={(e) => onCustomStartChange(e.target.value)}
-                            className="h-full px-1 text-xs bg-background border-border/50 rounded-lg focus-visible:ring-1 focus-visible:ring-offset-0 flex-1"
-                        />
-                        <span className="text-muted-foreground/50 text-[10px] font-medium shrink-0">a</span>
-                        <Input
-                            type="date"
-                            value={customEnd}
-                            onChange={(e) => onCustomEndChange(e.target.value)}
-                            className="h-full px-1 text-xs bg-background border-border/50 rounded-lg focus-visible:ring-1 focus-visible:ring-offset-0 flex-1"
-                        />
-                    </div>
-                )}
+                <PeriodFilter
+                    value={value}
+                    onChange={onChange}
+                    presets={withoutCustom(presets)}
+                    customId={"custom" as RangeFilterType}
+                    customStart={customStart}
+                    customEnd={customEnd}
+                    onCustomRangeChange={handleRangeChange}
+                />
             </div>
 
             {/* Desktop: segmented tabs OR custom date range in the same container */}
@@ -109,7 +86,7 @@ export function DateRangeFilter({
                                     : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
                             )}
                         >
-                            {p.label}
+                            {p.id === "custom" ? (formatRangeLabel(customStart, customEnd) ?? p.label) : p.label}
                         </button>
                     ))
                 ) : (
@@ -121,18 +98,11 @@ export function DateRangeFilter({
                         >
                             <X className="h-4 w-4" />
                         </button>
-                        <Input
-                            type="date"
-                            value={customStart}
-                            onChange={(e) => onCustomStartChange(e.target.value)}
-                            className="h-full text-xs bg-background border-border/50 rounded-lg focus-visible:ring-1 focus-visible:ring-offset-0 flex-1"
-                        />
-                        <span className="text-muted-foreground/50 text-xs font-medium shrink-0">a</span>
-                        <Input
-                            type="date"
-                            value={customEnd}
-                            onChange={(e) => onCustomEndChange(e.target.value)}
-                            className="h-full text-xs bg-background border-border/50 rounded-lg focus-visible:ring-1 focus-visible:ring-offset-0 flex-1"
+                        <DateRangePicker
+                            start={customStart}
+                            end={customEnd}
+                            onChange={handleRangeChange}
+                            className="h-full flex-1 border-border/50 bg-background text-xs"
                         />
                     </div>
                 )}

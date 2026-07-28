@@ -2,7 +2,7 @@
 
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, SlidersHorizontal, CalendarDays, X, ChevronDown, Filter } from "lucide-react";
+import { Search, SlidersHorizontal, X, ChevronDown, Filter } from "lucide-react";
 import {
     Popover,
     PopoverContent,
@@ -19,19 +19,13 @@ import { FinancialCategory, FinancialInstitution } from "@/domain/entities/finan
 import { useState, useEffect, useCallback } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { defaultHubCustomRange } from "@/lib/date-range";
+import { defaultHubCustomRange, STANDARD_PERIOD_PRESETS } from "@/lib/date-range";
+import { PeriodFilter } from "@/components/ui/period-filter";
 
 // ─── Date Preset Helpers ─────────────────────────────────────
 
 type DatePreset = "today" | "week" | "month" | "all" | "custom";
 
-const PRESET_LABELS: Record<DatePreset, string> = {
-    today: "Hoy",
-    week: "Esta semana",
-    month: "Este mes",
-    all: "Todos",
-    custom: "Personalizado",
-};
 
 function getPresetRange(preset: Exclude<DatePreset, "custom">): { from: string; to: string; range?: string } {
     const now = new Date();
@@ -57,15 +51,6 @@ function getPresetRange(preset: Exclude<DatePreset, "custom">): { from: string; 
             return { from: "", to: "", range: "all" };
         }
     }
-}
-
-/** Format an ISO string to a short locale date label (e.g. "26 may 2026") */
-function formatShortDate(iso: string): string {
-    return new Intl.DateTimeFormat("es-ES", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-    }).format(new Date(iso));
 }
 
 /** Convert an ISO string to a local YYYY-MM-DD for <input type="date"> */
@@ -114,7 +99,6 @@ export function TransactionFilters({ categories = [], institutions = [] }: Trans
     const [activePreset, setActivePreset] = useState<DatePreset | null>(
         searchParams.get("range") === "all" ? "all" : "custom"
     );
-    const [datePopoverOpen, setDatePopoverOpen] = useState(false);
 
     // ── Custom date inputs (local YYYY-MM-DD) ────────────────
     const defaultCustom = getDefaultCustomDates();
@@ -189,16 +173,21 @@ export function TransactionFilters({ categories = [], institutions = [] }: Trans
         setActivePreset(preset);
         const { from, to, range } = getPresetRange(preset);
         applyDateFilter(from, to, range);
-        setDatePopoverOpen(false);
     };
 
-    const handleCustomApply = () => {
-        if (!customFrom || !customTo) return;
-        const from = new Date(`${customFrom}T00:00:00`).toISOString();
-        const to = new Date(`${customTo}T23:59:59`).toISOString();
+    /**
+     * Applies as soon as a complete range is picked — same behaviour as the
+     * dashboards' filters, so there is no separate "Aplicar" step.
+     */
+    const handleCustomRangeChange = (nextFrom: string, nextTo: string) => {
+        setCustomFrom(nextFrom);
+        setCustomTo(nextTo);
+        if (!nextFrom || !nextTo) return;
         setActivePreset("custom");
-        applyDateFilter(from, to);
-        setDatePopoverOpen(false);
+        applyDateFilter(
+            new Date(`${nextFrom}T00:00:00`).toISOString(),
+            new Date(`${nextTo}T23:59:59`).toISOString(),
+        );
     };
 
     const clearDateFilter = () => {
@@ -253,15 +242,6 @@ export function TransactionFilters({ categories = [], institutions = [] }: Trans
 
     // ── Build label for date button ──────────────────────────
 
-    const getDateButtonLabel = (): string => {
-        if (isDefaultRange) {
-            return `${formatShortDate(`${defaultCustom.from}T00:00:00`)} – ${formatShortDate(`${defaultCustom.to}T00:00:00`)}`;
-        }
-        if (urlRange === 'all') return "Todos";
-        if (activePreset && activePreset !== "custom") return PRESET_LABELS[activePreset];
-        if (dateFrom && dateTo) return `${formatShortDate(dateFrom)} – ${formatShortDate(dateTo)}`;
-        return "Fecha";
-    };
 
     return (
         <div className="flex flex-col gap-3 w-full mb-4">
@@ -320,7 +300,7 @@ export function TransactionFilters({ categories = [], institutions = [] }: Trans
                                     <SelectValue placeholder="Todas" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="all">Todas las categorías</SelectItem>
+                                    <SelectItem value="all">Todas</SelectItem>
                                     {categories.map(c => (
                                         <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                                     ))}
@@ -336,7 +316,7 @@ export function TransactionFilters({ categories = [], institutions = [] }: Trans
                                     <SelectValue placeholder="Todas" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="all">Todas las instituciones</SelectItem>
+                                    <SelectItem value="all">Todas</SelectItem>
                                     {institutions.map(i => (
                                         <SelectItem key={i.id} value={i.id}>{i.name}</SelectItem>
                                     ))}
@@ -349,55 +329,17 @@ export function TransactionFilters({ categories = [], institutions = [] }: Trans
                         <label className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                             Período
                         </label>
-                        <Select
+                        {/* Presets and the custom range share one control: the custom
+                            entry shows the dates themselves and opens the calendar. */}
+                        <PeriodFilter
                             value={activePreset ?? "custom"}
-                            onValueChange={(v: string) => {
-                                const preset = v as DatePreset;
-                                if (preset === "custom") {
-                                    setActivePreset("custom");
-                                } else {
-                                    handlePresetClick(preset);
-                                }
-                            }}
-                        >
-                            <SelectTrigger className="w-full h-10 rounded-xl bg-muted/40 border-border/40">
-                                <SelectValue placeholder="Período" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {(["today", "week", "month", "all", "custom"] as const).map((preset) => (
-                                    <SelectItem key={preset} value={preset}>{PRESET_LABELS[preset]}</SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                        {activePreset === "custom" && (
-                            <div className="grid grid-cols-2 gap-2 pt-1">
-                                <Input
-                                    type="date"
-                                    aria-label="Desde"
-                                    value={customFrom}
-                                    onChange={(e) => setCustomFrom(e.target.value)}
-                                    className="h-10 rounded-xl bg-muted/40 border-border/40 text-xs"
-                                />
-                                <Input
-                                    type="date"
-                                    aria-label="Hasta"
-                                    value={customTo}
-                                    onChange={(e) => setCustomTo(e.target.value)}
-                                    className="h-10 rounded-xl bg-muted/40 border-border/40 text-xs"
-                                />
-                                <Button
-                                    size="sm"
-                                    className="col-span-2 rounded-xl"
-                                    disabled={!customFrom || !customTo}
-                                    onClick={handleCustomApply}
-                                >
-                                    Aplicar rango
-                                </Button>
-                            </div>
-                        )}
-                        <p className="text-[11px] text-muted-foreground pt-0.5">
-                            Rango: {getDateButtonLabel()}
-                        </p>
+                            onChange={(preset) => handlePresetClick(preset as Exclude<DatePreset, "custom">)}
+                            presets={STANDARD_PERIOD_PRESETS}
+                            customId="custom"
+                            customStart={customFrom}
+                            customEnd={customTo}
+                            onCustomRangeChange={handleCustomRangeChange}
+                        />
                     </div>
 
                     {hasAnyFilter && (
@@ -435,10 +377,10 @@ export function TransactionFilters({ categories = [], institutions = [] }: Trans
                                 </label>
                                 <Select value={categoryId} onValueChange={handleCategoryChange}>
                                     <SelectTrigger className="w-full">
-                                        <SelectValue placeholder="Todas las categorías" />
+                                        <SelectValue placeholder="Todas" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="all">Todas las categorías</SelectItem>
+                                        <SelectItem value="all">Todas</SelectItem>
                                         {categories.map(c => (
                                             <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                                         ))}
@@ -452,10 +394,10 @@ export function TransactionFilters({ categories = [], institutions = [] }: Trans
                                 </label>
                                 <Select value={institutionId} onValueChange={handleInstitutionChange}>
                                     <SelectTrigger className="w-full">
-                                        <SelectValue placeholder="Todas las instituciones" />
+                                        <SelectValue placeholder="Todas" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="all">Todas las instituciones</SelectItem>
+                                        <SelectItem value="all">Todas</SelectItem>
                                         {institutions.map(i => (
                                             <SelectItem key={i.id} value={i.id}>{i.name}</SelectItem>
                                         ))}
@@ -465,115 +407,30 @@ export function TransactionFilters({ categories = [], institutions = [] }: Trans
                         </PopoverContent>
                     </Popover>
 
-                    {/* Date Range Filter */}
-                    <Popover open={datePopoverOpen} onOpenChange={setDatePopoverOpen}>
-                        <PopoverTrigger asChild>
+                    {/* Date Range Filter: presets + custom range in one control */}
+                    <div className="flex items-center gap-1">
+                        <PeriodFilter
+                            value={activePreset ?? "custom"}
+                            onChange={(preset) => handlePresetClick(preset as Exclude<DatePreset, "custom">)}
+                            presets={STANDARD_PERIOD_PRESETS}
+                            customId="custom"
+                            customStart={customFrom}
+                            customEnd={customTo}
+                            onCustomRangeChange={handleCustomRangeChange}
+                            className="h-9 w-auto min-w-[170px] border-transparent bg-transparent hover:bg-white/5"
+                        />
+                        {hasDateFilter && (
                             <Button
                                 variant="ghost"
-                                className={cn(
-                                    "gap-2 hover:bg-white/5",
-                                    hasDateFilter ? "text-accent-primary" : "text-muted-foreground",
-                                )}
+                                size="icon"
+                                className="h-8 w-8 shrink-0 text-muted-foreground hover:text-foreground"
+                                onClick={clearDateFilter}
+                                aria-label="Limpiar filtro de fecha"
                             >
-                                <CalendarDays className={cn("h-4 w-4 shrink-0", hasDateFilter ? "text-accent-primary" : "text-muted-foreground")} />
-                                <span className="truncate max-w-[120px] sm:max-w-[160px]">{getDateButtonLabel()}</span>
-                                {hasDateFilter && (
-                                    <div
-                                        role="button"
-                                        tabIndex={0}
-                                        className="ml-1 -mr-1 rounded-full p-0.5 hover:bg-accent-primary/20 transition-colors"
-                                        onClick={(e) => {
-                                            e.preventDefault();
-                                            e.stopPropagation();
-                                            clearDateFilter();
-                                        }}
-                                        onKeyDown={(e) => {
-                                            if (e.key === 'Enter' || e.key === ' ') {
-                                                e.preventDefault();
-                                                e.stopPropagation();
-                                                clearDateFilter();
-                                            }
-                                        }}
-                                        aria-label="Limpiar filtro de fecha"
-                                    >
-                                        <X className="h-3 w-3" />
-                                    </div>
-                                )}
+                                <X className="h-3.5 w-3.5" />
                             </Button>
-                        </PopoverTrigger>
-                        <PopoverContent align="end" className="w-72 p-0">
-                            {/* Presets */}
-                            <div className="p-3 space-y-1">
-                                <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-2">
-                                    Rango rápido
-                                </p>
-                                {(["today", "week", "month", "all"] as const).map((preset) => (
-                                    <button
-                                        key={preset}
-                                        type="button"
-                                        className={cn(
-                                            "w-full text-left px-3 py-2 rounded-lg text-sm transition-colors",
-                                            activePreset === preset
-                                                ? "bg-accent-primary/10 text-accent-primary font-medium"
-                                                : "hover:bg-muted/50 text-foreground",
-                                        )}
-                                        onClick={() => handlePresetClick(preset)}
-                                    >
-                                        {PRESET_LABELS[preset]}
-                                    </button>
-                                ))}
-                            </div>
-
-                            <div className="border-t border-border/50" />
-
-                            {/* Custom range */}
-                            <div className="p-3 space-y-3">
-                                <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-                                    Personalizado
-                                </p>
-                                <div className="grid grid-cols-2 gap-2">
-                                    <div className="space-y-1">
-                                        <label htmlFor="date-filter-from" className="text-[11px] font-medium text-muted-foreground">
-                                            Desde
-                                        </label>
-                                        <Input
-                                            id="date-filter-from"
-                                            type="date"
-                                            value={customFrom}
-                                            onChange={(e) => {
-                                                setCustomFrom(e.target.value);
-                                                setActivePreset("custom");
-                                            }}
-                                            className="h-9 text-sm bg-bg-primary"
-                                        />
-                                    </div>
-                                    <div className="space-y-1">
-                                        <label htmlFor="date-filter-to" className="text-[11px] font-medium text-muted-foreground">
-                                            Hasta
-                                        </label>
-                                        <Input
-                                            id="date-filter-to"
-                                            type="date"
-                                            value={customTo}
-                                            onChange={(e) => {
-                                                setCustomTo(e.target.value);
-                                                setActivePreset("custom");
-                                            }}
-                                            className="h-9 text-sm bg-bg-primary"
-                                        />
-                                    </div>
-                                </div>
-                                <Button
-                                    size="sm"
-                                    className="w-full rounded-lg"
-                                    disabled={!customFrom || !customTo}
-                                    onClick={handleCustomApply}
-                                >
-                                    Aplicar rango
-                                </Button>
-                            </div>
-                        </PopoverContent>
-                    </Popover>
+                        )}
+                    </div>
 
                     {hasAnyFilter && (
                         <Button
