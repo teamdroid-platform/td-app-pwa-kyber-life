@@ -7,6 +7,7 @@ import type { PaginatedResult } from "@/domain/pagination";
 import { TransactionCard } from "./TransactionCard";
 import { financialOfflineStore } from "@/infrastructure/offline/financial-offline-store";
 import { searchPaginatedTransactionsAction, createTransactionAction } from "@/app/actions/financial-transactions";
+import { buildFallbackTitle } from "@/lib/financial-utils";
 import { useFinancialRealtime } from "../hooks/useFinancialRealtime";
 import { WifiOff, Loader2 } from "lucide-react";
 import { TransactionSummary } from "./TransactionSummary";
@@ -114,6 +115,25 @@ function groupTransactionsByDate(transactions: FinancialTransaction[]) {
 // ─── Default page size ───────────────────────────────────────
 
 const PAGE_SIZE = 20;
+
+/**
+ * A queued offline draft may predate the rule that makes the description
+ * required, or have been saved before the user typed one. Rather than let the
+ * sync fail, fall back to the title the app would show for it anyway.
+ */
+function withFallbackDescription(draft: unknown): Record<string, unknown> {
+    const data = { ...(draft as Record<string, unknown>) };
+    const description = typeof data.description === "string" ? data.description.trim() : "";
+    if (!description) {
+        data.description = buildFallbackTitle(
+            typeof data.type === "string" ? data.type : null,
+            typeof data.merchant === "string"
+                ? data.merchant
+                : typeof data.institutionName === "string" ? data.institutionName : null,
+        );
+    }
+    return data;
+}
 
 // ─── Component ───────────────────────────────────────────────
 
@@ -293,7 +313,7 @@ export function TransactionTimeline({ initialTransactions, allFilteredTransactio
                     let syncedCount = 0;
                     for (const draft of completedDrafts) {
                         try {
-                            const result = await createTransactionAction(draft.data as any);
+                            const result = await createTransactionAction(withFallbackDescription(draft.data));
                             if (result.success) {
                                 await financialOfflineStore.drafts.remove(draft.id);
                                 syncedCount++;

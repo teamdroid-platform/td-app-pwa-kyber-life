@@ -35,6 +35,14 @@ export const FINANCIAL_FLAGS = {
      * Default: false (Experimental)
      */
     RECURRING_DETECTION: process.env.NEXT_PUBLIC_FF_FINANCIAL_RECURRING === "true",
+
+    /**
+     * Toggles the stepped transaction wizard (create + edit) that replaces the
+     * single-screen accordion form. Turning it off restores the previous form
+     * without reverting any code.
+     * Default: true
+     */
+    WIZARD_ENABLED: process.env.NEXT_PUBLIC_FF_FINANCIAL_WIZARD !== "false",
 } as const;
 
 export type FinancialFeatureFlags = typeof FINANCIAL_FLAGS;

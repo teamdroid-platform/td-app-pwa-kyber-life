@@ -1,0 +1,230 @@
+"use client";
+
+import { useCallback, useMemo, useState } from "react";
+import type { FinancialTransactionType } from "@/domain/entities/financial";
+
+/** Types for which "paid with credit card" is a meaningful, editable flag. */
+export const CREDIT_ELIGIBLE_TYPES: readonly FinancialTransactionType[] = ["EXPENSE"];
+
+export type WizardStepId = "amount" | "institution" | "category" | "payment" | "date";
+
+/** The summary is a destination you return to, not a step you walk through. */
+export type WizardScreen = WizardStepId | "summary";
+
+export interface WizardValues {
+    type: FinancialTransactionType;
+    amount: string;
+    description: string;
+    institutionName: string;
+    accountName: string;
+    categoryName: string;
+    paidWithCredit: boolean;
+    date: string;
+    notes: string;
+    tags: string[];
+}
+
+export interface StepDefinition {
+    id: WizardStepId;
+    /** Shown under the wizard title, e.g. "Paso 2 de 5 · Institución". */
+    label: string;
+    /** Header used when the step is opened on its own from the summary. */
+    focusTitle: string;
+}
+
+export const WIZARD_STEPS: StepDefinition[] = [
+    { id: "amount", label: "Monto y descripción", focusTitle: "Editar monto y descripción" },
+    { id: "institution", label: "Institución", focusTitle: "Editar institución" },
+    { id: "category", label: "Categoría", focusTitle: "Editar categoría" },
+    { id: "payment", label: "Cuenta y pago", focusTitle: "Editar cuenta y pago" },
+    { id: "date", label: "Fecha y hora", focusTitle: "Editar fecha y hora" },
+];
+
+/** A required value the user still has to provide, and where to provide it. */
+export interface MissingField {
+    field: keyof WizardValues;
+    step: WizardStepId;
+    label: string;
+}
+
+/**
+ * Which step owns each value. Drives "edit only this field" from the summary
+ * and the jump-to-the-culprit behaviour of the missing-field rows.
+ */
+export const FIELD_STEP: Record<keyof WizardValues, WizardScreen> = {
+    type: "amount",
+    amount: "amount",
+    description: "amount",
+    institutionName: "institution",
+    categoryName: "category",
+    accountName: "payment",
+    paidWithCredit: "payment",
+    date: "date",
+    notes: "summary",
+    tags: "summary",
+};
+
+export function isAmountValid(amount: string): boolean {
+    const parsed = Number(amount);
+    return !!amount && !Number.isNaN(parsed) && parsed > 0;
+}
+
+/**
+ * Required values, in step order. Description is required by product decision:
+ * it is the transaction's title everywhere (`getTransactionDisplayTitle`).
+ */
+export function collectMissing(values: WizardValues): MissingField[] {
+    const missing: MissingField[] = [];
+    if (!isAmountValid(values.amount)) missing.push({ field: "amount", step: "amount", label: "Falta el monto" });
+    if (!values.description.trim()) missing.push({ field: "description", step: "amount", label: "Falta la descripción" });
+    if (!values.institutionName.trim()) missing.push({ field: "institutionName", step: "institution", label: "Falta la institución" });
+    if (!values.date) missing.push({ field: "date", step: "date", label: "Falta la fecha" });
+    return missing;
+}
+
+/** Whether a given step has everything it needs to move forward. */
+export function canLeaveStep(step: WizardStepId, values: WizardValues): boolean {
+    return collectMissing(values).every((m) => m.step !== step);
+}
+
+/** Fields whose value differs from the one the wizard opened with. */
+export function diffValues(initial: WizardValues, current: WizardValues): (keyof WizardValues)[] {
+    return (Object.keys(current) as (keyof WizardValues)[]).filter((key) => {
+        if (key === "tags") {
+            const a = initial.tags ?? [];
+            const b = current.tags ?? [];
+            return a.length !== b.length || a.some((tag, i) => tag !== b[i]);
+        }
+        return initial[key] !== current[key];
+    });
+}
+
+export interface UseTransactionWizardOptions {
+    mode: "create" | "edit";
+    initialValues: WizardValues;
+}
+
+/**
+ * State machine behind the stepped transaction form.
+ *
+ * Two ways to reach a step:
+ *   - the walk-through (`next`/`back`), where the primary action advances, and
+ *   - focus mode (`openFocus`), reached from a summary row, where the primary
+ *     action saves that one field and returns to the summary.
+ *
+ * Nothing here touches the server: the wizard edits a draft in memory and the
+ * caller writes it once, at the end.
+ */
+export function useTransactionWizard({ mode, initialValues }: UseTransactionWizardOptions) {
+    const [values, setValues] = useState<WizardValues>(initialValues);
+    // Editing an existing transaction starts at the summary: the point is to
+    // change one thing, not to re-capture the whole record.
+    const [screen, setScreen] = useState<WizardScreen>(mode === "edit" ? "summary" : "amount");
+    const [focus, setFocus] = useState(false);
+    /** Value snapshot taken when a focus edit starts, so Cancel can restore it. */
+    const [focusSnapshot, setFocusSnapshot] = useState<WizardValues | null>(null);
+
+    const setValue = useCallback(<K extends keyof WizardValues>(key: K, value: WizardValues[K]) => {
+        setValues((prev) => ({ ...prev, [key]: value }));
+    }, []);
+
+    const patch = useCallback((partial: Partial<WizardValues>) => {
+        setValues((prev) => ({ ...prev, ...partial }));
+    }, []);
+
+    const stepIndex = WIZARD_STEPS.findIndex((s) => s.id === screen);
+    const isSummary = screen === "summary";
+
+    const missing = useMemo(() => collectMissing(values), [values]);
+    const changed = useMemo(() => diffValues(initialValues, values), [initialValues, values]);
+
+    const canAdvance = isSummary
+        ? missing.length === 0
+        : missing.every((m) => m.step !== (screen as WizardStepId));
+
+    /** Walk-through: move to the next step, or to the summary after the last one. */
+    const next = useCallback(() => {
+        setScreen((current) => {
+            const index = WIZARD_STEPS.findIndex((s) => s.id === current);
+            if (index < 0 || index === WIZARD_STEPS.length - 1) return "summary";
+            return WIZARD_STEPS[index + 1].id;
+        });
+    }, []);
+
+    /** Back gesture: never closes the wizard, never loses what was typed. */
+    const back = useCallback(() => {
+        if (focus) {
+            setFocus(false);
+            setFocusSnapshot(null);
+            setScreen("summary");
+            return;
+        }
+        setScreen((current) => {
+            if (current === "summary") return WIZARD_STEPS[WIZARD_STEPS.length - 1].id;
+            const index = WIZARD_STEPS.findIndex((s) => s.id === current);
+            return index <= 0 ? current : WIZARD_STEPS[index - 1].id;
+        });
+    }, [focus]);
+
+    const goTo = useCallback((target: WizardScreen) => {
+        setFocus(false);
+        setFocusSnapshot(null);
+        setScreen(target);
+    }, []);
+
+    /** Open one step on its own; saving or cancelling returns to the summary. */
+    const openFocus = useCallback((target: WizardScreen) => {
+        if (target === "summary") return;
+        setFocusSnapshot(values);
+        setFocus(true);
+        setScreen(target);
+    }, [values]);
+
+    /** Keep the focused edit and go back to the summary. */
+    const commitFocus = useCallback(() => {
+        setFocus(false);
+        setFocusSnapshot(null);
+        setScreen("summary");
+    }, []);
+
+    /** Discard the focused edit and go back to the summary. */
+    const cancelFocus = useCallback(() => {
+        if (focusSnapshot) setValues(focusSnapshot);
+        setFocus(false);
+        setFocusSnapshot(null);
+        setScreen("summary");
+    }, [focusSnapshot]);
+
+    /** Drop every pending change (edit mode's "Deshacer"). */
+    const reset = useCallback(() => {
+        setValues(initialValues);
+        setFocus(false);
+        setFocusSnapshot(null);
+    }, [initialValues]);
+
+    const creditEligible = CREDIT_ELIGIBLE_TYPES.includes(values.type);
+
+    return {
+        values,
+        setValue,
+        patch,
+        screen,
+        stepIndex,
+        isSummary,
+        focus,
+        next,
+        back,
+        goTo,
+        openFocus,
+        commitFocus,
+        cancelFocus,
+        reset,
+        missing,
+        changed,
+        canAdvance,
+        creditEligible,
+        isDirty: changed.length > 0,
+    };
+}
+
+export type TransactionWizardApi = ReturnType<typeof useTransactionWizard>;

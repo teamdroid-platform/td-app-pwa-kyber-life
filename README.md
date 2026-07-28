@@ -83,6 +83,7 @@ Renombra `.env.example` a `.env` y configura las variables:
 | `NEXT_PUBLIC_FF_FINANCIAL_AI` | ❌ Opcional | Habilita categorización con IA (`true`/`false`). Default: `false` |
 | `NEXT_PUBLIC_FF_FINANCIAL_OFFLINE` | ❌ Opcional | Habilita caché offline IndexedDB (`true`/`false`). Default: `true` |
 | `NEXT_PUBLIC_FF_FINANCIAL_RECURRING` | ❌ Opcional | Habilita detección de transacciones recurrentes (`true`/`false`). Default: `false` |
+| `NEXT_PUBLIC_FF_FINANCIAL_WIZARD` | ❌ Opcional | Habilita el asistente por pasos para crear/editar transacciones (`true`/`false`). Con `false` vuelve el formulario de acordeones. Default: `true` |
 | `NEXT_PUBLIC_FINANCIAL_POLLING_INTERVAL_MS` | ❌ Opcional | Intervalo de polling en ms. Default: `60000` |
 | `N8N_SCANNER_WEBHOOK_URL` | ❌ Opcional | Webhook de N8N para escaneo automático de transacciones |
 

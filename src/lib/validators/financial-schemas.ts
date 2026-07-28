@@ -20,7 +20,10 @@ export const transactionStatusSchema = z.enum(TRANSACTION_STATUSES);
 export const createTransactionSchema = z.object({
     type: transactionTypeSchema,
     status: transactionStatusSchema.optional(),
-    description: z.string().max(2000).optional().nullable(),
+    // Required: the description is the transaction's title everywhere
+    // (`getTransactionDisplayTitle`), so an empty one leaves the record showing
+    // a generated "Gasto – <merchant>" instead of a name the user recognises.
+    description: z.string().trim().min(1, "La descripción es requerida").max(2000),
     amount: z.number().positive("Amount must be positive"),
     currency: z.string().min(3, "Currency code required").max(3, "Use ISO 4217 code"),
     date: z.string().refine(

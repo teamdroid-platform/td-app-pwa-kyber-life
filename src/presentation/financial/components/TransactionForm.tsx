@@ -13,6 +13,8 @@ import { Switch } from "@/components/ui/switch";
 import { DateTimeStepInput } from "@/components/ui/datetime-step-input";
 import { createTransactionAction } from "@/app/actions/financial-transactions";
 import { updateInstitutionAction } from "@/app/actions/financial-settings";
+import { FINANCIAL_FLAGS } from "@/lib/feature-flags";
+import { TransactionCreateWizard } from "./transaction-wizard/TransactionCreateWizard";
 import { useTransactionFormOptions } from "../hooks/useTransactionFormOptions";
 import { FinancialTransactionType } from "@/domain/entities/financial";
 import { financialOfflineStore } from "@/infrastructure/offline/financial-offline-store";
@@ -23,18 +25,11 @@ import { AmountHeroInput } from "./AmountHeroInput";
 import { AccountSelect } from "./AccountSelect";
 import { StickyActionBar } from "@/components/ui/sticky-action-bar";
 import { toDateTimeLocalValue, isoToWallClockInput, wallClockInputToISO, roundToNearestFiveMinutes } from "@/lib/date-range";
+import { buildAutoNotes, formatNotesDateTime } from "../lib/transaction-notes";
 import { Building2, Landmark, FileText, CreditCard, Calendar, MessageSquare, Tag } from "lucide-react";
 
 /** Types for which "paid with credit card" is a meaningful, editable flag. */
 const CREDIT_ELIGIBLE_TYPES: readonly FinancialTransactionType[] = ["EXPENSE"];
-
-// Lowercase type labels for natural-reading auto notes.
-const NOTE_TYPE_LABELS: Record<string, string> = {
-    EXPENSE: "gasto",
-    INCOME: "ingreso",
-    TRANSFER: "transferencia",
-    WITHDRAWAL: "retiro",
-};
 
 const MAX_DESCRIPTION = 120;
 const MAX_NOTES = 200;
@@ -42,38 +37,12 @@ const MAX_NOTES = 200;
 /** Accordion section ids. Only one may be expanded at a time (or none). */
 type SectionId = "description" | "institution" | "account" | "category" | "date" | "notes";
 
-/** Format a datetime-local string as "DD/MM/YYYY HH:mm". */
-function formatNotesDateTime(dtLocal: string): string {
-    if (!dtLocal) return "";
-    const d = new Date(dtLocal);
-    if (Number.isNaN(d.getTime())) return "";
-    const pad = (n: number) => String(n).padStart(2, "0");
-    return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-
-interface AutoNotesInput {
-    type: string;
-    description: string;
-    institutionName: string;
-    amount: string;
-    date: string;
-    accountName: string;
-}
-
-/** Build the auto-generated notes sentence from the current form fields. */
-function buildAutoNotes(p: AutoNotesInput): string {
-    const typeLabel = NOTE_TYPE_LABELS[p.type] ?? p.type.toLowerCase();
-    let s = `Registro de ${typeLabel}`;
-    if (p.description.trim()) s += ` por ${p.description.trim()}`;
-    if (p.institutionName.trim()) s += ` en ${p.institutionName.trim()}`;
-    if (p.amount && Number(p.amount) > 0) s += ` por un monto de $${p.amount}`;
-    const dateStr = formatNotesDateTime(p.date);
-    if (dateStr) s += ` el ${dateStr}`;
-    if (p.accountName.trim()) s += ` desde la cuenta ${p.accountName.trim()}`;
-    return s;
-}
-
 export function TransactionForm() {
+    return FINANCIAL_FLAGS.WIZARD_ENABLED ? <TransactionCreateWizard /> : <LegacyTransactionForm />;
+}
+
+/** The original single-screen form. Superseded by the wizard; kept as fallback. */
+export function LegacyTransactionForm() {
     const router = useRouter();
     const [isSubmitting, setIsSubmitting] = useState(false);
     const formRef = useRef<HTMLFormElement>(null);
@@ -226,6 +195,12 @@ export function TransactionForm() {
             toast.error("Ingresa un monto válido mayor a 0");
             return;
         }
+        // Required server-side too: it is the title the transaction is listed under.
+        if (!description.trim()) {
+            toast.error("La descripción es requerida");
+            setExpanded("description");
+            return;
+        }
         if (!date) {
             toast.error("La fecha es requerida");
             setExpanded("date");
@@ -243,7 +218,7 @@ export function TransactionForm() {
             status: "MANUAL" as const,
             amount: Number(amount),
             currency,
-            description: description.trim() || undefined,
+            description: description.trim(),
             date: wallClockInputToISO(date)!,
             notes: notes || undefined,
             institutionName: institutionName || undefined,
