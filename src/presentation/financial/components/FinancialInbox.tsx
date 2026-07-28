@@ -157,7 +157,9 @@ export function FinancialInbox() {
     const [institutionNames, setInstitutionNames] = useState<string[]>([]);
     const [institutionsLoaded, setInstitutionsLoaded] = useState(false);
     const [loading, setLoading] = useState(true);
-    const [processingId, setProcessingId] = useState<string | null>(null);
+    // Which row is busy *and* what it's doing, so the spinner lands on the
+    // button that was actually pressed (confirm vs dismiss).
+    const [processing, setProcessing] = useState<{ id: string; action: "confirm" | "dismiss" } | null>(null);
     const [showPollingNotice, setShowPollingNotice] = useState(false);
     const hasLoadedOnceRef = useRef(false);
     const transactionsRef = useRef<FinancialScannerTransaction[]>([]);
@@ -371,7 +373,7 @@ export function FinancialInbox() {
             return;
         }
 
-        setProcessingId(tx.id!);
+        setProcessing({ id: tx.id!, action: "confirm" });
         try {
             const result = await mapInboxTransactionAction({
                 scannerTransactionId: tx.id!,
@@ -396,11 +398,11 @@ export function FinancialInbox() {
         } catch {
             toast.error("Error al procesar la transacción");
         }
-        setProcessingId(null);
+        setProcessing(null);
     };
 
     const handleDismiss = async (txId: string) => {
-        setProcessingId(txId);
+        setProcessing({ id: txId, action: "dismiss" });
         try {
             const result = await dismissInboxTransactionAction(txId);
             if (result.success) {
@@ -416,7 +418,7 @@ export function FinancialInbox() {
         } catch {
             toast.error("Error al descartar la transacción");
         }
-        setProcessingId(null);
+        setProcessing(null);
     };
 
     const updateEditState = <K extends keyof EditState>(txId: string, field: K, value: EditState[K]) => {
@@ -601,7 +603,9 @@ export function FinancialInbox() {
                         </h3>
                         <div className="grid gap-4 items-start grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
                             {items.map((tx, index) => {
-                                const isProcessing = processingId === tx.id;
+                                const isProcessing = processing?.id === tx.id;
+                                const isConfirming = isProcessing && processing?.action === "confirm";
+                                const isDismissing = isProcessing && processing?.action === "dismiss";
                                 const editing = isEditing[tx.id!] || false;
                                 const expanded = expandedStates[tx.id!] || false;
 
@@ -823,7 +827,11 @@ export function FinancialInbox() {
                                                                     disabled={isProcessing}
                                                                     title="Descartar"
                                                                 >
-                                                                    <X className="h-4 w-4" />
+                                                                    {isDismissing ? (
+                                                                        <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                                                                    ) : (
+                                                                        <X className="h-4 w-4" />
+                                                                    )}
                                                                 </Button>
                                                                 <Button
                                                                     size="icon"
@@ -832,7 +840,7 @@ export function FinancialInbox() {
                                                                     disabled={isProcessing}
                                                                     title="Confirmar"
                                                                 >
-                                                                    {isProcessing ? (
+                                                                    {isConfirming ? (
                                                                         <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
                                                                     ) : (
                                                                         <Check className="h-4 w-4" />
