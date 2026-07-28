@@ -16,6 +16,7 @@ import {
 import { MobileCarousel } from "@/presentation/components/dashboard/MobileCarousel";
 import { formatAxisCurrency } from "@/lib/date-bucketing";
 import { CreditToggle } from "./CreditToggle";
+import { useChartTooltipDismiss } from "@/hooks/use-chart-tooltip-dismiss";
 
 // ─── Type visual metadata ────────────────────────────────────
 
@@ -66,6 +67,8 @@ export function TransactionSummary({ transactions }: TransactionSummaryProps) {
     // Off by default: amounts and charts show only real (cash) spending until
     // the user opts into seeing credit-card-paid transactions too.
     const [showCredit, setShowCredit] = useState(false);
+    // On touch there is no "mouse leave" to close the tooltip, so make it dismissable.
+    const { containerRef, tooltipActive, handlePointerDown } = useChartTooltipDismiss();
 
     const effectiveTransactions = useMemo(
         () => (showCredit ? transactions : transactions.filter((t) => !t.paidWithCredit)),
@@ -253,7 +256,7 @@ export function TransactionSummary({ transactions }: TransactionSummaryProps) {
     );
 
     return (
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-3" ref={containerRef} onPointerDown={handlePointerDown}>
             {/* ═══════════════ MOBILE ACCORDION TOGGLE ═══════════════ */}
             <div
                 className={cn(
@@ -385,6 +388,7 @@ export function TransactionSummary({ transactions }: TransactionSummaryProps) {
                                             ))}
                                         </Pie>
                                         <Tooltip
+                                            active={tooltipActive}
                                             content={({ active, payload }) => {
                                                 if (active && payload && payload.length) {
                                                     return (
@@ -406,6 +410,7 @@ export function TransactionSummary({ transactions }: TransactionSummaryProps) {
                                         <XAxis dataKey="name" tick={renderCustomXAxisTick} axisLine={false} tickLine={false} height={36} interval={0} />
                                         <YAxis type="number" hide domain={[0, 'dataMax + 10']} />
                                         <Tooltip
+                                            active={tooltipActive}
                                             cursor={{ fill: 'transparent' }}
                                             content={({ active, payload }) => {
                                                 if (active && payload && payload.length) {
@@ -508,6 +513,7 @@ export function TransactionSummary({ transactions }: TransactionSummaryProps) {
                                         minTickGap={20}
                                     />
                                     <Tooltip
+                                        active={tooltipActive}
                                         content={({ active, payload, label }) => {
                                             if (active && payload && payload.length) {
                                                 return (
@@ -647,6 +653,7 @@ export function TransactionSummary({ transactions }: TransactionSummaryProps) {
                                                 ))}
                                             </Pie>
                                             <Tooltip
+                                                active={tooltipActive}
                                                 content={({ active, payload }) => {
                                                     if (active && payload && payload.length) {
                                                         return (
@@ -668,6 +675,7 @@ export function TransactionSummary({ transactions }: TransactionSummaryProps) {
                                             <XAxis dataKey="name" tick={renderCustomXAxisTick} axisLine={false} tickLine={false} height={36} interval={0} />
                                             <YAxis type="number" hide domain={[0, 'dataMax + 10']} />
                                             <Tooltip
+                                                active={tooltipActive}
                                                 cursor={{ fill: 'transparent' }}
                                                 content={({ active, payload }) => {
                                                     if (active && payload && payload.length) {
@@ -769,6 +777,7 @@ export function TransactionSummary({ transactions }: TransactionSummaryProps) {
                                             minTickGap={20}
                                         />
                                         <Tooltip
+                                            active={tooltipActive}
                                             content={({ active, payload, label }) => {
                                                 if (active && payload && payload.length) {
                                                     return (

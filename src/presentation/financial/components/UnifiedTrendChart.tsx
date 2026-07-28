@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RobotLoader } from '@/components/ui/RobotLoader';
 import { cn } from "@/lib/utils";
+import { useChartTooltipDismiss } from "@/hooks/use-chart-tooltip-dismiss";
 import {
     formatDay,
     formatMonth,
@@ -65,6 +66,8 @@ export function UnifiedTrendChart({ data, iconLegend = false, className }: Unifi
     const [chartType, setChartType] = useState<"bar" | "curve">("curve");
     const [userMode, setUserMode] = useState<ViewMode | null>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
+    // On touch the tooltip has no "mouse leave" to close it, so make it dismissable.
+    const { containerRef, tooltipActive, handlePointerDown } = useChartTooltipDismiss();
 
     // Intelligent default granularity based on the dataset span, overridable by
     // the user. Derived (not effect-driven) to avoid cascading renders.
@@ -147,7 +150,7 @@ export function UnifiedTrendChart({ data, iconLegend = false, className }: Unifi
     }, [chartData]);
 
     return (
-        <Card className={cn("flex flex-col h-full min-h-[320px] sm:min-h-[280px] bg-bg-primary border-border/40 shadow-sm overflow-hidden", className)}>
+        <Card ref={containerRef} className={cn("flex flex-col h-full min-h-[320px] sm:min-h-[280px] bg-bg-primary border-border/40 shadow-sm overflow-hidden", className)}>
             <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-2 gap-4">
                 <div className="flex items-center gap-2">
                     <Activity className="h-5 w-5 text-emerald-500" />
@@ -195,7 +198,11 @@ export function UnifiedTrendChart({ data, iconLegend = false, className }: Unifi
                         <RobotLoader text="Sin datos" showDots={false} size={64} />
                     </div>
                 ) : (
-                    <div className="flex-1 w-full overflow-x-auto overflow-y-hidden custom-scrollbar min-h-0" ref={scrollRef}>
+                    <div
+                        className="flex-1 w-full overflow-x-auto overflow-y-hidden custom-scrollbar min-h-0"
+                        ref={scrollRef}
+                        onPointerDown={handlePointerDown}
+                    >
                         <div style={{ minWidth: minChartWidth, height: "100%" }} className="px-2">
                             <ResponsiveContainer width="100%" height="100%">
                                 {chartType === "bar" ? (
@@ -226,6 +233,7 @@ export function UnifiedTrendChart({ data, iconLegend = false, className }: Unifi
                                             dx={0}
                                         />
                                         <Tooltip
+                                            active={tooltipActive}
                                             cursor={{ fill: 'var(--color-muted)', opacity: 0.4 }}
                                             formatter={(value: number | undefined) => formatCurrency(value ?? 0)}
                                             contentStyle={{
@@ -287,6 +295,7 @@ export function UnifiedTrendChart({ data, iconLegend = false, className }: Unifi
                                             dx={0}
                                         />
                                         <Tooltip
+                                            active={tooltipActive}
                                             formatter={(value: number | undefined) => formatCurrency(value ?? 0)}
                                             contentStyle={{
                                                 backgroundColor: "var(--color-bg-secondary)",

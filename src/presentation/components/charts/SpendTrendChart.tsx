@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { ResponsiveContainer, BarChart, AreaChart, Area, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts";
+import { useChartTooltipDismiss } from "@/hooks/use-chart-tooltip-dismiss";
 import type { LucideIcon } from "lucide-react";
 import { BarChart3, Activity } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -42,6 +43,9 @@ export function SpendTrendChart({
     variant = "area",
     className,
 }: SpendTrendChartProps) {
+    // On touch there is no "mouse leave" to close the tooltip, so make it dismissable.
+    const { containerRef, tooltipActive, handlePointerDown } = useChartTooltipDismiss();
+
     const [userMode, setUserMode] = useState<ChartViewMode | null>(null);
     const [chartType, setChartType] = useState<"area" | "bar">(variant);
     const scrollRef = useRef<HTMLDivElement>(null);
@@ -78,7 +82,7 @@ export function SpendTrendChart({
     const gradientId = `spend-grad-${useId().replace(/:/g, "")}`;
 
     return (
-        <Card className={cn("flex flex-col h-full min-h-[320px] sm:min-h-[280px] bg-bg-primary border-border/40 shadow-sm overflow-hidden", className)}>
+        <Card ref={containerRef} onPointerDown={handlePointerDown} className={cn("flex flex-col h-full min-h-[320px] sm:min-h-[280px] bg-bg-primary border-border/40 shadow-sm overflow-hidden", className)}>
             <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-2 gap-3">
                 <div className="flex items-center gap-2.5">
                     {Icon && (
@@ -152,6 +156,7 @@ export function SpendTrendChart({
                                             domain={[0, 'auto']}
                                         />
                                         <Tooltip
+                                            active={tooltipActive}
                                             cursor={{ fill: 'var(--color-muted)', opacity: 0.4 }}
                                             formatter={(value: number | undefined) => [formatChartCurrency(value ?? 0), seriesName]}
                                             contentStyle={{
@@ -202,6 +207,7 @@ export function SpendTrendChart({
                                             domain={[0, 'auto']}
                                         />
                                         <Tooltip
+                                            active={tooltipActive}
                                             formatter={(value: number | undefined) => [formatChartCurrency(value ?? 0), seriesName]}
                                             contentStyle={{
                                                 backgroundColor: "var(--color-bg-secondary)",
