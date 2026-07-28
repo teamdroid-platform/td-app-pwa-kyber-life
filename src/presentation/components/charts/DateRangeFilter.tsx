@@ -1,7 +1,8 @@
 "use client";
 
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
+import { PeriodFilter } from "@/components/ui/period-filter";
+import { formatRangeLabel } from "@/components/ui/range-calendar";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { RangeFilterType } from "@/lib/date-range";
@@ -44,6 +45,9 @@ interface DateRangeFilterProps {
  * main dashboard hub: a Select on mobile, a segmented tab bar on desktop, and
  * inline date inputs when "Personalizado" is selected.
  */
+/** Presets without the custom entry: the period control appends the range itself. */
+const withoutCustom = (presets: DateRangePreset[]) => presets.filter((p) => p.id !== "custom");
+
 export function DateRangeFilter({
     value,
     onChange,
@@ -62,36 +66,17 @@ export function DateRangeFilter({
 
     return (
         <div className={cn("flex flex-col w-full", className)}>
-            {/* Mobile: Select + Date Inputs if custom */}
+            {/* Mobile: one control holding both the presets and the range */}
             <div className="flex flex-col gap-2 w-full sm:hidden h-10">
-                {value !== "custom" ? (
-                    <Select value={value} onValueChange={(v) => onChange(v as RangeFilterType)}>
-                        <SelectTrigger className="w-full bg-muted/40 border-border/40 rounded-xl h-10 font-medium">
-                            <SelectValue placeholder="Seleccionar período" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {presets.map((p) => (
-                                <SelectItem key={p.id} value={p.id}>{p.label}</SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                ) : (
-                    <div className="flex items-center gap-1 w-full h-10 animate-in fade-in slide-in-from-top-1 bg-muted/20 p-1 rounded-xl border border-border/40">
-                        <button
-                            onClick={() => onChange("all")}
-                            className="flex items-center justify-center h-full px-2 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-lg transition-colors shrink-0"
-                            title="Volver a los filtros predefinidos"
-                        >
-                            <X className="h-4 w-4" />
-                        </button>
-                        <DateRangePicker
-                            start={customStart}
-                            end={customEnd}
-                            onChange={handleRangeChange}
-                            className="h-full flex-1 border-border/50 bg-background text-xs"
-                        />
-                    </div>
-                )}
+                <PeriodFilter
+                    value={value}
+                    onChange={onChange}
+                    presets={withoutCustom(presets)}
+                    customId={"custom" as RangeFilterType}
+                    customStart={customStart}
+                    customEnd={customEnd}
+                    onCustomRangeChange={handleRangeChange}
+                />
             </div>
 
             {/* Desktop: segmented tabs OR custom date range in the same container */}
@@ -108,7 +93,7 @@ export function DateRangeFilter({
                                     : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
                             )}
                         >
-                            {p.label}
+                            {p.id === "custom" ? (formatRangeLabel(customStart, customEnd) ?? p.label) : p.label}
                         </button>
                     ))
                 ) : (

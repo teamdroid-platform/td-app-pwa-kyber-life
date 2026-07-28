@@ -17,9 +17,14 @@ const clickDay = (day: string) => {
 };
 
 describe("DateRangePicker", () => {
-    it("shows the selected range as a single label", () => {
+    it("shows the selected range as a single label, without repeating the year", () => {
         render(<DateRangePicker start="2026-06-22" end="2026-07-21" onChange={jest.fn()} />);
-        expect(screen.getByRole("button", { name: /22 jun 2026 – 21 jul 2026/i })).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: /22 jun – 21 jul 2026/i })).toBeInTheDocument();
+    });
+
+    it("keeps both years when the range spans two of them", () => {
+        render(<DateRangePicker start="2026-12-22" end="2027-01-21" onChange={jest.fn()} />);
+        expect(screen.getByRole("button", { name: /22 dic 2026 – 21 ene 2027/i })).toBeInTheDocument();
     });
 
     it("prompts for a range when nothing is selected", () => {

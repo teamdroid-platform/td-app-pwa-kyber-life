@@ -2,9 +2,18 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
+import { PeriodFilter } from "@/components/ui/period-filter";
+import { formatRangeLabel } from "@/components/ui/range-calendar";
 import { defaultHubCustomRange } from "@/lib/date-range";
+
+/** Presets for the period control; it appends the custom range itself. */
+const MARKET_PRESETS = [
+    { id: "all" as const, label: "Todo el tiempo" },
+    { id: "today" as const, label: "Hoy" },
+    { id: "week" as const, label: "Semana" },
+    { id: "month" as const, label: "Mes" },
+];
 
 export type FilterType = "all" | "today" | "week" | "month" | "custom";
 
@@ -167,18 +176,16 @@ export function MarketDateFilterBar() {
         <div className="flex flex-col xl:flex-row items-start xl:items-center gap-4 flex-1 w-full mb-6">
             {/* Mobile Filter (Select) */}
             <div className="w-full sm:hidden">
-                <Select value={filterType} onValueChange={(v: FilterType) => handleTypeChange(v)}>
-                    <SelectTrigger className="w-full bg-bg-2 border-border/40 rounded-xl h-10 font-medium text-text-1">
-                        <SelectValue placeholder="Seleccionar período" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="all">Todo el tiempo</SelectItem>
-                        <SelectItem value="today">Hoy</SelectItem>
-                        <SelectItem value="week">Semana</SelectItem>
-                        <SelectItem value="month">Mes</SelectItem>
-                        <SelectItem value="custom">Personalizado</SelectItem>
-                    </SelectContent>
-                </Select>
+                <PeriodFilter
+                    value={filterType}
+                    onChange={(v) => handleTypeChange(v as FilterType)}
+                    presets={MARKET_PRESETS}
+                    customId={"custom" as FilterType}
+                    customStart={customStartDate}
+                    customEnd={customEndDate}
+                    onCustomRangeChange={handleCustomRangeChange}
+                    className="bg-bg-2 text-text-1"
+                />
             </div>
 
             {/* Desktop Filter (Tabs) */}
@@ -189,7 +196,7 @@ export function MarketDateFilterBar() {
                         { id: 'today', label: 'Hoy' },
                         { id: 'week', label: 'Semana' },
                         { id: 'month', label: 'Mes' },
-                        { id: 'custom', label: 'Personalizado' }
+                        { id: 'custom', label: formatRangeLabel(customStartDate, customEndDate) ?? 'Personalizado' }
                     ] as const
                 ).map((tab) => (
                     <button
