@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Check, ChevronDown } from "lucide-react";
+import { Check, ChevronDown, ChevronRight } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { RangeCalendar, formatRangeLabel } from "@/components/ui/range-calendar";
 import { cn } from "@/lib/utils";
@@ -99,22 +99,34 @@ export function PeriodFilter<T extends string = string>({
                             </button>
                         ))}
 
-                        {/* The custom range shows the dates themselves, not "Personalizado". */}
-                        <button
-                            type="button"
-                            onClick={() => setShowCalendar(true)}
+                        {/* The custom range shows the dates themselves, not "Personalizado",
+                            and splits in two: picking the label applies the range as-is
+                            (so the default cycle is one tap away, with no calendar to
+                            navigate), while the arrow opens the calendar to adjust it. */}
+                        <div
                             className={cn(
-                                "flex items-center justify-between gap-3 rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-muted",
+                                "flex items-center rounded-lg transition-colors hover:bg-muted",
                                 isCustom && "text-accent-primary font-medium",
                             )}
                         >
-                            <span className="truncate">{rangeLabel}</span>
-                            {isCustom ? (
-                                <Check className="h-3.5 w-3.5 shrink-0" />
-                            ) : (
-                                <ChevronDown className="h-3.5 w-3.5 shrink-0 -rotate-90 text-muted-foreground" />
-                            )}
-                        </button>
+                            <button
+                                type="button"
+                                onClick={() => selectPreset(customId)}
+                                className="flex flex-1 items-center justify-between gap-3 rounded-l-lg px-3 py-2 text-left text-sm"
+                            >
+                                <span className="truncate">{rangeLabel}</span>
+                                {isCustom && <Check className="h-3.5 w-3.5 shrink-0" />}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setShowCalendar(true)}
+                                aria-label="Ajustar el rango de fechas"
+                                title="Ajustar el rango"
+                                className="flex h-9 w-8 shrink-0 items-center justify-center rounded-r-lg text-muted-foreground transition-colors hover:bg-muted-foreground/10 hover:text-foreground"
+                            >
+                                <ChevronRight className="h-4 w-4" />
+                            </button>
+                        </div>
                     </div>
                 ) : (
                     <div className="p-1.5">

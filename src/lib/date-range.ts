@@ -7,6 +7,19 @@
 
 export type RangeFilterType = "all" | "today" | "week" | "month" | "custom";
 
+/**
+ * The period options every filter shows, in this order and with these labels.
+ * Single source of truth so the dashboards, the transactions list and the market
+ * filter can't drift apart again ("Todo el tiempo" vs "Todos", "Esta semana" vs
+ * "Semana", …). The custom range is appended by the period control itself.
+ */
+export const STANDARD_PERIOD_PRESETS: { id: Exclude<RangeFilterType, "custom">; label: string }[] = [
+    { id: "all", label: "Todos" },
+    { id: "today", label: "Hoy" },
+    { id: "week", label: "Semana" },
+    { id: "month", label: "Mes" },
+];
+
 export interface ResolvedRange {
     startDate?: string;
     endDate?: string;

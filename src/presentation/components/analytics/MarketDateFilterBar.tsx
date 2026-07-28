@@ -5,15 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { PeriodFilter } from "@/components/ui/period-filter";
 import { formatRangeLabel } from "@/components/ui/range-calendar";
-import { defaultHubCustomRange } from "@/lib/date-range";
-
-/** Presets for the period control; it appends the custom range itself. */
-const MARKET_PRESETS = [
-    { id: "all" as const, label: "Todo el tiempo" },
-    { id: "today" as const, label: "Hoy" },
-    { id: "week" as const, label: "Semana" },
-    { id: "month" as const, label: "Mes" },
-];
+import { defaultHubCustomRange, STANDARD_PERIOD_PRESETS } from "@/lib/date-range";
 
 export type FilterType = "all" | "today" | "week" | "month" | "custom";
 
@@ -179,7 +171,7 @@ export function MarketDateFilterBar() {
                 <PeriodFilter
                     value={filterType}
                     onChange={(v) => handleTypeChange(v as FilterType)}
-                    presets={MARKET_PRESETS}
+                    presets={STANDARD_PERIOD_PRESETS}
                     customId={"custom" as FilterType}
                     customStart={customStartDate}
                     customEnd={customEndDate}
@@ -192,12 +184,9 @@ export function MarketDateFilterBar() {
             <div className="hidden sm:flex items-center p-1 bg-bg-2 border border-border/40 rounded-xl w-full">
                 {(
                     [
-                        { id: 'all', label: 'Todo el tiempo' },
-                        { id: 'today', label: 'Hoy' },
-                        { id: 'week', label: 'Semana' },
-                        { id: 'month', label: 'Mes' },
-                        { id: 'custom', label: formatRangeLabel(customStartDate, customEndDate) ?? 'Personalizado' }
-                    ] as const
+                        ...STANDARD_PERIOD_PRESETS,
+                        { id: 'custom' as const, label: formatRangeLabel(customStartDate, customEndDate) ?? 'Personalizado' },
+                    ]
                 ).map((tab) => (
                     <button
                         key={tab.id}

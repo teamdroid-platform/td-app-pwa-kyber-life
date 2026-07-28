@@ -19,28 +19,13 @@ import { FinancialCategory, FinancialInstitution } from "@/domain/entities/finan
 import { useState, useEffect, useCallback } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { defaultHubCustomRange } from "@/lib/date-range";
+import { defaultHubCustomRange, STANDARD_PERIOD_PRESETS } from "@/lib/date-range";
 import { PeriodFilter } from "@/components/ui/period-filter";
 
 // ─── Date Preset Helpers ─────────────────────────────────────
 
 type DatePreset = "today" | "week" | "month" | "all" | "custom";
 
-const PRESET_LABELS: Record<DatePreset, string> = {
-    today: "Hoy",
-    week: "Esta semana",
-    month: "Este mes",
-    all: "Todos",
-    custom: "Personalizado",
-};
-
-/** Presets offered by the period control; the custom range is appended by it. */
-const PERIOD_PRESETS = [
-    { id: "today" as const, label: PRESET_LABELS.today },
-    { id: "week" as const, label: PRESET_LABELS.week },
-    { id: "month" as const, label: PRESET_LABELS.month },
-    { id: "all" as const, label: PRESET_LABELS.all },
-];
 
 function getPresetRange(preset: Exclude<DatePreset, "custom">): { from: string; to: string; range?: string } {
     const now = new Date();
@@ -349,7 +334,7 @@ export function TransactionFilters({ categories = [], institutions = [] }: Trans
                         <PeriodFilter
                             value={activePreset ?? "custom"}
                             onChange={(preset) => handlePresetClick(preset as Exclude<DatePreset, "custom">)}
-                            presets={PERIOD_PRESETS}
+                            presets={STANDARD_PERIOD_PRESETS}
                             customId="custom"
                             customStart={customFrom}
                             customEnd={customTo}
@@ -427,7 +412,7 @@ export function TransactionFilters({ categories = [], institutions = [] }: Trans
                         <PeriodFilter
                             value={activePreset ?? "custom"}
                             onChange={(preset) => handlePresetClick(preset as Exclude<DatePreset, "custom">)}
-                            presets={PERIOD_PRESETS}
+                            presets={STANDARD_PERIOD_PRESETS}
                             customId="custom"
                             customStart={customFrom}
                             customEnd={customTo}

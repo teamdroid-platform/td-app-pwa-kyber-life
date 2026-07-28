@@ -5,29 +5,22 @@ import { PeriodFilter } from "@/components/ui/period-filter";
 import { formatRangeLabel } from "@/components/ui/range-calendar";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { RangeFilterType } from "@/lib/date-range";
+import { STANDARD_PERIOD_PRESETS, type RangeFilterType } from "@/lib/date-range";
 
 export interface DateRangePreset {
     id: RangeFilterType;
     label: string;
 }
 
-export const DEFAULT_PRESETS: DateRangePreset[] = [
-    { id: "all", label: "Todo el tiempo" },
-    { id: "today", label: "Hoy" },
-    { id: "week", label: "Semana" },
-    { id: "month", label: "Mes" },
+const STANDARD_WITH_CUSTOM: DateRangePreset[] = [
+    ...STANDARD_PERIOD_PRESETS,
     { id: "custom", label: "Personalizado" },
 ];
 
-/** Presets for the main dashboard hub. */
-export const HUB_PRESETS: DateRangePreset[] = [
-    { id: "all", label: "Todos" },
-    { id: "today", label: "Hoy" },
-    { id: "week", label: "Semana" },
-    { id: "month", label: "Mes" },
-    { id: "custom", label: "Personalizado" },
-];
+export const DEFAULT_PRESETS = STANDARD_WITH_CUSTOM;
+
+/** Kept for the hub's call sites; the options are the standard ones. */
+export const HUB_PRESETS = STANDARD_WITH_CUSTOM;
 
 interface DateRangeFilterProps {
     value: RangeFilterType;

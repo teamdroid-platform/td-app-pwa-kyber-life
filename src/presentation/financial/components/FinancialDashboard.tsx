@@ -13,9 +13,8 @@ import { formatRangeLabel as formatDayRangeLabel } from "@/components/ui/range-c
 import { useFinancialRealtime } from "../hooks/useFinancialRealtime";
 import { Filter, ChevronDown } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
 import { RobotLoader } from "@/components/ui/RobotLoader";
-import { defaultHubCustomRange } from "@/lib/date-range";
+import { defaultHubCustomRange, STANDARD_PERIOD_PRESETS } from "@/lib/date-range";
 import { cn } from "@/lib/utils";
 import { BalanceHeroCard } from "./BalanceHeroCard";
 import { QuickSummary } from "./QuickSummary";
@@ -42,15 +41,9 @@ function formatRangeLabel(filterType: string, startISO?: string, endISO?: string
 }
 
 const DASHBOARD_TABS = [
-    { id: "all", label: "Todo el tiempo" },
-    { id: "today", label: "Hoy" },
-    { id: "week", label: "Semana" },
-    { id: "month", label: "Mes" },
-    { id: "custom", label: "Personalizado" },
-] as const;
-
-/** Presets for the mobile control; it appends the custom range on its own. */
-const DASHBOARD_PRESETS = DASHBOARD_TABS.filter((t) => t.id !== "custom").map((t) => ({ id: t.id, label: t.label }));
+    ...STANDARD_PERIOD_PRESETS,
+    { id: "custom" as const, label: "Personalizado" },
+];
 
 export function FinancialDashboard() {
     const [filterType, setFilterType] = useState<"all" | "today" | "week" | "month" | "custom">("custom");
@@ -228,7 +221,7 @@ export function FinancialDashboard() {
                             <PeriodFilter
                                 value={filterType}
                                 onChange={(v) => setFilterType(v as typeof filterType)}
-                                presets={DASHBOARD_PRESETS}
+                                presets={STANDARD_PERIOD_PRESETS}
                                 customId="custom"
                                 customStart={customStartDate}
                                 customEnd={customEndDate}

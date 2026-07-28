@@ -2,12 +2,9 @@ import React from "react";
 import { render, screen, fireEvent, within } from "@testing-library/react";
 import { PeriodFilter } from "@/components/ui/period-filter";
 
-const PRESETS = [
-    { id: "today", label: "Hoy" },
-    { id: "week", label: "Esta semana" },
-    { id: "month", label: "Este mes" },
-    { id: "all", label: "Todos" },
-];
+import { STANDARD_PERIOD_PRESETS } from "@/lib/date-range";
+
+const PRESETS = STANDARD_PERIOD_PRESETS;
 
 function renderFilter(overrides: Partial<React.ComponentProps<typeof PeriodFilter>> = {}) {
     const props = {
@@ -29,7 +26,7 @@ const openDropdown = () => fireEvent.click(screen.getByRole("button", { name: /P
 describe("PeriodFilter", () => {
     it("shows the active preset on the trigger", () => {
         renderFilter({ value: "month" });
-        expect(screen.getByRole("button", { name: /Período: Este mes/i })).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: /Período: Mes/i })).toBeInTheDocument();
     });
 
     it("shows the dates — not 'Personalizado' — when the custom range is active", () => {
@@ -48,16 +45,40 @@ describe("PeriodFilter", () => {
     it("selects a preset from the same control", () => {
         const props = renderFilter();
         openDropdown();
-        fireEvent.click(screen.getByText("Esta semana"));
+        fireEvent.click(screen.getByText("Semana"));
         expect(props.onChange).toHaveBeenCalledWith("week");
     });
 
-    it("opens the calendar from the range entry and applies the new range", () => {
+    it("lists the standard options, in order, with the range last", () => {
+        renderFilter();
+        openDropdown();
+
+        // Option buttons are the ones without an aria-label (the trigger and the
+        // range arrow do have one).
+        const optionTexts = screen
+            .getAllByRole("button")
+            .filter((b) => !b.getAttribute("aria-label"))
+            .map((b) => b.textContent?.trim());
+
+        expect(optionTexts).toEqual(["Todos", "Hoy", "Semana", "Mes", "22 jun – 21 jul 2026"]);
+    });
+
+    it("applies the range directly when its label is tapped, without opening the calendar", () => {
+        const props = renderFilter({ value: "month" });
+        openDropdown();
+
+        fireEvent.click(screen.getByText("22 jun – 21 jul 2026"));
+
+        expect(props.onChange).toHaveBeenCalledWith("custom");
+        expect(screen.queryByText("Lun")).not.toBeInTheDocument(); // no calendar
+    });
+
+    it("opens the calendar from the arrow and applies the new range", () => {
         const props = renderFilter();
         openDropdown();
 
-        // The range entry expands into the calendar — no separate date field.
-        fireEvent.click(screen.getByText("22 jun – 21 jul 2026"));
+        // Only the arrow drills into the calendar.
+        fireEvent.click(screen.getByRole("button", { name: /Ajustar el rango de fechas/i }));
         expect(screen.getByText("Lun")).toBeInTheDocument();
 
         const grid = screen.getByText("Lun").parentElement!;
