@@ -135,7 +135,9 @@ export function TransactionScanWizard({ initialData, resolvedInstitutionName, in
 
     return (
         <TransactionWizard
-            mode="create"
+            // Opens on the summary: the values are already extracted, so the
+            // task is to approve them at a glance, not to walk five steps.
+            mode="confirm"
             initialValues={initialValues}
             currency={initialData.currency || "USD"}
             // Never let the auto-generated sentence overwrite the email's summary.

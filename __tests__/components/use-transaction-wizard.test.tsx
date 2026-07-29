@@ -4,6 +4,7 @@ import {
     collectMissing,
     diffValues,
     useTransactionWizard,
+    type WizardMode,
     type WizardValues,
 } from "@/presentation/financial/hooks/useTransactionWizard";
 
@@ -23,7 +24,7 @@ const BASE: WizardValues = {
 const values = (overrides: Partial<WizardValues> = {}): WizardValues => ({ ...BASE, ...overrides });
 
 /** Minimal host that surfaces the parts of the API the tests drive. */
-function Host({ mode, initial }: { mode: "create" | "edit"; initial: WizardValues }) {
+function Host({ mode, initial }: { mode: WizardMode; initial: WizardValues }) {
     const w = useTransactionWizard({ mode, initialValues: initial });
     return (
         <div>
@@ -120,6 +121,17 @@ describe("useTransactionWizard — navigation", () => {
     it("starts on the summary when editing", () => {
         render(<Host mode="edit" initial={values()} />);
         expect(screenId()).toBe("summary");
+    });
+
+    it("starts on the summary when confirming a scan — the values already exist", () => {
+        render(<Host mode="confirm" initial={values()} />);
+        expect(screenId()).toBe("summary");
+    });
+
+    it("still lets a confirmation walk back into the steps", () => {
+        render(<Host mode="confirm" initial={values()} />);
+        click("back");
+        expect(screenId()).toBe("date");
     });
 });
 

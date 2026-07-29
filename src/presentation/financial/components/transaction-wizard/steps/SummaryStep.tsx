@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 import { Textarea } from "@/components/ui/textarea";
 import { TagInput } from "@/components/ui/tag-input";
 import { resolveTransactionTypeOption } from "../../TransactionTypeChips";
-import type { MissingField, WizardScreen, WizardValues } from "../../../hooks/useTransactionWizard";
+import type { MissingField, WizardMode, WizardScreen, WizardValues } from "../../../hooks/useTransactionWizard";
 
 const MAX_NOTES = 200;
 
@@ -87,7 +87,7 @@ interface SummaryStepProps {
     changed: (keyof WizardValues)[];
     missing: MissingField[];
     currency: string;
-    mode: "create" | "edit";
+    mode: WizardMode;
     onEdit: (screen: WizardScreen) => void;
     onNotesChange: (value: string) => void;
     onTagsChange: (value: string[]) => void;

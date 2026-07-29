@@ -99,8 +99,17 @@ export function diffValues(initial: WizardValues, current: WizardValues): (keyof
     });
 }
 
+/**
+ * What the wizard is being used for:
+ *  - `create`  — capture from scratch: starts at step 1 and keeps a draft.
+ *  - `edit`    — fix an existing transaction: starts at the summary, shows a diff.
+ *  - `confirm` — review something already extracted (a scan): starts at the
+ *                summary so approving is one tap, with the steps a tap away.
+ */
+export type WizardMode = "create" | "edit" | "confirm";
+
 export interface UseTransactionWizardOptions {
-    mode: "create" | "edit";
+    mode: WizardMode;
     initialValues: WizardValues;
 }
 
@@ -117,9 +126,10 @@ export interface UseTransactionWizardOptions {
  */
 export function useTransactionWizard({ mode, initialValues }: UseTransactionWizardOptions) {
     const [values, setValues] = useState<WizardValues>(initialValues);
-    // Editing an existing transaction starts at the summary: the point is to
-    // change one thing, not to re-capture the whole record.
-    const [screen, setScreen] = useState<WizardScreen>(mode === "edit" ? "summary" : "amount");
+    // Only a capture from scratch starts at step 1. When the values already
+    // exist — an edit, or a scan waiting to be confirmed — the summary is the
+    // right first screen: the task is to approve, not to re-enter.
+    const [screen, setScreen] = useState<WizardScreen>(mode === "create" ? "amount" : "summary");
     const [focus, setFocus] = useState(false);
     /** Value snapshot taken when a focus edit starts, so Cancel can restore it. */
     const [focusSnapshot, setFocusSnapshot] = useState<WizardValues | null>(null);
