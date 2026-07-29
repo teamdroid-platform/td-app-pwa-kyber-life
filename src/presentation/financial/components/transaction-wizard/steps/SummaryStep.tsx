@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
     Building2, Calendar, DollarSign, FileText, Landmark, MessageSquare, Pencil, Tag, Tags,
@@ -8,7 +8,7 @@ import {
 import { cn } from "@/lib/utils";
 import { Textarea } from "@/components/ui/textarea";
 import { TagInput } from "@/components/ui/tag-input";
-import { DEFAULT_TRANSACTION_TYPE_OPTIONS } from "../../TransactionTypeChips";
+import { resolveTransactionTypeOption } from "../../TransactionTypeChips";
 import type { MissingField, WizardScreen, WizardValues } from "../../../hooks/useTransactionWizard";
 
 const MAX_NOTES = 200;
@@ -94,6 +94,8 @@ interface SummaryStepProps {
     tagSuggestions: string[];
     /** Where the notes came from, so a pre-filled box doesn't look like a mistake. */
     notesOrigin: "auto" | "scan" | "manual";
+    /** Read-only content appended after the rows (e.g. the scan's original data). */
+    extra?: ReactNode;
 }
 
 const NOTES_ORIGIN_LABEL: Record<SummaryStepProps["notesOrigin"], string> = {
@@ -122,6 +124,7 @@ export function SummaryStep({
     onTagsChange,
     tagSuggestions,
     notesOrigin,
+    extra,
 }: SummaryStepProps) {
     const [openEditor, setOpenEditor] = useState<"notes" | "tags" | null>(null);
 
@@ -137,7 +140,7 @@ export function SummaryStep({
         return text.trim() || "Sin valor";
     };
 
-    const typeOption = DEFAULT_TRANSACTION_TYPE_OPTIONS.find((o) => o.value === values.type);
+    const typeOption = resolveTransactionTypeOption(values.type);
     const heroSub = [values.institutionName, formatShortDate(values.date)].filter(Boolean).join(" · ");
 
     return (
@@ -153,12 +156,10 @@ export function SummaryStep({
                     </p>
                     {heroSub && <p className="mt-0.5 truncate text-xs text-text-tertiary">{heroSub}</p>}
                 </div>
-                {typeOption && (
-                    <span className="flex shrink-0 items-center gap-1.5 rounded-full border border-border/50 bg-bg-secondary/70 px-2.5 py-1 text-[11px] font-medium text-text-secondary">
-                        <typeOption.Icon className={cn("h-3.5 w-3.5", typeOption.color)} />
-                        {typeOption.label}
-                    </span>
-                )}
+                <span className="flex shrink-0 items-center gap-1.5 rounded-full border border-border/50 bg-bg-secondary/70 px-2.5 py-1 text-[11px] font-medium text-text-secondary">
+                    <typeOption.Icon className={cn("h-3.5 w-3.5", typeOption.color)} />
+                    {typeOption.label}
+                </span>
             </div>
 
             <div className="flex flex-col gap-1.5">
@@ -284,6 +285,8 @@ export function SummaryStep({
                     </div>
                 )}
             </div>
+
+            {extra}
         </>
     );
 }
