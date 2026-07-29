@@ -30,6 +30,8 @@ import { AccountSelect } from "./AccountSelect";
 import { cn } from "@/lib/utils";
 import { isoToWallClockInput, wallClockInputToISO } from "@/lib/date-range";
 import { TagInput } from "@/components/ui/tag-input";
+import { FINANCIAL_FLAGS } from "@/lib/feature-flags";
+import { TransactionEditWizard } from "./transaction-wizard/TransactionEditWizard";
 
 // ─── Helpers ──────────────────────────────────────────────────
 
@@ -295,6 +297,25 @@ export function TransactionDetailClient({ initialTransaction }: TransactionDetai
         : (paidWithCreditActive ? "Tarjeta de crédito" : "Ej. Ahorros Múltiple, Tarjeta Visa");
     const accountHasValue = !!editState.accountName || paidWithCreditActive;
     const datePreview = formatDateTimeLocalPreview(editState.date) || "Selecciona fecha y hora";
+
+    // Behind the flag, editing is the stepped wizard: it opens on the summary
+    // so correcting one value doesn't mean walking the whole record again. The
+    // read-only blocks (history, duplicates, origin) stay on this screen.
+    if (isEditing && FINANCIAL_FLAGS.WIZARD_ENABLED) {
+        return (
+            <TransactionEditWizard
+                transaction={transaction}
+                displayNames={displayNames}
+                notes={extractContext(transaction)}
+                onSaved={(updated) => {
+                    setTransaction(updated);
+                    setIsEditing(false);
+                    router.refresh();
+                }}
+                onCancel={() => setIsEditing(false)}
+            />
+        );
+    }
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

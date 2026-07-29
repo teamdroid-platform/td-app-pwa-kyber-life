@@ -68,6 +68,22 @@ export async function getUniqueTagsAction() {
     }
 }
 
+/**
+ * Recent, distinct descriptions, offered as one-tap answers in the capture
+ * flow. The description is the transaction's title, so making it required only
+ * works if answering it is usually a tap rather than a sentence.
+ */
+export async function getRecentDescriptionsAction() {
+    try {
+        const userId = await getAuthUserId();
+        const result = await financialTransactionService.getRecentDescriptions(userId);
+        return { success: true, data: result };
+    } catch (error) {
+        console.error("Error fetching recent descriptions:", error);
+        return { success: false, error: (error as Error).message };
+    }
+}
+
 // ─── Paginated Search ────────────────────────────────────────
 
 export async function searchPaginatedTransactionsAction(params: Record<string, unknown>) {

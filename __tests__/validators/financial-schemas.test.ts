@@ -49,6 +49,13 @@ describe("financial-schemas", () => {
             expect(result.success).toBe(true);
         });
 
+        it("should require a description — it is the transaction's title", () => {
+            const { description: _omitted, ...withoutDescription } = validPayload;
+            expect(createTransactionSchema.safeParse(withoutDescription).success).toBe(false);
+            expect(createTransactionSchema.safeParse({ ...validPayload, description: "" }).success).toBe(false);
+            expect(createTransactionSchema.safeParse({ ...validPayload, description: "   " }).success).toBe(false);
+        });
+
         it("should reject a negative amount", () => {
             const result = createTransactionSchema.safeParse({
                 ...validPayload,
@@ -119,6 +126,16 @@ describe("financial-schemas", () => {
                 amount: 150
             });
             expect(result.success).toBe(true);
+        });
+
+        // The update stays partial — a change that only touches the category must
+        // keep validating — but a description that IS sent cannot be blank.
+        it("should stay partial while rejecting a blank description", () => {
+            const id = uuidv4();
+            expect(updateTransactionSchema.safeParse({ id, categoryName: "Alimentación" }).success).toBe(true);
+            expect(updateTransactionSchema.safeParse({ id, description: "Compra semanal" }).success).toBe(true);
+            expect(updateTransactionSchema.safeParse({ id, description: "" }).success).toBe(false);
+            expect(updateTransactionSchema.safeParse({ id, description: "   " }).success).toBe(false);
         });
     });
 

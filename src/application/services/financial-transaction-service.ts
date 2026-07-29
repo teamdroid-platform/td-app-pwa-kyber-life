@@ -336,6 +336,30 @@ export class FinancialTransactionService {
         return this.transactionRepo.getUniqueTags(userId);
     }
 
+    /**
+     * The owner's most recent distinct descriptions, newest first.
+     *
+     * Reads a single page rather than the whole history: this feeds a handful
+     * of suggestion chips, so a wider scan would cost more than it's worth.
+     */
+    async getRecentDescriptions(userId: UUID, limit = 8): Promise<string[]> {
+        const page = await this.searchPaginated(userId, {}, { page: 1, pageSize: 60 });
+        const seen = new Set<string>();
+        const descriptions: string[] = [];
+
+        for (const tx of page.data) {
+            const description = tx.description?.trim();
+            if (!description) continue;
+            const key = description.toLowerCase();
+            if (seen.has(key)) continue;
+            seen.add(key);
+            descriptions.push(description);
+            if (descriptions.length >= limit) break;
+        }
+
+        return descriptions;
+    }
+
     async getAuditTrail(transactionId: UUID): Promise<unknown[]> {
         return this.auditLogRepo.findByTransactionId(transactionId);
     }
