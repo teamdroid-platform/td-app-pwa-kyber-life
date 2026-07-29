@@ -24,6 +24,8 @@ import { AccountSelect } from "./AccountSelect";
 import { InstitutionPicker, type PendingInstitutionEdit } from "./InstitutionPicker";
 import { CategoryPicker } from "./CategoryPicker";
 import { InstitutionMatchBadge } from "./InstitutionMatchBadge";
+import { FINANCIAL_FLAGS } from "@/lib/feature-flags";
+import { TransactionScanWizard, extractSummary } from "./transaction-wizard/TransactionScanWizard";
 import type { InstitutionMatchInfo } from "@/lib/institution-match";
 import { isoToWallClockInput, wallClockInputToISO } from "@/lib/date-range";
 import type { FinancialTransactionType } from "@/domain/entities/financial";
@@ -52,20 +54,6 @@ function normalizeType(type?: string | null): FinancialTransactionType {
     return (TYPE_OPTIONS as readonly string[]).includes(normalized || "") ? (normalized as FinancialTransactionType) : "EXPENSE";
 }
 
-function extractSummary(tx: FinancialScannerTransaction): string {
-    const s = tx.summary?.trim();
-    if (s && s !== "null" && s !== "undefined") return s;
-
-    const stats = tx.originStats as Record<string, unknown> | null | undefined;
-    const emailBody = typeof stats?.emailBody === "string" ? stats.emailBody.trim() : "";
-    if (emailBody) return `[MAIL] ${emailBody}`;
-
-    const snippet = typeof stats?.snippet === "string" ? stats.snippet.trim() : "";
-    if (snippet) return `[SNIPPET] ${snippet}`;
-
-    return "";
-}
-
 /** Format a datetime-local string as "DD/MM/YYYY HH:mm". */
 function formatDateTimePreview(dtLocal: string): string {
     if (!dtLocal) return "";
@@ -75,7 +63,19 @@ function formatDateTimePreview(dtLocal: string): string {
     return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-export function ScanDetailsForm({ initialData, resolvedInstitutionName, institutionMatch }: ScanDetailsFormProps) {
+/**
+ * Entry point for confirming a scanned movement.
+ *
+ * Behind the wizard flag this is the same stepped flow as manual capture, so
+ * there is one standard instead of a third variant of the form; with the flag
+ * off it is the single-screen version below.
+ */
+export function ScanDetailsForm(props: ScanDetailsFormProps) {
+    return FINANCIAL_FLAGS.WIZARD_ENABLED ? <TransactionScanWizard {...props} /> : <LegacyScanDetailsForm {...props} />;
+}
+
+/** The original single-screen confirmation form. Superseded by the wizard. */
+export function LegacyScanDetailsForm({ initialData, resolvedInstitutionName, institutionMatch }: ScanDetailsFormProps) {
     const router = useRouter();
     const [isProcessing, setIsProcessing] = useState(false);
     const formRef = useRef<HTMLDivElement>(null);

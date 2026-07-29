@@ -24,6 +24,26 @@ export const DEFAULT_TRANSACTION_TYPE_OPTIONS: TransactionTypeOption[] = [
     { value: "WITHDRAWAL", label: "Retiro", Icon: Wallet, color: "text-indigo-500" },
 ];
 
+/**
+ * Presentation for any transaction type, including the ones the quick-pick
+ * chips don't offer (PAYMENT, REFUND, FEE…). Those still exist on scanned
+ * records, so a detail screen must be able to label them.
+ */
+const FALLBACK_TYPE_LABELS: Record<string, string> = {
+    PAYMENT: "Pago",
+    REFUND: "Reembolso",
+    DEPOSIT: "Depósito",
+    FEE: "Comisión",
+    TAX: "Impuesto",
+    OTHER: "Otro",
+};
+
+export function resolveTransactionTypeOption(type: string): Omit<TransactionTypeOption, "value"> {
+    const known = DEFAULT_TRANSACTION_TYPE_OPTIONS.find((o) => o.value === type);
+    if (known) return known;
+    return { label: FALLBACK_TYPE_LABELS[type] ?? type, Icon: Wallet, color: "text-text-tertiary" };
+}
+
 export interface TransactionTypeChipsProps {
     value: FinancialTransactionType;
     onChange: (value: FinancialTransactionType) => void;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -38,6 +38,15 @@ export interface TransactionWizardProps {
     /** Called when the user leaves the wizard from the summary. */
     onClose?: () => void;
     submitLabel?: string;
+    /**
+     * Read-only content appended to the summary — used by the scan flow to keep
+     * the originally extracted data consultable before confirming.
+     */
+    summaryExtra?: ReactNode;
+    /** Extra action rendered under the primary button on the summary (e.g. Descartar). */
+    secondaryAction?: ReactNode;
+    /** Shown inside the institution step, e.g. how confident the scan's match is. */
+    institutionHint?: ReactNode;
 }
 
 /**
@@ -56,6 +65,9 @@ export function TransactionWizard({
     onSubmit,
     onClose,
     submitLabel,
+    summaryExtra,
+    secondaryAction,
+    institutionHint,
 }: TransactionWizardProps) {
     const wizard = useTransactionWizard({ mode, initialValues });
     const { values, setValue, screen, focus, isSummary } = wizard;
@@ -239,6 +251,7 @@ export function TransactionWizard({
                         onQueryChange={setInstitutionQuery}
                         pendingEdit={pendingInstitutionEdit}
                         onPendingEditChange={setPendingInstitutionEdit}
+                        hint={institutionHint}
                     />
                 );
             case "category":
@@ -280,6 +293,7 @@ export function TransactionWizard({
                         onTagsChange={(v) => setValue("tags", v)}
                         tagSuggestions={tagSuggestions}
                         notesOrigin={notesOrigin}
+                        extra={summaryExtra}
                     />
                 );
         }
@@ -344,6 +358,8 @@ export function TransactionWizard({
                             Omitir
                         </Button>
                     )}
+
+                    {isSummary && secondaryAction}
                 </>
             )}
         </div>
