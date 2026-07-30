@@ -6,7 +6,7 @@ import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { financialOfflineStore } from "@/infrastructure/offline/financial-offline-store";
 import { wallClockInputToISO } from "@/lib/date-range";
-import { getUniqueTagsAction, getRecentDescriptionsAction } from "@/app/actions/financial-transactions";
+import { getUniqueTagsAction, getFrequentDescriptionsAction } from "@/app/actions/financial-transactions";
 import { updateInstitutionAction } from "@/app/actions/financial-settings";
 import { useTransactionFormOptions } from "../../hooks/useTransactionFormOptions";
 import {
@@ -48,6 +48,8 @@ export interface TransactionWizardProps {
     secondaryAction?: ReactNode;
     /** Shown inside the institution step, e.g. how confident the scan's match is. */
     institutionHint?: ReactNode;
+    /** Marker beside the institution on the summary, e.g. that same confidence. */
+    institutionMarker?: ReactNode;
 }
 
 /**
@@ -69,6 +71,7 @@ export function TransactionWizard({
     summaryExtra,
     secondaryAction,
     institutionHint,
+    institutionMarker,
 }: TransactionWizardProps) {
     const wizard = useTransactionWizard({ mode, initialValues });
     const { values, setValue, screen, focus, isSummary } = wizard;
@@ -103,22 +106,31 @@ export function TransactionWizard({
     // Suggestions are a convenience: a failure just means fewer chips.
     useEffect(() => {
         let active = true;
-        const loadSuggestions = async () => {
-            const [tags, descriptions] = await Promise.all([
-                getUniqueTagsAction().catch(() => null),
-                getRecentDescriptionsAction().catch(() => null),
-            ]);
-            if (!active) return;
-            if (tags?.success && Array.isArray(tags.data)) setTagSuggestions(tags.data as string[]);
-            if (descriptions?.success && Array.isArray(descriptions.data)) {
-                setDescriptionSuggestions(descriptions.data as string[]);
-            }
-        };
-        void loadSuggestions();
+        void getUniqueTagsAction()
+            .then((res) => {
+                if (active && res?.success && Array.isArray(res.data)) setTagSuggestions(res.data as string[]);
+            })
+            .catch(() => undefined);
         return () => {
             active = false;
         };
     }, []);
+
+    // Re-fetched per type: what you tend to write for an expense is not what
+    // you write for an income, and the chips only pay off if they're plausible.
+    useEffect(() => {
+        let active = true;
+        void getFrequentDescriptionsAction(values.type)
+            .then((res) => {
+                if (active && res?.success && Array.isArray(res.data)) {
+                    setDescriptionSuggestions(res.data as string[]);
+                }
+            })
+            .catch(() => undefined);
+        return () => {
+            active = false;
+        };
+    }, [values.type]);
 
     const autoNotes = useMemo(
         () => buildAutoNotes({
@@ -304,6 +316,7 @@ export function TransactionWizard({
                         tagSuggestions={tagSuggestions}
                         notesOrigin={notesOrigin}
                         extra={summaryExtra}
+                        institutionMarker={institutionMarker}
                     />
                 );
         }

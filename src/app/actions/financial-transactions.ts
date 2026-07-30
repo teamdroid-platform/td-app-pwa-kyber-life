@@ -69,17 +69,17 @@ export async function getUniqueTagsAction() {
 }
 
 /**
- * Recent, distinct descriptions, offered as one-tap answers in the capture
- * flow. The description is the transaction's title, so making it required only
- * works if answering it is usually a tap rather than a sentence.
+ * The user's most used descriptions for a transaction type, most frequent
+ * first. Feeds the one-tap suggestions in the capture flow, where the
+ * description is required: answering it should cost a tap, not a sentence.
  */
-export async function getRecentDescriptionsAction() {
+export async function getFrequentDescriptionsAction(type?: string | null) {
     try {
         const userId = await getAuthUserId();
-        const result = await financialTransactionService.getRecentDescriptions(userId);
+        const result = await financialTransactionService.getFrequentDescriptions(userId, type);
         return { success: true, data: result };
     } catch (error) {
-        console.error("Error fetching recent descriptions:", error);
+        console.error("Error fetching frequent descriptions:", error);
         return { success: false, error: (error as Error).message };
     }
 }

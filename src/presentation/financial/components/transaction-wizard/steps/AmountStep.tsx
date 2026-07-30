@@ -9,6 +9,17 @@ import { StepHeading } from "../WizardShell";
 
 const MAX_DESCRIPTION = 120;
 
+/** How many suggestions the step offers, matching what the query returns. */
+const MAX_SUGGESTIONS = 5;
+
+/** Plural, lowercase, for the line that introduces the suggestions. */
+const SUGGESTION_SCOPE: Record<string, string> = {
+    EXPENSE: "gastos",
+    INCOME: "ingresos",
+    TRANSFER: "transferencias",
+    WITHDRAWAL: "retiros",
+};
+
 interface AmountStepProps {
     amount: string;
     onAmountChange: (value: string) => void;
@@ -17,7 +28,7 @@ interface AmountStepProps {
     onTypeChange: (value: FinancialTransactionType) => void;
     description: string;
     onDescriptionChange: (value: string) => void;
-    /** Recent descriptions, offered as one-tap answers. */
+    /** The user's most used descriptions for this type, offered as one-tap answers. */
     suggestions: string[];
 }
 
@@ -26,8 +37,9 @@ interface AmountStepProps {
  *
  * The description shares this screen because it is the transaction's title
  * everywhere (`getTransactionDisplayTitle` falls back to "Gasto – Supermaxi"
- * without it), so it cannot be a field the user scrolls past. The suggestions
- * exist so that requiring it costs a tap rather than a sentence.
+ * without it), so it cannot be a field the user scrolls past. The suggestions —
+ * the user's most used descriptions for the selected type — exist so that
+ * requiring it costs a tap rather than a sentence.
  */
 export function AmountStep({
     amount,
@@ -39,7 +51,10 @@ export function AmountStep({
     onDescriptionChange,
     suggestions,
 }: AmountStepProps) {
-    const unused = suggestions.filter((s) => s.toLowerCase() !== description.trim().toLowerCase()).slice(0, 6);
+    // Never offer what's already typed; it would read as a no-op.
+    const unused = suggestions
+        .filter((s) => s.toLowerCase() !== description.trim().toLowerCase())
+        .slice(0, MAX_SUGGESTIONS);
 
     return (
         <>
@@ -68,6 +83,12 @@ export function AmountStep({
                     <p className="text-[11px] text-text-tertiary">Así se verá en tu listado de transacciones.</p>
                     <span className="shrink-0 text-[11px] text-text-tertiary">{description.length}/{MAX_DESCRIPTION}</span>
                 </div>
+
+                {unused.length > 0 && (
+                    <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-text-tertiary">
+                        Tus más usadas en {SUGGESTION_SCOPE[type] ?? "transacciones"}
+                    </p>
+                )}
 
                 {unused.length > 0 && (
                     <div className="flex flex-wrap gap-1.5">

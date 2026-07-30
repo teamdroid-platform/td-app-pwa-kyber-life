@@ -52,9 +52,11 @@ interface RowProps {
     changed?: boolean;
     /** Previous value, shown struck through when the row changed. */
     previous?: string;
+    /** Small non-interactive marker shown after the value (e.g. a match level). */
+    marker?: React.ReactNode;
 }
 
-function SummaryRow({ icon: Icon, iconClass, label, children, onEdit, missing, changed, previous }: RowProps) {
+function SummaryRow({ icon: Icon, iconClass, label, children, onEdit, missing, changed, previous, marker }: RowProps) {
     return (
         <button
             type="button"
@@ -71,9 +73,12 @@ function SummaryRow({ icon: Icon, iconClass, label, children, onEdit, missing, c
             </span>
             <span className="min-w-0 flex-1">
                 <span className="block text-[10px] uppercase tracking-[0.1em] text-text-tertiary">{label}</span>
-                <span className={cn("block truncate text-sm", missing ? "text-amber-400" : "text-text-primary")}>
-                    {previous && <span className="mr-1.5 text-text-tertiary line-through">{previous}</span>}
-                    {children}
+                <span className={cn("flex items-center gap-1.5 text-sm", missing ? "text-amber-400" : "text-text-primary")}>
+                    <span className="truncate">
+                        {previous && <span className="mr-1.5 text-text-tertiary line-through">{previous}</span>}
+                        {children}
+                    </span>
+                    {marker}
                 </span>
             </span>
             <Pencil className="h-3.5 w-3.5 shrink-0 text-text-tertiary" />
@@ -96,6 +101,8 @@ interface SummaryStepProps {
     notesOrigin: "auto" | "scan" | "manual";
     /** Read-only content appended after the rows (e.g. the scan's original data). */
     extra?: ReactNode;
+    /** Marker for the institution row, e.g. how confident a scan's match was. */
+    institutionMarker?: ReactNode;
 }
 
 const NOTES_ORIGIN_LABEL: Record<SummaryStepProps["notesOrigin"], string> = {
@@ -125,6 +132,7 @@ export function SummaryStep({
     tagSuggestions,
     notesOrigin,
     extra,
+    institutionMarker,
 }: SummaryStepProps) {
     const [openEditor, setOpenEditor] = useState<"notes" | "tags" | null>(null);
 
@@ -198,6 +206,7 @@ export function SummaryStep({
                     missing={missingFor("institutionName")}
                     changed={didChange("institutionName")}
                     previous={previousOf("institutionName")}
+                    marker={institutionMarker}
                 >
                     {values.institutionName || missingLabel("institutionName")}
                 </SummaryRow>

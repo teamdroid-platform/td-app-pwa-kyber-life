@@ -2,7 +2,7 @@ import React from "react";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { TransactionWizard } from "@/presentation/financial/components/transaction-wizard/TransactionWizard";
 import { getTransactionFormOptionsAction } from "@/app/actions/financial-settings";
-import { getUniqueTagsAction, getRecentDescriptionsAction } from "@/app/actions/financial-transactions";
+import { getUniqueTagsAction, getFrequentDescriptionsAction } from "@/app/actions/financial-transactions";
 import type { WizardValues } from "@/presentation/financial/hooks/useTransactionWizard";
 import type { FinancialCategory, FinancialInstitution } from "@/domain/entities/financial";
 
@@ -12,7 +12,7 @@ jest.mock("next/navigation", () => ({
 
 jest.mock("@/app/actions/financial-transactions", () => ({
     getUniqueTagsAction: jest.fn(),
-    getRecentDescriptionsAction: jest.fn(),
+    getFrequentDescriptionsAction: jest.fn(),
 }));
 
 jest.mock("@/app/actions/financial-settings", () => ({
@@ -72,7 +72,7 @@ beforeEach(() => {
         data: { institutions: [institution], accounts: [{ id: "acc-1", ownerUserId: "user-1", name: "Visa Oro", currency: "USD", createdAt: now, updatedAt: now, isDeleted: false }], categories: [category], institutionTypes: [] },
     });
     (getUniqueTagsAction as jest.Mock).mockResolvedValue({ success: true, data: ["MERCADO"] });
-    (getRecentDescriptionsAction as jest.Mock).mockResolvedValue({ success: true, data: ["Compra semanal", "Almuerzo"] });
+    (getFrequentDescriptionsAction as jest.Mock).mockResolvedValue({ success: true, data: ["Compra semanal", "Almuerzo"] });
 });
 
 describe("TransactionWizard — capture", () => {
@@ -89,11 +89,36 @@ describe("TransactionWizard — capture", () => {
         expect(primary()).toBeEnabled();
     });
 
-    it("fills the description from a recent one with a single tap", async () => {
+    it("fills the description from a frequent one with a single tap", async () => {
         renderWizard();
 
         fireEvent.click(await screen.findByRole("button", { name: /Almuerzo/ }));
         expect(screen.getByPlaceholderText("Ej. Compra semanal")).toHaveValue("Almuerzo");
+    });
+
+    it("asks for the suggestions of the selected type, and again when it changes", async () => {
+        renderWizard();
+
+        await waitFor(() => expect(getFrequentDescriptionsAction).toHaveBeenCalledWith("EXPENSE"));
+        expect(await screen.findByText("Tus más usadas en gastos")).toBeInTheDocument();
+
+        // What you write for an income is not what you write for an expense.
+        fireEvent.click(screen.getByRole("button", { name: /Ingreso/ }));
+
+        await waitFor(() => expect(getFrequentDescriptionsAction).toHaveBeenCalledWith("INCOME"));
+        expect(await screen.findByText("Tus más usadas en ingresos")).toBeInTheDocument();
+    });
+
+    it("offers at most five suggestions, in the order the query returned them", async () => {
+        (getFrequentDescriptionsAction as jest.Mock).mockResolvedValue({
+            success: true,
+            data: ["Uno", "Dos", "Tres", "Cuatro", "Cinco", "Seis"],
+        });
+        renderWizard();
+
+        expect(await screen.findByRole("button", { name: /Uno/ })).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: /Cinco/ })).toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: /Seis/ })).not.toBeInTheDocument();
     });
 
     it("reaches the summary and shows what will be saved", async () => {

@@ -162,6 +162,33 @@ export class InMemoryFinancialTransactionRepository extends InMemoryRepository<F
         return filtered;
     }
 
+    async getFrequentDescriptions(userId: UUID, type?: string | null, limit = 5): Promise<string[]> {
+        const transactions = await this.findByOwnerId(userId);
+        const counts = new Map<string, { uses: number; last: string }>();
+
+        for (const t of transactions) {
+            const description = t.description?.trim();
+            if (!description) continue;
+            if (type && t.type !== type) continue;
+            if (t.status && ["DELETED", "ARCHIVED", "REJECTED"].includes(t.status)) continue;
+
+            const current = counts.get(description);
+            const date = t.date ?? "";
+            if (current) {
+                current.uses += 1;
+                if (date > current.last) current.last = date;
+            } else {
+                counts.set(description, { uses: 1, last: date });
+            }
+        }
+
+        return Array.from(counts.entries())
+            // Most used first; ties broken by the most recent use.
+            .sort((a, b) => b[1].uses - a[1].uses || b[1].last.localeCompare(a[1].last))
+            .slice(0, Math.max(limit, 1))
+            .map(([description]) => description);
+    }
+
     async getUniqueTags(userId: UUID): Promise<string[]> {
         const transactions = await this.findByOwnerId(userId);
         const tagsSet = new Set<string>();
