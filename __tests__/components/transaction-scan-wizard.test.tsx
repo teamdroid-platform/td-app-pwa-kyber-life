@@ -65,7 +65,8 @@ function renderScanWizard(overrides: Partial<FinancialScannerTransaction> = {}) 
     );
 }
 
-const openSummary = async () => fireEvent.click(await screen.findByRole("button", { name: /Resumen/i }));
+/** The scan flow opens straight on the summary, so there is nothing to open. */
+const summaryHeading = () => screen.findByText("Confirmar transacción");
 
 beforeEach(() => {
     jest.clearAllMocks();
@@ -80,16 +81,43 @@ beforeEach(() => {
 });
 
 describe("TransactionScanWizard", () => {
-    it("starts from the scanned values, with the institution already resolved", async () => {
+    it("opens on the summary, so confirming is a single tap", async () => {
         renderScanWizard();
 
-        expect(await screen.findByPlaceholderText("Ej. Compra semanal")).toHaveValue("Compra semanal");
-        expect(screen.getByPlaceholderText("0.00")).toHaveValue(47.9);
+        expect(await summaryHeading()).toBeInTheDocument();
+        expect(screen.getByText("Revisa y confirma, o edita cualquier dato")).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: /Confirmar/i })).toBeEnabled();
+
+        // Not the capture flow: no step 1 in sight.
+        expect(screen.queryByText("¿Cuánto fue?")).not.toBeInTheDocument();
+    });
+
+    it("shows the scanned values at a glance, with the institution already resolved", async () => {
+        renderScanWizard();
+
+        await summaryHeading();
+        expect(screen.getAllByText("Compra semanal").length).toBeGreaterThan(0);
+        expect(screen.getByText("Supermaxi")).toBeInTheDocument();
+        // Twice on purpose: the reviewed value, and the scan's original one.
+        expect(screen.getAllByText("Supermercado")).toHaveLength(2);
+    });
+
+    it("opens a single field for editing and returns to the summary", async () => {
+        renderScanWizard();
+        await summaryHeading();
+
+        // The first is the editable summary row; the second is read-only origin data.
+        fireEvent.click(screen.getAllByText("Supermercado")[0]);
+        expect(await screen.findByText("Editar categoría")).toBeInTheDocument();
+        expect(screen.getByText("Volverás al resumen")).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole("button", { name: /Guardar cambio$/i }));
+        expect(await screen.findByRole("button", { name: /Confirmar/i })).toBeInTheDocument();
     });
 
     it("seeds the notes from the scan's summary and never auto-generates over them", async () => {
         renderScanWizard();
-        await openSummary();
+        await summaryHeading();
 
         expect(await screen.findByText("Consumo con tarjeta VISA en SUPERMAXI")).toBeInTheDocument();
         expect(screen.getByText("Notas · del correo")).toBeInTheDocument();
@@ -101,14 +129,29 @@ describe("TransactionScanWizard", () => {
             summary: null,
             originStats: { origin: "email", emailBody: "Su consumo fue de USD 47.90" },
         });
-        await openSummary();
+        await summaryHeading();
 
         expect(await screen.findByText(/\[MAIL\] Su consumo fue de USD 47\.90/)).toBeInTheDocument();
     });
 
+    it("lays the card out one element per row, so nothing truncates or collides", async () => {
+        renderScanWizard({ description: "Pago de matrícula del segundo semestre en la Universidad de Cuenca", amount: 12480.5 });
+        await summaryHeading();
+
+        // The description is not clipped: the type badge no longer shares its line.
+        const [heroTitle] = screen.getAllByText("Pago de matrícula del segundo semestre en la Universidad de Cuenca");
+        expect(heroTitle.className).not.toMatch(/truncate/);
+
+        // Type, description and amount are siblings — each with the full width.
+        const card = heroTitle.parentElement!;
+        expect(card.className).toMatch(/flex-col/);
+        expect(card).toHaveTextContent("Gasto");
+        expect(card).toHaveTextContent(/12[.,]480[.,]50/);
+    });
+
     it("keeps the originally extracted data consultable on the summary", async () => {
         renderScanWizard();
-        await openSummary();
+        await summaryHeading();
 
         expect(await screen.findByText("Datos originales extraídos")).toBeInTheDocument();
         expect(screen.getByText("47.9 USD")).toBeInTheDocument();
@@ -117,9 +160,9 @@ describe("TransactionScanWizard", () => {
 
     it("confirms through the inbox action with the reviewed values", async () => {
         renderScanWizard();
-        await openSummary();
+        await summaryHeading();
 
-        fireEvent.click(await screen.findByRole("button", { name: /Confirmar/i }));
+        fireEvent.click(screen.getByRole("button", { name: /Confirmar/i }));
 
         await waitFor(() => expect(mapInboxTransactionAction).toHaveBeenCalledTimes(1));
         expect(mapInboxTransactionAction).toHaveBeenCalledWith(expect.objectContaining({
@@ -135,9 +178,9 @@ describe("TransactionScanWizard", () => {
     it("discards the record after confirming the intent", async () => {
         window.confirm = jest.fn(() => true);
         renderScanWizard();
-        await openSummary();
+        await summaryHeading();
 
-        fireEvent.click(await screen.findByRole("button", { name: /Descartar/i }));
+        fireEvent.click(screen.getByRole("button", { name: /Descartar/i }));
 
         await waitFor(() => expect(dismissInboxTransactionAction).toHaveBeenCalledWith("scan-1"));
     });
@@ -145,9 +188,9 @@ describe("TransactionScanWizard", () => {
     it("does not discard when the confirmation is cancelled", async () => {
         window.confirm = jest.fn(() => false);
         renderScanWizard();
-        await openSummary();
+        await summaryHeading();
 
-        fireEvent.click(await screen.findByRole("button", { name: /Descartar/i }));
+        fireEvent.click(screen.getByRole("button", { name: /Descartar/i }));
 
         expect(dismissInboxTransactionAction).not.toHaveBeenCalled();
     });

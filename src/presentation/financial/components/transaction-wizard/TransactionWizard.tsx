@@ -12,6 +12,7 @@ import { useTransactionFormOptions } from "../../hooks/useTransactionFormOptions
 import {
     WIZARD_STEPS,
     useTransactionWizard,
+    type WizardMode,
     type WizardScreen,
     type WizardValues,
 } from "../../hooks/useTransactionWizard";
@@ -25,7 +26,7 @@ import { DateStep } from "./steps/DateStep";
 import { SummaryStep } from "./steps/SummaryStep";
 
 export interface TransactionWizardProps {
-    mode: "create" | "edit";
+    mode: WizardMode;
     initialValues: WizardValues;
     currency?: string;
     /**
@@ -210,18 +211,27 @@ export function TransactionWizard({
     const stepDefinition = WIZARD_STEPS.find((s) => s.id === screen);
     const stepNumber = WIZARD_STEPS.findIndex((s) => s.id === screen) + 1;
 
-    const title = focus
-        ? stepDefinition?.focusTitle ?? "Editar"
-        : mode === "edit" ? "Editar transacción" : "Nueva transacción";
+    const MODE_TITLES: Record<WizardMode, string> = {
+        create: "Nueva transacción",
+        edit: "Editar transacción",
+        confirm: "Confirmar transacción",
+    };
+
+    const title = focus ? stepDefinition?.focusTitle ?? "Editar" : MODE_TITLES[mode];
+
+    const summarySubtitle = () => {
+        if (mode === "edit") {
+            if (!wizard.isDirty) return "Sin cambios";
+            return `${wizard.changed.length} ${wizard.changed.length === 1 ? "cambio" : "cambios"} sin guardar`;
+        }
+        if (mode === "confirm") return "Revisa y confirma, o edita cualquier dato";
+        return "Revisa antes de guardar";
+    };
 
     const subtitle = focus
         ? "Volverás al resumen"
         : isSummary
-            ? mode === "edit"
-                ? wizard.isDirty
-                    ? `${wizard.changed.length} ${wizard.changed.length === 1 ? "cambio" : "cambios"} sin guardar`
-                    : "Sin cambios"
-                : "Revisa antes de guardar"
+            ? summarySubtitle()
             : `Paso ${stepNumber} de ${WIZARD_STEPS.length} · ${stepDefinition?.label ?? ""}`;
 
     const renderScreen = () => {
@@ -299,16 +309,18 @@ export function TransactionWizard({
         }
     };
 
+    const editSaveLabel = wizard.isDirty
+        ? `Guardar ${wizard.changed.length} ${wizard.changed.length === 1 ? "cambio" : "cambios"}`
+        : "Guardar cambios";
+
     const primaryLabel = isSummary
-        ? submitLabel ?? (mode === "edit"
-            ? wizard.isDirty
-                ? `Guardar ${wizard.changed.length} ${wizard.changed.length === 1 ? "cambio" : "cambios"}`
-                : "Guardar cambios"
-            : "Guardar transacción")
+        ? submitLabel ?? (mode === "edit" ? editSaveLabel : "Guardar transacción")
         : focus
             ? "Guardar cambio"
             : screen === "date" ? "Ver resumen" : "Siguiente";
 
+    // Confirming needs no changes to be meaningful — approving as-is is the
+    // common case — so only an edit requires something to have moved.
     const primaryDisabled = isSummary
         ? isSubmitting || wizard.missing.length > 0 || (mode === "edit" && !wizard.isDirty)
         : !wizard.canAdvance;

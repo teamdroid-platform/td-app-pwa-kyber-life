@@ -25,7 +25,9 @@ interface InstitutionStepProps {
 export function InstitutionStep({ hint, ...picker }: InstitutionStepProps) {
     return (
         <>
-            <StepHeading question="¿Dónde fue?" hint="Busca el comercio o el banco, o crea uno nuevo." />
+            {/* With a detection hint the generic help line adds nothing, and the
+                grid needs the room more than the user needs to be told to search. */}
+            <StepHeading question="¿Dónde fue?" hint={hint ? undefined : "Busca el comercio o el banco, o crea uno nuevo."} />
             {hint}
             <InstitutionPicker {...picker} />
         </>
