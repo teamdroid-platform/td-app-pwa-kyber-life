@@ -26,6 +26,13 @@ const LEVEL_CONFIG = {
     },
 } as const;
 
+/** Surface per level, for the expanded hint. */
+const LEVEL_SURFACE = {
+    verified: "border-sky-500/35 bg-sky-500/[0.07]",
+    warning: "border-[#FFB020]/40 bg-[#FFB020]/[0.07]",
+    none: "border-border/40 bg-bg-secondary/40",
+} as const;
+
 interface InstitutionMatchBadgeProps {
     info: InstitutionMatchInfo;
     /** Icon size in px. */
@@ -85,5 +92,49 @@ export function InstitutionMatchBadge({ info, size = 14, className }: Institutio
                 </div>
             </PopoverContent>
         </Popover>
+    );
+}
+
+interface InstitutionMatchHintProps {
+    info: InstitutionMatchInfo;
+    /** The raw merchant the scan extracted, so the message names what it read. */
+    merchant?: string | null;
+    className?: string;
+}
+
+/**
+ * The same match information as the badge, but spelled out.
+ *
+ * The badge is an icon whose explanation lives in a popover — right beside a
+ * name in a dense list, wrong where there is room to simply say it. In a wizard
+ * step a lone icon tells the user nothing, so this states the confidence, the
+ * institution it matched and what the email actually read.
+ */
+export function InstitutionMatchHint({ info, merchant, className }: InstitutionMatchHintProps) {
+    const cfg = LEVEL_CONFIG[info.level];
+    const Icon = cfg.Icon;
+    const pct = Math.round(info.score * 100);
+    const read = merchant?.trim();
+
+    return (
+        <div className={cn("flex items-start gap-2.5 rounded-xl border p-3", LEVEL_SURFACE[info.level], className)}>
+            <Icon className={cn("mt-0.5 h-4 w-4 shrink-0", cfg.iconClass)} />
+            <div className="min-w-0 space-y-0.5">
+                <p className={cn("text-xs font-medium leading-tight", cfg.titleClass)}>{cfg.title}</p>
+                {info.level === "none" ? (
+                    <p className="text-xs leading-snug text-text-tertiary">
+                        {read
+                            ? <>El escaneo leyó «{read}» y no se parece a ninguna institución guardada. Elige la correcta o crea una nueva.</>
+                            : <>No se identificó ninguna institución. Elige la correcta o crea una nueva.</>}
+                    </p>
+                ) : (
+                    <p className="text-xs leading-snug text-text-tertiary">
+                        {read && <>El escaneo leyó «{read}». </>}
+                        Coincide un {pct}% con «{info.matchedName}».
+                        {info.level === "warning" && " Confirma que sea la correcta."}
+                    </p>
+                )}
+            </div>
+        </div>
     );
 }

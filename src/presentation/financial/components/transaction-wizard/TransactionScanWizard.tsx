@@ -10,7 +10,7 @@ import { mapInboxTransactionAction, dismissInboxTransactionAction } from "@/app/
 import type { FinancialScannerTransaction, FinancialTransactionType } from "@/domain/entities/financial";
 import type { InstitutionMatchInfo } from "@/lib/institution-match";
 import type { WizardValues } from "../../hooks/useTransactionWizard";
-import { InstitutionMatchBadge } from "../InstitutionMatchBadge";
+import { InstitutionMatchHint } from "../InstitutionMatchBadge";
 import { ScanOriginalData } from "../ScanOriginalData";
 import { TransactionWizard } from "./TransactionWizard";
 
@@ -146,9 +146,7 @@ export function TransactionScanWizard({ initialData, resolvedInstitutionName, in
             onSubmit={handleSubmit}
             onClose={() => router.replace("/financial/scans")}
             institutionHint={institutionMatch && (
-                <div className="flex items-center gap-2 rounded-xl border border-border/40 bg-bg-secondary/40 px-3 py-2">
-                    <InstitutionMatchBadge info={institutionMatch} size={14} />
-                </div>
+                <InstitutionMatchHint info={institutionMatch} merchant={initialData.merchant} />
             )}
             summaryExtra={<ScanOriginalData transaction={initialData} />}
             secondaryAction={
