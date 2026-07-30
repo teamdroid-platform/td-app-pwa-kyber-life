@@ -11,6 +11,12 @@ jest.mock("next/navigation", () => ({
     useRouter: jest.fn(),
 }));
 
+// This suite covers the single-screen confirmation form, which is what renders
+// with the wizard flag off. The stepped flow has its own suite.
+jest.mock("@/lib/feature-flags", () => ({
+    FINANCIAL_FLAGS: { WIZARD_ENABLED: false },
+}));
+
 jest.mock("@/app/actions/financial-inbox", () => ({
     mapInboxTransactionAction: jest.fn(),
     dismissInboxTransactionAction: jest.fn(),

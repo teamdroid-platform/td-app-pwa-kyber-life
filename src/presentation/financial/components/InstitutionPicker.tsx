@@ -138,8 +138,16 @@ export function InstitutionPicker({
                     </div>
                     {matchedInstitution && (
                         <div className="mt-2">
-                            <button type="button" onClick={() => setDialogOpen(true)} className="inline-flex items-center gap-1.5 text-sm font-medium text-text-secondary hover:text-text-primary">
-                                <Pencil className="h-3.5 w-3.5" /> Editar
+                            {/* Names what it changes: right under a grid used for
+                                choosing, a bare "Editar" reads as "pick another". */}
+                            <button
+                                type="button"
+                                onClick={() => setDialogOpen(true)}
+                                aria-label={`Editar los datos de ${matchedInstitution.name}`}
+                                className="inline-flex max-w-full items-center gap-1.5 text-sm font-medium text-text-secondary hover:text-text-primary"
+                            >
+                                <Pencil className="h-3.5 w-3.5 shrink-0" />
+                                <span className="truncate">Editar «{matchedInstitution.name}»</span>
                             </button>
                         </div>
                     )}

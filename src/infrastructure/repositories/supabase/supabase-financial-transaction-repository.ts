@@ -272,6 +272,28 @@ export class SupabaseFinancialTransactionRepository implements IFinancialTransac
         return (data || []).map((item: any) => item.tag);
     }
 
+    async getFrequentDescriptions(userId: UUID, limit = 5): Promise<Record<string, string[]>> {
+        const supabase = await createClient();
+        const { data, error } = await supabase.rpc('get_frequent_financial_descriptions', {
+            p_user_id: userId,
+            p_limit: limit,
+        });
+
+        if (error) {
+            // Suggestions are a convenience: a missing RPC or a transient failure
+            // must never break the capture flow.
+            console.error('Error fetching frequent descriptions:', error);
+            return {};
+        }
+
+        // The RPC already ranks each type; grouping only reshapes the rows.
+        const grouped: Record<string, string[]> = {};
+        for (const row of (data || []) as { type: string; description: string }[]) {
+            (grouped[row.type] ??= []).push(row.description);
+        }
+        return grouped;
+    }
+
     /**
      * Shared filter builder used by both `search` and `findPaginated`.
      * Keeps all SQL-level filtering in a single place.

@@ -6,7 +6,7 @@ import { getTransactionDisplayTitle } from "@/lib/financial-utils";
 import { AuditTrail } from "./AuditTrail";
 import { DuplicateResolver } from "./DuplicateResolver";
 import { OriginStatsViewer } from "./OriginStatsViewer";
-import { History, Calendar, Edit2, Undo2, Check, Sparkles, Building2, Tags, FileText, Wallet, CreditCard, Landmark, Tag } from "lucide-react";
+import { History, Calendar, Edit2, Undo2, Check, Sparkles, Building2, Tags, FileText, CreditCard, Landmark, Tag } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,12 +24,14 @@ import { updateInstitutionAction } from "@/app/actions/financial-settings";
 import { useTransactionFormOptions } from "../hooks/useTransactionFormOptions";
 import { InstitutionPicker, type PendingInstitutionEdit } from "./InstitutionPicker";
 import { CategoryPicker } from "./CategoryPicker";
-import { TransactionTypeChips } from "./TransactionTypeChips";
+import { TransactionTypeChips, resolveTransactionTypeOption } from "./TransactionTypeChips";
 import { AmountHeroInput } from "./AmountHeroInput";
 import { AccountSelect } from "./AccountSelect";
 import { cn } from "@/lib/utils";
 import { isoToWallClockInput, wallClockInputToISO } from "@/lib/date-range";
 import { TagInput } from "@/components/ui/tag-input";
+import { FINANCIAL_FLAGS } from "@/lib/feature-flags";
+import { TransactionEditWizard } from "./transaction-wizard/TransactionEditWizard";
 
 // ─── Helpers ──────────────────────────────────────────────────
 
@@ -38,28 +40,6 @@ const CREDIT_ELIGIBLE_TYPES: readonly FinancialTransactionType[] = ["EXPENSE"];
 
 /** Accordion section ids used while editing. Only one may be expanded at a time (or none). */
 type SectionId = "description" | "institution" | "account" | "category" | "date" | "notes" | "tags";
-
-const TYPE_LABELS: Record<string, string> = {
-    EXPENSE: "Gasto",
-    INCOME: "Ingreso",
-    TRANSFER: "Transferencias",
-    PAYMENT: "Pago",
-    REFUND: "Reembolso",
-    WITHDRAWAL: "Retiro",
-    DEPOSIT: "Depósito",
-    FEE: "Comisión",
-    TAX: "Impuesto",
-    OTHER: "Otro",
-};
-
-function getTypeBadgeVariant(type: string): "danger" | "success" | "warning" | "outline" {
-    const INCOME_TYPES = ["INCOME", "DEPOSIT", "REFUND"];
-    const EXPENSE_TYPES = ["EXPENSE", "PAYMENT", "WITHDRAWAL", "FEE", "TAX"];
-    if (EXPENSE_TYPES.includes(type)) return "danger";
-    if (INCOME_TYPES.includes(type)) return "success";
-    if (type === "TRANSFER") return "warning";
-    return "outline";
-}
 
 const STATUS_CONFIG: Record<string, { variant: "warning" | "success" | "danger" | "outline" | "default"; label: string }> = {
     DETECTED: { variant: "warning", label: "Nueva" },
@@ -282,8 +262,7 @@ export function TransactionDetailClient({ initialTransaction }: TransactionDetai
 
     const isIncome = ["INCOME", "DEPOSIT", "REFUND"].includes(transaction.type);
     const statusCfg = STATUS_CONFIG[transaction.status] ?? STATUS_CONFIG.DETECTED;
-    const typeLabel = TYPE_LABELS[transaction.type] ?? transaction.type;
-    const typeBadgeVariant = getTypeBadgeVariant(transaction.type);
+    const typeOption = resolveTransactionTypeOption(transaction.type);
     const displayContext = extractContext(transaction);
     const creditEligible = CREDIT_ELIGIBLE_TYPES.includes(editState.type as FinancialTransactionType);
     const canEdit = transaction.status !== "ARCHIVED";
@@ -295,6 +274,25 @@ export function TransactionDetailClient({ initialTransaction }: TransactionDetai
         : (paidWithCreditActive ? "Tarjeta de crédito" : "Ej. Ahorros Múltiple, Tarjeta Visa");
     const accountHasValue = !!editState.accountName || paidWithCreditActive;
     const datePreview = formatDateTimeLocalPreview(editState.date) || "Selecciona fecha y hora";
+
+    // Behind the flag, editing is the stepped wizard: it opens on the summary
+    // so correcting one value doesn't mean walking the whole record again. The
+    // read-only blocks (history, duplicates, origin) stay on this screen.
+    if (isEditing && FINANCIAL_FLAGS.WIZARD_ENABLED) {
+        return (
+            <TransactionEditWizard
+                transaction={transaction}
+                displayNames={displayNames}
+                notes={extractContext(transaction)}
+                onSaved={(updated) => {
+                    setTransaction(updated);
+                    setIsEditing(false);
+                    router.refresh();
+                }}
+                onCancel={() => setIsEditing(false)}
+            />
+        );
+    }
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -340,11 +338,19 @@ export function TransactionDetailClient({ initialTransaction }: TransactionDetai
                             currency={transaction.currency}
                         />
                     ) : (
-                        <div className="rounded-2xl border border-border/40 bg-bg-secondary/50 p-4">
-                            <p className="text-xs font-medium text-text-tertiary">Monto ({transaction.currency})</p>
-                            <div className={cn("mt-1 text-3xl font-bold tracking-tighter sm:text-4xl", isIncome && "text-emerald-500")}>
-                                {isIncome ? "+" : ""}{formatAmount(transaction.amount, transaction.currency)}
+                        // Amount and type read as one fact, so they sit together —
+                        // same pairing the wizard's summary uses.
+                        <div className="flex items-start justify-between gap-3 rounded-2xl border border-border/40 bg-bg-secondary/50 p-4">
+                            <div className="min-w-0">
+                                <p className="text-xs font-medium text-text-tertiary">Monto ({transaction.currency})</p>
+                                <div className={cn("mt-1 text-3xl font-bold tracking-tighter sm:text-4xl", isIncome && "text-emerald-500")}>
+                                    {isIncome ? "+" : ""}{formatAmount(transaction.amount, transaction.currency)}
+                                </div>
                             </div>
+                            <span className="flex shrink-0 items-center gap-1.5 rounded-full border border-border/50 bg-bg-secondary/70 px-2.5 py-1 text-[11px] font-medium text-text-secondary">
+                                <typeOption.Icon className={cn("h-3.5 w-3.5", typeOption.color)} />
+                                {typeOption.label}
+                            </span>
                         </div>
                     )}
 
@@ -430,7 +436,16 @@ export function TransactionDetailClient({ initialTransaction }: TransactionDetai
                         </AccordionField>
                     ) : (
                         <FieldCard icon={<Landmark className="h-4 w-4" />} iconClass="bg-emerald-500/15 text-emerald-500" label="Cuenta">
-                            <p className="text-base font-bold text-text-primary">{displayNames.account || "Sin cuenta"}</p>
+                            {/* Paying on credit is a property of how the account was used,
+                                so it belongs here rather than in a section of its own. */}
+                            <div className="flex flex-wrap items-center gap-2">
+                                <p className="text-base font-bold text-text-primary">{displayNames.account || "Sin cuenta"}</p>
+                                {transaction.type === "EXPENSE" && transaction.paidWithCredit && (
+                                    <Badge variant="outline" className="gap-1.5 rounded-full px-2.5 text-xs">
+                                        <CreditCard className="h-3.5 w-3.5" /> Tarjeta de crédito
+                                    </Badge>
+                                )}
+                            </div>
                         </FieldCard>
                     )}
 
@@ -476,20 +491,6 @@ export function TransactionDetailClient({ initialTransaction }: TransactionDetai
                     ) : (
                         <FieldCard icon={<Calendar className="h-4 w-4" />} iconClass="bg-accent-primary/15 text-accent-primary" label="Fecha y hora">
                             <p className="text-base font-bold text-text-primary">{formatDate(transaction.date)}</p>
-                        </FieldCard>
-                    )}
-
-                    {/* Tipo de operación — view-only summary (edit mode shows the chips up top instead). */}
-                    {!isEditing && (
-                        <FieldCard icon={<Wallet className="h-4 w-4" />} iconClass="bg-indigo-500/15 text-indigo-500" label="Tipo de operación">
-                            <div className="flex flex-wrap items-center gap-2">
-                                <Badge variant={typeBadgeVariant} className="text-sm px-3">{typeLabel}</Badge>
-                                {transaction.type === "EXPENSE" && transaction.paidWithCredit && (
-                                    <Badge variant="outline" className="text-sm px-3 gap-1.5">
-                                        <CreditCard className="h-3.5 w-3.5" /> Tarjeta de crédito
-                                    </Badge>
-                                )}
-                            </div>
                         </FieldCard>
                     )}
 
