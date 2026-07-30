@@ -10,7 +10,7 @@ import { mapInboxTransactionAction, dismissInboxTransactionAction } from "@/app/
 import type { FinancialScannerTransaction, FinancialTransactionType } from "@/domain/entities/financial";
 import type { InstitutionMatchInfo } from "@/lib/institution-match";
 import type { WizardValues } from "../../hooks/useTransactionWizard";
-import { InstitutionMatchHint } from "../InstitutionMatchBadge";
+import { InstitutionMatchHint, InstitutionMatchIcon } from "../InstitutionMatchBadge";
 import { ScanOriginalData } from "../ScanOriginalData";
 import { TransactionWizard } from "./TransactionWizard";
 
@@ -148,6 +148,9 @@ export function TransactionScanWizard({ initialData, resolvedInstitutionName, in
             institutionHint={institutionMatch && (
                 <InstitutionMatchHint info={institutionMatch} merchant={initialData.merchant} />
             )}
+            // On the summary, the level shows beside the institution itself, so
+            // whether it was identified is visible without opening anything.
+            institutionMarker={institutionMatch && <InstitutionMatchIcon info={institutionMatch} />}
             summaryExtra={<ScanOriginalData transaction={initialData} />}
             secondaryAction={
                 <Button

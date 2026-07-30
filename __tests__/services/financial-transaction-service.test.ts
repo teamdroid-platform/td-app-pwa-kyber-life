@@ -25,6 +25,7 @@ describe("FinancialTransactionService", () => {
             findById: jest.fn(),
             delete: jest.fn(),
             getUniqueTags: jest.fn(),
+            getFrequentDescriptions: jest.fn(),
             findPaginated: jest.fn(),
             search: jest.fn(),
         };
@@ -477,5 +478,26 @@ describe("FinancialTransactionService", () => {
             expect(result.status).toBe("ARCHIVED");
         });
     });
+
+    describe("frequent descriptions", () => {
+        it("delegates to the repository, which aggregates them in the store", async () => {
+            transactionRepoMock.getFrequentDescriptions.mockResolvedValue({
+                EXPENSE: ["Compra semanal", "Almuerzo"],
+            });
+
+            const result = await service.getFrequentDescriptions(mockUserId);
+
+            expect(transactionRepoMock.getFrequentDescriptions).toHaveBeenCalledWith(mockUserId, 5);
+            expect(result).toEqual({ EXPENSE: ["Compra semanal", "Almuerzo"] });
+        });
+
+        it("degrades to no suggestions when the repository can't provide them", async () => {
+            const withoutSupport = { ...transactionRepoMock, getFrequentDescriptions: undefined };
+            const limited = new FinancialTransactionService(withoutSupport as any, auditLogRepoMock as any);
+
+            await expect(limited.getFrequentDescriptions(mockUserId)).resolves.toEqual({});
+        });
+    });
+
 });
 

@@ -69,17 +69,25 @@ export async function getUniqueTagsAction() {
 }
 
 /**
- * Recent, distinct descriptions, offered as one-tap answers in the capture
- * flow. The description is the transaction's title, so making it required only
- * works if answering it is usually a tap rather than a sentence.
+ * Everything the capture flow offers as one-tap answers: the user's existing
+ * tags, and their most used descriptions grouped by transaction type.
+ *
+ * Bundled into a single action deliberately. Each server action is its own HTTP
+ * request and resolves the session on its own — so splitting these cost two
+ * auth round-trips, and asking for descriptions per type cost one more request
+ * on every chip the user tapped. The aggregate itself runs in under a
+ * millisecond; the requests were the latency.
  */
-export async function getRecentDescriptionsAction() {
+export async function getTransactionSuggestionsAction() {
     try {
         const userId = await getAuthUserId();
-        const result = await financialTransactionService.getRecentDescriptions(userId);
-        return { success: true, data: result };
+        const [tags, descriptionsByType] = await Promise.all([
+            financialTransactionService.getUniqueTags(userId),
+            financialTransactionService.getFrequentDescriptions(userId),
+        ]);
+        return { success: true, data: { tags, descriptionsByType } };
     } catch (error) {
-        console.error("Error fetching recent descriptions:", error);
+        console.error("Error fetching transaction suggestions:", error);
         return { success: false, error: (error as Error).message };
     }
 }

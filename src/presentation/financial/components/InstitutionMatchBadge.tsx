@@ -187,3 +187,35 @@ export function InstitutionMatchHint({ info, merchant, className }: InstitutionM
         </div>
     );
 }
+
+interface InstitutionMatchIconProps {
+    info: InstitutionMatchInfo;
+    className?: string;
+}
+
+/**
+ * The match level as a bare icon, for places that are already interactive —
+ * the summary rows are buttons, and a popover trigger cannot nest inside one.
+ *
+ * It carries the explanation in its title and accessible name instead, so the
+ * user learns at a glance whether the institution was identified, guessed or
+ * not found at all.
+ */
+export function InstitutionMatchIcon({ info, className }: InstitutionMatchIconProps) {
+    const cfg = LEVEL_CONFIG[info.level];
+    const Icon = cfg.Icon;
+    const pct = Math.round(info.score * 100);
+    const label = info.level === "none"
+        ? cfg.title
+        : `${cfg.title} · ${pct}% con «${info.matchedName}»`;
+
+    return (
+        <Icon
+            role="img"
+            aria-label={label}
+            className={cn("h-3.5 w-3.5 shrink-0", cfg.iconClass, className)}
+        >
+            <title>{label}</title>
+        </Icon>
+    );
+}

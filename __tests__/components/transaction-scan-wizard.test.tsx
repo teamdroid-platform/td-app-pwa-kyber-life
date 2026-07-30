@@ -2,9 +2,10 @@ import React from "react";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { TransactionScanWizard } from "@/presentation/financial/components/transaction-wizard/TransactionScanWizard";
 import { getTransactionFormOptionsAction } from "@/app/actions/financial-settings";
-import { getUniqueTagsAction, getRecentDescriptionsAction } from "@/app/actions/financial-transactions";
+import { getTransactionSuggestionsAction } from "@/app/actions/financial-transactions";
 import { mapInboxTransactionAction, dismissInboxTransactionAction } from "@/app/actions/financial-inbox";
 import type { FinancialScannerTransaction } from "@/domain/entities/financial";
+import type { InstitutionMatchInfo } from "@/lib/institution-match";
 
 const replace = jest.fn();
 jest.mock("next/navigation", () => ({
@@ -17,8 +18,7 @@ jest.mock("@/app/actions/financial-inbox", () => ({
 }));
 
 jest.mock("@/app/actions/financial-transactions", () => ({
-    getUniqueTagsAction: jest.fn(),
-    getRecentDescriptionsAction: jest.fn(),
+    getTransactionSuggestionsAction: jest.fn(),
 }));
 
 jest.mock("@/app/actions/financial-settings", () => ({
@@ -56,11 +56,15 @@ const scanned: FinancialScannerTransaction = {
     isDeleted: false,
 };
 
-function renderScanWizard(overrides: Partial<FinancialScannerTransaction> = {}) {
+function renderScanWizard(
+    overrides: Partial<FinancialScannerTransaction> = {},
+    institutionMatch?: InstitutionMatchInfo,
+) {
     render(
         <TransactionScanWizard
             initialData={{ ...scanned, ...overrides }}
             resolvedInstitutionName="Supermaxi"
+            institutionMatch={institutionMatch}
         />,
     );
 }
@@ -74,8 +78,10 @@ beforeEach(() => {
         success: true,
         data: { institutions: [], accounts: [], categories: [], institutionTypes: [] },
     });
-    (getUniqueTagsAction as jest.Mock).mockResolvedValue({ success: true, data: [] });
-    (getRecentDescriptionsAction as jest.Mock).mockResolvedValue({ success: true, data: [] });
+    (getTransactionSuggestionsAction as jest.Mock).mockResolvedValue({
+        success: true,
+        data: { tags: [], descriptionsByType: {} },
+    });
     (mapInboxTransactionAction as jest.Mock).mockResolvedValue({ success: true });
     (dismissInboxTransactionAction as jest.Mock).mockResolvedValue({ success: true });
 });
@@ -147,6 +153,28 @@ describe("TransactionScanWizard", () => {
         expect(card.className).toMatch(/flex-col/);
         expect(card).toHaveTextContent("Gasto");
         expect(card).toHaveTextContent(/12[.,]480[.,]50/);
+    });
+
+    it("marks the institution row with how confident the detection was", async () => {
+        renderScanWizard({}, { level: "verified", score: 0.97, matchedName: "Supermaxi" });
+        await summaryHeading();
+
+        // Visible on the summary itself: no need to open anything to know.
+        expect(screen.getByLabelText("Institución identificada · 97% con «Supermaxi»")).toBeInTheDocument();
+    });
+
+    it("marks a partial detection differently, so it reads as worth checking", async () => {
+        renderScanWizard({}, { level: "warning", score: 0.6, matchedName: "Supermaxi" });
+        await summaryHeading();
+
+        expect(screen.getByLabelText("Coincidencia parcial · 60% con «Supermaxi»")).toBeInTheDocument();
+    });
+
+    it("marks an absent detection without inventing a name", async () => {
+        renderScanWizard({}, { level: "none", score: 0.1, matchedName: null });
+        await summaryHeading();
+
+        expect(screen.getByLabelText("Sin coincidencia")).toBeInTheDocument();
     });
 
     it("keeps the originally extracted data consultable on the summary", async () => {

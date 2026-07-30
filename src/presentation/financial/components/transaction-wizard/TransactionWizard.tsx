@@ -6,7 +6,7 @@ import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { financialOfflineStore } from "@/infrastructure/offline/financial-offline-store";
 import { wallClockInputToISO } from "@/lib/date-range";
-import { getUniqueTagsAction, getRecentDescriptionsAction } from "@/app/actions/financial-transactions";
+import { getTransactionSuggestionsAction } from "@/app/actions/financial-transactions";
 import { updateInstitutionAction } from "@/app/actions/financial-settings";
 import { useTransactionFormOptions } from "../../hooks/useTransactionFormOptions";
 import {
@@ -48,6 +48,8 @@ export interface TransactionWizardProps {
     secondaryAction?: ReactNode;
     /** Shown inside the institution step, e.g. how confident the scan's match is. */
     institutionHint?: ReactNode;
+    /** Marker beside the institution on the summary, e.g. that same confidence. */
+    institutionMarker?: ReactNode;
 }
 
 /**
@@ -69,6 +71,7 @@ export function TransactionWizard({
     summaryExtra,
     secondaryAction,
     institutionHint,
+    institutionMarker,
 }: TransactionWizardProps) {
     const wizard = useTransactionWizard({ mode, initialValues });
     const { values, setValue, screen, focus, isSummary } = wizard;
@@ -78,7 +81,8 @@ export function TransactionWizard({
     const [categoryQuery, setCategoryQuery] = useState("");
     const [pendingInstitutionEdit, setPendingInstitutionEdit] = useState<PendingInstitutionEdit | null>(null);
     const [tagSuggestions, setTagSuggestions] = useState<string[]>([]);
-    const [descriptionSuggestions, setDescriptionSuggestions] = useState<string[]>([]);
+    const [descriptionsByType, setDescriptionsByType] = useState<Record<string, string[]>>({});
+    const [suggestionsLoading, setSuggestionsLoading] = useState(true);
 
     // Only the auto-generated sentence may be overwritten. Notes seeded from a
     // scan's `summary`, or belonging to an existing transaction, are the user's.
@@ -100,25 +104,31 @@ export function TransactionWizard({
         if (optionsError) toast.error("No se pudieron cargar categorías e instituciones. Reintenta.");
     }, [optionsError]);
 
+    // Fetched once, for every type at once: what you write for an expense is
+    // not what you write for an income, but re-asking on each chip tap cost a
+    // request (and its auth round-trip) for data that fits in one response.
     // Suggestions are a convenience: a failure just means fewer chips.
     useEffect(() => {
         let active = true;
-        const loadSuggestions = async () => {
-            const [tags, descriptions] = await Promise.all([
-                getUniqueTagsAction().catch(() => null),
-                getRecentDescriptionsAction().catch(() => null),
-            ]);
-            if (!active) return;
-            if (tags?.success && Array.isArray(tags.data)) setTagSuggestions(tags.data as string[]);
-            if (descriptions?.success && Array.isArray(descriptions.data)) {
-                setDescriptionSuggestions(descriptions.data as string[]);
-            }
-        };
-        void loadSuggestions();
+        void getTransactionSuggestionsAction()
+            .then((res) => {
+                if (!active) return;
+                if (res?.success && res.data) {
+                    setTagSuggestions(res.data.tags ?? []);
+                    setDescriptionsByType(res.data.descriptionsByType ?? {});
+                }
+            })
+            .catch(() => undefined)
+            .finally(() => {
+                if (active) setSuggestionsLoading(false);
+            });
         return () => {
             active = false;
         };
     }, []);
+
+    // Switching type is now a lookup, not a request.
+    const descriptionSuggestions = descriptionsByType[values.type] ?? [];
 
     const autoNotes = useMemo(
         () => buildAutoNotes({
@@ -247,6 +257,7 @@ export function TransactionWizard({
                         description={values.description}
                         onDescriptionChange={(v) => setValue("description", v)}
                         suggestions={descriptionSuggestions}
+                        suggestionsLoading={suggestionsLoading}
                     />
                 );
             case "institution":
@@ -304,6 +315,7 @@ export function TransactionWizard({
                         tagSuggestions={tagSuggestions}
                         notesOrigin={notesOrigin}
                         extra={summaryExtra}
+                        institutionMarker={institutionMarker}
                     />
                 );
         }

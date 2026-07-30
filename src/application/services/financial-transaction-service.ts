@@ -337,27 +337,19 @@ export class FinancialTransactionService {
     }
 
     /**
-     * The owner's most recent distinct descriptions, newest first.
+     * The owner's most used descriptions, most frequent first, grouped by
+     * transaction type.
      *
-     * Reads a single page rather than the whole history: this feeds a handful
-     * of suggestion chips, so a wider scan would cost more than it's worth.
+     * Delegated to the repository so the store can aggregate it: this feeds a
+     * handful of suggestion chips, and counting them here would mean pulling
+     * the history on every visit to the first step.
      */
-    async getRecentDescriptions(userId: UUID, limit = 8): Promise<string[]> {
-        const page = await this.searchPaginated(userId, {}, { page: 1, pageSize: 60 });
-        const seen = new Set<string>();
-        const descriptions: string[] = [];
-
-        for (const tx of page.data) {
-            const description = tx.description?.trim();
-            if (!description) continue;
-            const key = description.toLowerCase();
-            if (seen.has(key)) continue;
-            seen.add(key);
-            descriptions.push(description);
-            if (descriptions.length >= limit) break;
+    async getFrequentDescriptions(userId: UUID, limit = 5): Promise<Record<string, string[]>> {
+        if (!this.transactionRepo.getFrequentDescriptions) {
+            console.warn("getFrequentDescriptions is not implemented on the current transaction repository.");
+            return {};
         }
-
-        return descriptions;
+        return this.transactionRepo.getFrequentDescriptions(userId, limit);
     }
 
     async getAuditTrail(transactionId: UUID): Promise<unknown[]> {
