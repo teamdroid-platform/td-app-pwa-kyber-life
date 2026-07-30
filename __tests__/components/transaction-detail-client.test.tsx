@@ -61,7 +61,7 @@ const TRANSACTION: FinancialTransaction = {
     updatedAt: now,
 };
 
-async function renderDetail() {
+async function renderDetail(overrides: Partial<FinancialTransaction> = {}) {
     (useRouter as jest.Mock).mockReturnValue({ push: jest.fn(), refresh: jest.fn() });
     (getUniqueTagsAction as jest.Mock).mockResolvedValue({ success: true, data: ["mercado", "casa"] });
     (getAuditTrailAction as jest.Mock).mockResolvedValue({ success: true, data: [] });
@@ -70,7 +70,7 @@ async function renderDetail() {
         data: { institutions: [], accounts: [], categories: [], institutionTypes: [] },
     });
 
-    render(<TransactionDetailClient initialTransaction={TRANSACTION} />);
+    render(<TransactionDetailClient initialTransaction={{ ...TRANSACTION, ...overrides }} />);
     await waitFor(() => expect(getTransactionFormOptionsAction).toHaveBeenCalled());
 }
 
@@ -87,6 +87,20 @@ describe("TransactionDetailClient", () => {
         expect(screen.getByRole("button", { name: /Editar transacción/i })).toBeInTheDocument();
         // Not yet in edit mode: no Guardar/Cancelar buttons.
         expect(screen.queryByRole("button", { name: /Guardar Cambios/i })).not.toBeInTheDocument();
+    });
+
+    it("keeps the status badge out of the way when there is nothing to report", async () => {
+        await renderDetail();
+
+        // "Confirmada" is the expected state: saying it costs a row and tells
+        // the user nothing.
+        expect(screen.queryByText("Confirmada")).not.toBeInTheDocument();
+    });
+
+    it("shows the status badge for any state worth noticing", async () => {
+        await renderDetail({ status: "DETECTED" });
+
+        expect(screen.getByText("Nueva")).toBeInTheDocument();
     });
 
     it("switches to edit mode with the atomic pickers and floating Cancelar/Guardar actions", async () => {
