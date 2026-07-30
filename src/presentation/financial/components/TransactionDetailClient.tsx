@@ -262,6 +262,8 @@ export function TransactionDetailClient({ initialTransaction }: TransactionDetai
 
     const isIncome = ["INCOME", "DEPOSIT", "REFUND"].includes(transaction.type);
     const statusCfg = STATUS_CONFIG[transaction.status] ?? STATUS_CONFIG.DETECTED;
+    // The expected state needs no badge; anything else does.
+    const showStatus = transaction.status !== "CONFIRMED";
     const typeOption = resolveTransactionTypeOption(transaction.type);
     const displayContext = extractContext(transaction);
     const creditEligible = CREDIT_ELIGIBLE_TYPES.includes(editState.type as FinancialTransactionType);
@@ -314,16 +316,23 @@ export function TransactionDetailClient({ initialTransaction }: TransactionDetai
                 >
                     <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-accent-primary/60 to-accent-primary/10" aria-hidden="true" />
 
-                    <div className="flex flex-wrap items-center gap-2">
-                        <Badge variant={statusCfg.variant} className="rounded-full px-3 py-0.5 text-[10px] uppercase tracking-[0.14em]">
-                            {statusCfg.label}
-                        </Badge>
-                        {isEditing && (
-                            <Badge variant="outline" className="rounded-full px-3 py-0.5 text-[10px] uppercase tracking-[0.14em] border-accent-primary/50 text-accent-primary">
-                                Modo Edición
-                            </Badge>
-                        )}
-                    </div>
+                    {/* "Confirmada" is what a transaction is expected to be, so
+                        saying it spends a row to tell the user nothing. Only a
+                        state worth noticing earns the space. */}
+                    {(showStatus || isEditing) && (
+                        <div className="flex flex-wrap items-center gap-2">
+                            {showStatus && (
+                                <Badge variant={statusCfg.variant} className="rounded-full px-3 py-0.5 text-[10px] uppercase tracking-[0.14em]">
+                                    {statusCfg.label}
+                                </Badge>
+                            )}
+                            {isEditing && (
+                                <Badge variant="outline" className="rounded-full px-3 py-0.5 text-[10px] uppercase tracking-[0.14em] border-accent-primary/50 text-accent-primary">
+                                    Modo Edición
+                                </Badge>
+                            )}
+                        </div>
+                    )}
 
                     {/* Tipo de operación — quick-pick chips, only while editing (same as the create form's top). */}
                     {isEditing && (
