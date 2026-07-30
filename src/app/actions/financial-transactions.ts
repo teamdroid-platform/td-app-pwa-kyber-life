@@ -69,17 +69,25 @@ export async function getUniqueTagsAction() {
 }
 
 /**
- * The user's most used descriptions for a transaction type, most frequent
- * first. Feeds the one-tap suggestions in the capture flow, where the
- * description is required: answering it should cost a tap, not a sentence.
+ * Everything the capture flow offers as one-tap answers: the user's existing
+ * tags, and their most used descriptions grouped by transaction type.
+ *
+ * Bundled into a single action deliberately. Each server action is its own HTTP
+ * request and resolves the session on its own — so splitting these cost two
+ * auth round-trips, and asking for descriptions per type cost one more request
+ * on every chip the user tapped. The aggregate itself runs in under a
+ * millisecond; the requests were the latency.
  */
-export async function getFrequentDescriptionsAction(type?: string | null) {
+export async function getTransactionSuggestionsAction() {
     try {
         const userId = await getAuthUserId();
-        const result = await financialTransactionService.getFrequentDescriptions(userId, type);
-        return { success: true, data: result };
+        const [tags, descriptionsByType] = await Promise.all([
+            financialTransactionService.getUniqueTags(userId),
+            financialTransactionService.getFrequentDescriptions(userId),
+        ]);
+        return { success: true, data: { tags, descriptionsByType } };
     } catch (error) {
-        console.error("Error fetching frequent descriptions:", error);
+        console.error("Error fetching transaction suggestions:", error);
         return { success: false, error: (error as Error).message };
     }
 }

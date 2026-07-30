@@ -1,8 +1,8 @@
 import React from "react";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { act, render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { TransactionWizard } from "@/presentation/financial/components/transaction-wizard/TransactionWizard";
 import { getTransactionFormOptionsAction } from "@/app/actions/financial-settings";
-import { getUniqueTagsAction, getFrequentDescriptionsAction } from "@/app/actions/financial-transactions";
+import { getTransactionSuggestionsAction } from "@/app/actions/financial-transactions";
 import type { WizardValues } from "@/presentation/financial/hooks/useTransactionWizard";
 import type { FinancialCategory, FinancialInstitution } from "@/domain/entities/financial";
 
@@ -11,8 +11,7 @@ jest.mock("next/navigation", () => ({
 }));
 
 jest.mock("@/app/actions/financial-transactions", () => ({
-    getUniqueTagsAction: jest.fn(),
-    getFrequentDescriptionsAction: jest.fn(),
+    getTransactionSuggestionsAction: jest.fn(),
 }));
 
 jest.mock("@/app/actions/financial-settings", () => ({
@@ -71,8 +70,16 @@ beforeEach(() => {
         success: true,
         data: { institutions: [institution], accounts: [{ id: "acc-1", ownerUserId: "user-1", name: "Visa Oro", currency: "USD", createdAt: now, updatedAt: now, isDeleted: false }], categories: [category], institutionTypes: [] },
     });
-    (getUniqueTagsAction as jest.Mock).mockResolvedValue({ success: true, data: ["MERCADO"] });
-    (getFrequentDescriptionsAction as jest.Mock).mockResolvedValue({ success: true, data: ["Compra semanal", "Almuerzo"] });
+    (getTransactionSuggestionsAction as jest.Mock).mockResolvedValue({
+        success: true,
+        data: {
+            tags: ["MERCADO"],
+            descriptionsByType: {
+                EXPENSE: ["Compra semanal", "Almuerzo"],
+                INCOME: ["Salario"],
+            },
+        },
+    });
 });
 
 describe("TransactionWizard — capture", () => {
@@ -96,23 +103,46 @@ describe("TransactionWizard — capture", () => {
         expect(screen.getByPlaceholderText("Ej. Compra semanal")).toHaveValue("Almuerzo");
     });
 
-    it("asks for the suggestions of the selected type, and again when it changes", async () => {
+    it("switches the suggestions with the type without asking the server again", async () => {
         renderWizard();
 
-        await waitFor(() => expect(getFrequentDescriptionsAction).toHaveBeenCalledWith("EXPENSE"));
         expect(await screen.findByText("Tus más usadas en gastos")).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: /Almuerzo/ })).toBeInTheDocument();
 
         // What you write for an income is not what you write for an expense.
         fireEvent.click(screen.getByRole("button", { name: /Ingreso/ }));
 
-        await waitFor(() => expect(getFrequentDescriptionsAction).toHaveBeenCalledWith("INCOME"));
         expect(await screen.findByText("Tus más usadas en ingresos")).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: /Salario/ })).toBeInTheDocument();
+
+        // Every type arrived in the first response; switching costs no request.
+        expect(getTransactionSuggestionsAction).toHaveBeenCalledTimes(1);
+    });
+
+    it("holds the space with placeholders while the suggestions load", async () => {
+        let resolve: (value: unknown) => void = () => undefined;
+        (getTransactionSuggestionsAction as jest.Mock).mockReturnValue(
+            new Promise((r) => { resolve = r; }),
+        );
+        renderWizard();
+
+        expect(await screen.findByRole("status")).toHaveTextContent("Cargando tus descripciones más usadas");
+
+        await act(async () => {
+            resolve({ success: true, data: { tags: [], descriptionsByType: { EXPENSE: ["Almuerzo"] } } });
+        });
+
+        expect(screen.queryByRole("status")).not.toBeInTheDocument();
+        expect(screen.getByRole("button", { name: /Almuerzo/ })).toBeInTheDocument();
     });
 
     it("offers at most five suggestions, in the order the query returned them", async () => {
-        (getFrequentDescriptionsAction as jest.Mock).mockResolvedValue({
+        (getTransactionSuggestionsAction as jest.Mock).mockResolvedValue({
             success: true,
-            data: ["Uno", "Dos", "Tres", "Cuatro", "Cinco", "Seis"],
+            data: {
+                tags: [],
+                descriptionsByType: { EXPENSE: ["Uno", "Dos", "Tres", "Cuatro", "Cinco", "Seis"] },
+            },
         });
         renderWizard();
 

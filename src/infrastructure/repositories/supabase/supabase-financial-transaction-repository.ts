@@ -272,11 +272,10 @@ export class SupabaseFinancialTransactionRepository implements IFinancialTransac
         return (data || []).map((item: any) => item.tag);
     }
 
-    async getFrequentDescriptions(userId: UUID, type?: string | null, limit = 5): Promise<string[]> {
+    async getFrequentDescriptions(userId: UUID, limit = 5): Promise<Record<string, string[]>> {
         const supabase = await createClient();
         const { data, error } = await supabase.rpc('get_frequent_financial_descriptions', {
             p_user_id: userId,
-            p_type: type ?? null,
             p_limit: limit,
         });
 
@@ -284,10 +283,15 @@ export class SupabaseFinancialTransactionRepository implements IFinancialTransac
             // Suggestions are a convenience: a missing RPC or a transient failure
             // must never break the capture flow.
             console.error('Error fetching frequent descriptions:', error);
-            return [];
+            return {};
         }
 
-        return (data || []).map((item: { description: string }) => item.description);
+        // The RPC already ranks each type; grouping only reshapes the rows.
+        const grouped: Record<string, string[]> = {};
+        for (const row of (data || []) as { type: string; description: string }[]) {
+            (grouped[row.type] ??= []).push(row.description);
+        }
+        return grouped;
     }
 
     /**

@@ -2,7 +2,7 @@ import React from "react";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { TransactionScanWizard } from "@/presentation/financial/components/transaction-wizard/TransactionScanWizard";
 import { getTransactionFormOptionsAction } from "@/app/actions/financial-settings";
-import { getUniqueTagsAction, getFrequentDescriptionsAction } from "@/app/actions/financial-transactions";
+import { getTransactionSuggestionsAction } from "@/app/actions/financial-transactions";
 import { mapInboxTransactionAction, dismissInboxTransactionAction } from "@/app/actions/financial-inbox";
 import type { FinancialScannerTransaction } from "@/domain/entities/financial";
 import type { InstitutionMatchInfo } from "@/lib/institution-match";
@@ -18,8 +18,7 @@ jest.mock("@/app/actions/financial-inbox", () => ({
 }));
 
 jest.mock("@/app/actions/financial-transactions", () => ({
-    getUniqueTagsAction: jest.fn(),
-    getFrequentDescriptionsAction: jest.fn(),
+    getTransactionSuggestionsAction: jest.fn(),
 }));
 
 jest.mock("@/app/actions/financial-settings", () => ({
@@ -79,8 +78,10 @@ beforeEach(() => {
         success: true,
         data: { institutions: [], accounts: [], categories: [], institutionTypes: [] },
     });
-    (getUniqueTagsAction as jest.Mock).mockResolvedValue({ success: true, data: [] });
-    (getFrequentDescriptionsAction as jest.Mock).mockResolvedValue({ success: true, data: [] });
+    (getTransactionSuggestionsAction as jest.Mock).mockResolvedValue({
+        success: true,
+        data: { tags: [], descriptionsByType: {} },
+    });
     (mapInboxTransactionAction as jest.Mock).mockResolvedValue({ success: true });
     (dismissInboxTransactionAction as jest.Mock).mockResolvedValue({ success: true });
 });

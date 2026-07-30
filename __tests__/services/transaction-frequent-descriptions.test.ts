@@ -45,7 +45,7 @@ describe("frequent descriptions", () => {
             tx({ description: "Gasolina" }),
         ]);
 
-        expect(await repo.getFrequentDescriptions(OWNER)).toEqual([
+        expect((await repo.getFrequentDescriptions(OWNER)).EXPENSE).toEqual([
             "Compra semanal",
             "Gasolina",
             "Almuerzo",
@@ -58,18 +58,22 @@ describe("frequent descriptions", () => {
             tx({ description: "Reciente", date: "2026-07-20T10:00:00.000Z" }),
         ]);
 
-        expect(await repo.getFrequentDescriptions(OWNER)).toEqual(["Reciente", "Vieja"]);
+        expect((await repo.getFrequentDescriptions(OWNER)).EXPENSE).toEqual(["Reciente", "Vieja"]);
     });
 
-    it("only counts the requested type", async () => {
+    it("groups every type in a single call, so switching type costs no request", async () => {
         const repo = await seed([
             tx({ description: "Sueldo", type: "INCOME" }),
             tx({ description: "Sueldo", type: "INCOME" }),
             tx({ description: "Compra semanal", type: "EXPENSE" }),
+            tx({ description: "Retiro desde cajero", type: "WITHDRAWAL" }),
         ]);
 
-        expect(await repo.getFrequentDescriptions(OWNER, "INCOME")).toEqual(["Sueldo"]);
-        expect(await repo.getFrequentDescriptions(OWNER, "EXPENSE")).toEqual(["Compra semanal"]);
+        expect(await repo.getFrequentDescriptions(OWNER)).toEqual({
+            INCOME: ["Sueldo"],
+            EXPENSE: ["Compra semanal"],
+            WITHDRAWAL: ["Retiro desde cajero"],
+        });
     });
 
     it("ignores discarded movements — they shouldn't shape today's suggestions", async () => {
@@ -80,16 +84,16 @@ describe("frequent descriptions", () => {
             tx({ description: "Vigente" }),
         ]);
 
-        expect(await repo.getFrequentDescriptions(OWNER)).toEqual(["Vigente"]);
+        expect((await repo.getFrequentDescriptions(OWNER)).EXPENSE).toEqual(["Vigente"]);
     });
 
-    it("skips empty descriptions and caps the list", async () => {
+    it("skips empty descriptions and caps the list per type", async () => {
         const repo = await seed([
             tx({ description: "   " }),
             ...["A", "B", "C", "D", "E", "F"].map((d) => tx({ description: d })),
         ]);
 
-        const result = await repo.getFrequentDescriptions(OWNER, null, 5);
+        const result = (await repo.getFrequentDescriptions(OWNER, 5)).EXPENSE;
         expect(result).toHaveLength(5);
         expect(result).not.toContain("   ");
     });
@@ -100,6 +104,6 @@ describe("frequent descriptions", () => {
             tx({ description: "Ajena", ownerUserId: "user-2" }),
         ]);
 
-        expect(await repo.getFrequentDescriptions(OWNER)).toEqual(["Mía"]);
+        expect((await repo.getFrequentDescriptions(OWNER)).EXPENSE).toEqual(["Mía"]);
     });
 });

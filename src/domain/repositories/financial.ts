@@ -32,11 +32,14 @@ export interface IFinancialTransactionRepository extends IRepository<FinancialTr
     findPaginated(userId: UUID, filters: TransactionSearchFilters, pagination: PaginationParams): Promise<PaginatedResult<FinancialTransaction>>;
     getUniqueTags(userId: UUID): Promise<string[]>;
     /**
-     * The user's most used descriptions, most frequent first, optionally for a
-     * single transaction type. Aggregated by the store rather than in memory:
-     * this feeds five suggestion chips, not a listing.
+     * The user's most used descriptions, most frequent first, grouped by
+     * transaction type. Aggregated by the store rather than in memory: this
+     * feeds a handful of suggestion chips, not a listing.
+     *
+     * Every type comes back in one call on purpose — the capture flow switches
+     * types with a chip, and a request per switch cost far more than the query.
      */
-    getFrequentDescriptions(userId: UUID, type?: string | null, limit?: number): Promise<string[]>;
+    getFrequentDescriptions(userId: UUID, limit?: number): Promise<Record<string, string[]>>;
     /** Number of transactions owned by the user that reference the given category. */
     countByCategoryId(userId: UUID, categoryId: UUID): Promise<number>;
     /**

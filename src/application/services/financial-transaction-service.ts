@@ -337,19 +337,19 @@ export class FinancialTransactionService {
     }
 
     /**
-     * The owner's most used descriptions, most frequent first, for one
+     * The owner's most used descriptions, most frequent first, grouped by
      * transaction type.
      *
-     * Delegated to the repository so the store can aggregate it: this feeds
-     * five suggestion chips, and counting them here would mean pulling the
-     * history on every visit to the first step.
+     * Delegated to the repository so the store can aggregate it: this feeds a
+     * handful of suggestion chips, and counting them here would mean pulling
+     * the history on every visit to the first step.
      */
-    async getFrequentDescriptions(userId: UUID, type?: string | null, limit = 5): Promise<string[]> {
+    async getFrequentDescriptions(userId: UUID, limit = 5): Promise<Record<string, string[]>> {
         if (!this.transactionRepo.getFrequentDescriptions) {
             console.warn("getFrequentDescriptions is not implemented on the current transaction repository.");
-            return [];
+            return {};
         }
-        return this.transactionRepo.getFrequentDescriptions(userId, type, limit);
+        return this.transactionRepo.getFrequentDescriptions(userId, limit);
     }
 
     async getAuditTrail(transactionId: UUID): Promise<unknown[]> {
