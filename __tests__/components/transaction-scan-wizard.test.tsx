@@ -134,6 +134,21 @@ describe("TransactionScanWizard", () => {
         expect(await screen.findByText(/\[MAIL\] Su consumo fue de USD 47\.90/)).toBeInTheDocument();
     });
 
+    it("lays the card out one element per row, so nothing truncates or collides", async () => {
+        renderScanWizard({ description: "Pago de matrícula del segundo semestre en la Universidad de Cuenca", amount: 12480.5 });
+        await summaryHeading();
+
+        // The description is not clipped: the type badge no longer shares its line.
+        const [heroTitle] = screen.getAllByText("Pago de matrícula del segundo semestre en la Universidad de Cuenca");
+        expect(heroTitle.className).not.toMatch(/truncate/);
+
+        // Type, description and amount are siblings — each with the full width.
+        const card = heroTitle.parentElement!;
+        expect(card.className).toMatch(/flex-col/);
+        expect(card).toHaveTextContent("Gasto");
+        expect(card).toHaveTextContent(/12[.,]480[.,]50/);
+    });
+
     it("keeps the originally extracted data consultable on the summary", async () => {
         renderScanWizard();
         await summaryHeading();

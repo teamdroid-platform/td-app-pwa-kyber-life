@@ -145,21 +145,24 @@ export function SummaryStep({
 
     return (
         <>
-            {/* Hero: what the transaction is, before the detail of how it got there. */}
-            <div className="flex items-center justify-between gap-3 rounded-2xl border border-accent-primary/35 bg-gradient-to-br from-accent-primary/20 to-accent-primary/5 p-4">
-                <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold text-text-primary">
-                        {values.description.trim() || "Sin descripción"}
-                    </p>
-                    <p className="mt-0.5 text-2xl font-bold tracking-tight text-text-primary">
-                        {formatAmount(values.amount, currency)}
-                    </p>
-                    {heroSub && <p className="mt-0.5 truncate text-xs text-text-tertiary">{heroSub}</p>}
+            {/* Hero: what the transaction is, before the detail of how it got there.
+                One element per row, each with the card's full width — the type used
+                to sit beside the description and force it to truncate, and pairing
+                it with the amount instead let a long figure push it out. */}
+            <div className="flex flex-col gap-1 rounded-2xl border border-accent-primary/35 bg-gradient-to-br from-accent-primary/20 to-accent-primary/5 p-4">
+                <div className="flex">
+                    <span className="flex items-center gap-1.5 rounded-full border border-border/50 bg-bg-secondary/70 px-2.5 py-1 text-[11px] font-medium text-text-secondary">
+                        <typeOption.Icon className={cn("h-3.5 w-3.5", typeOption.color)} />
+                        {typeOption.label}
+                    </span>
                 </div>
-                <span className="flex shrink-0 items-center gap-1.5 rounded-full border border-border/50 bg-bg-secondary/70 px-2.5 py-1 text-[11px] font-medium text-text-secondary">
-                    <typeOption.Icon className={cn("h-3.5 w-3.5", typeOption.color)} />
-                    {typeOption.label}
-                </span>
+                <p className="text-sm font-semibold text-text-primary">
+                    {values.description.trim() || "Sin descripción"}
+                </p>
+                <p className="text-2xl font-bold tracking-tight text-text-primary">
+                    {formatAmount(values.amount, currency)}
+                </p>
+                {heroSub && <p className="text-xs text-text-tertiary">{heroSub}</p>}
             </div>
 
             <div className="flex flex-col gap-1.5">
