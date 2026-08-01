@@ -50,6 +50,11 @@ export interface TransactionWizardProps {
     institutionHint?: ReactNode;
     /** Marker beside the institution on the summary, e.g. that same confidence. */
     institutionMarker?: ReactNode;
+    /**
+     * Open straight on one field, as if its summary row had been tapped. Set
+     * when the editor is entered from a specific row on the detail screen.
+     */
+    initialFocus?: WizardScreen;
 }
 
 /**
@@ -72,8 +77,9 @@ export function TransactionWizard({
     secondaryAction,
     institutionHint,
     institutionMarker,
+    initialFocus,
 }: TransactionWizardProps) {
-    const wizard = useTransactionWizard({ mode, initialValues });
+    const wizard = useTransactionWizard({ mode, initialValues, initialFocus });
     const { values, setValue, screen, focus, isSummary } = wizard;
 
     const [isSubmitting, setIsSubmitting] = useState(false);

@@ -6,7 +6,7 @@ import { isoToWallClockInput, wallClockInputToISO } from "@/lib/date-range";
 import { getTransactionDisplayTitle } from "@/lib/financial-utils";
 import { updateTransactionAction } from "@/app/actions/financial-transactions";
 import type { FinancialTransaction, FinancialTransactionType } from "@/domain/entities/financial";
-import type { WizardValues } from "../../hooks/useTransactionWizard";
+import type { WizardScreen, WizardValues } from "../../hooks/useTransactionWizard";
 import { TransactionWizard } from "./TransactionWizard";
 
 export interface TransactionEditWizardProps {
@@ -17,6 +17,8 @@ export interface TransactionEditWizardProps {
     notes: string;
     onSaved: (updated: FinancialTransaction) => void;
     onCancel: () => void;
+    /** Open straight on the field the user tapped on the detail screen. */
+    initialFocus?: WizardScreen;
 }
 
 /**
@@ -29,6 +31,7 @@ export function TransactionEditWizard({
     notes,
     onSaved,
     onCancel,
+    initialFocus,
 }: TransactionEditWizardProps) {
     const initialValues = useMemo<WizardValues>(() => ({
         type: (transaction.type || "EXPENSE") as FinancialTransactionType,
@@ -86,6 +89,7 @@ export function TransactionEditWizard({
             notesOrigin="manual"
             onSubmit={handleSubmit}
             onClose={onCancel}
+            initialFocus={initialFocus}
         />
     );
 }
