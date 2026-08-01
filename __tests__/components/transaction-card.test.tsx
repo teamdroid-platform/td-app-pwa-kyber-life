@@ -6,6 +6,7 @@ import type { FinancialTransaction } from "@/domain/entities/financial";
 
 jest.mock("next/navigation", () => ({
     useRouter: jest.fn(),
+    usePathname: jest.fn(() => "/financial/transactions"),
 }));
 
 jest.mock("@/app/actions/financial-transactions", () => ({
@@ -78,6 +79,29 @@ describe("TransactionCard", () => {
         fireEvent.click(screen.getByRole("button", { name: /Opciones/i }));
 
         expect(push).not.toHaveBeenCalled();
+    });
+
+    it("says it heard the tap while the detail screen loads", () => {
+        render(<TransactionCard transaction={TRANSACTION} />);
+        const row = screen.getByRole("link");
+
+        expect(row).toHaveAttribute("aria-busy", "false");
+
+        fireEvent.click(row);
+
+        // The silence was why the row got tapped repeatedly.
+        expect(row).toHaveAttribute("aria-busy", "true");
+    });
+
+    it("ignores further taps while it is already opening", () => {
+        render(<TransactionCard transaction={TRANSACTION} />);
+        const row = screen.getByRole("link");
+
+        fireEvent.click(row);
+        fireEvent.click(row);
+        fireEvent.click(row);
+
+        expect(push).toHaveBeenCalledTimes(1);
     });
 
     it("shows what the row is about without expanding anything", () => {
