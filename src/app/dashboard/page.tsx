@@ -10,9 +10,11 @@ export default async function DashboardPage() {
     let userFirstName: string | undefined;
 
     if (process.env.DATA_SOURCE === "SUPABASE") {
-        const { createClient } = await import("@/infrastructure/supabase/server");
-        const supabase = await createClient();
-        const { data: { user } } = await supabase.auth.getUser();
+        // The memoized resolver, not a fresh client: the layout above already
+        // asked who the user is in this same render, and `auth.getUser()`
+        // validates against the auth server every time it is called.
+        const { getAuthUser } = await import("@/infrastructure/supabase/auth-user");
+        const user = await getAuthUser();
         userId = user?.id;
         userFirstName = user?.user_metadata?.first_name;
     } else {
