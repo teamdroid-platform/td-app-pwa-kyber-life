@@ -1,11 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import NextLink from "next/link";
+import { useRouter } from "next/navigation";
 
 import { FinancialTransaction } from "@/domain/entities/financial";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -15,14 +14,9 @@ import {
 import {
     CheckCircle2,
     AlertCircle,
-    Sparkles,
     Archive,
     Trash2,
-    Eye,
-    ChevronDown,
-    ChevronUp,
     MoreVertical,
-    Clock,
     TrendingDown,
     TrendingUp,
     ArrowRightLeft,
@@ -34,7 +28,6 @@ import {
     Landmark,
     MoreHorizontal
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -97,22 +90,6 @@ function formatTime(dateStr: string): string {
     }).format(new Date(dateStr));
 }
 
-/**
- * Extract the best available context from a transaction.
- * Priority: notes → originStats.emailBody → originStats.snippet
- */
-function extractContext(tx: FinancialTransaction): string {
-    if (tx.notes) return tx.notes;
-    const stats = tx.originStats as Record<string, unknown> | null | undefined;
-    const emailBody = stats?.emailBody as string | undefined;
-    const snippet = stats?.snippet as string | undefined;
-    
-    if (emailBody) return `[MAIL] ${emailBody}`;
-    if (snippet) return `[MAIL] ${snippet}`;
-    
-    return "";
-}
-
 function getFallbackDescription(tx: FinancialTransaction, typeLabel: string): string {
     if (tx.description && tx.description.trim() !== "") return tx.description;
     
@@ -135,8 +112,8 @@ export function TransactionCard({
     onStatusChange,
     onDeleted,
 }: TransactionCardProps) {
+    const router = useRouter();
     const [isLoading, setIsLoading] = useState(false);
-    const [isExpanded, setIsExpanded] = useState(false);
 
     const isIncome = ["INCOME", "DEPOSIT", "REFUND"].includes(transaction.type);
     const isExpense = ["EXPENSE", "PAYMENT", "FEE", "TAX"].includes(transaction.type);
@@ -144,8 +121,6 @@ export function TransactionCard({
     const amountSign = isIncome ? "+" : isExpense ? "-" : "";
     const style = TYPE_STYLE[transaction.type] ?? DEFAULT_TYPE_STYLE;
     const typeLabel = style.label;
-    const displayContext = extractContext(transaction);
-    const hasContext = displayContext.trim().length > 0;
     const displayTitle = getFallbackDescription(transaction, typeLabel);
 
     const handleAction = async (
@@ -189,10 +164,20 @@ export function TransactionCard({
             <CardHeader
                 className={cn(
                     "flex flex-row items-center justify-between w-full !space-y-0 !px-2.5 !py-2 sm:!px-4 sm:!py-3 select-none bg-bg-secondary/50 transition-colors gap-2.5 sm:gap-3",
-                    isExpanded && "border-b border-border/50",
-                    hasContext && "cursor-pointer hover:bg-bg-secondary"
+                    "cursor-pointer hover:bg-bg-secondary",
                 )}
-                onClick={() => hasContext && setIsExpanded(!isExpanded)}
+                // The whole row opens the transaction. It used to expand an
+                // inline summary while a small eye icon did the navigation —
+                // two behaviours competing for the same tap.
+                role="link"
+                tabIndex={0}
+                onClick={() => router.push(`/financial/transactions/${transaction.id}`)}
+                onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        router.push(`/financial/transactions/${transaction.id}`);
+                    }
+                }}
             >
                 {/* Left Side: Badge + Title/Subtitle */}
                 <div className="flex items-center gap-3 min-w-0 flex-1">
@@ -229,8 +214,7 @@ export function TransactionCard({
                     <div className="flex flex-col min-w-0 justify-center">
                         <CardTitle
                             className={cn(
-                                "text-[13px] sm:text-base tracking-tight line-clamp-2 sm:line-clamp-3 break-words font-semibold transition-colors leading-snug",
-                                hasContext && "group-hover:text-accent-primary"
+                                "text-[13px] sm:text-base tracking-tight line-clamp-2 sm:line-clamp-3 break-words font-semibold transition-colors leading-snug group-hover:text-accent-primary",
                             )}
                             title={displayTitle}
                         >
@@ -270,11 +254,6 @@ export function TransactionCard({
                     <div className="flex items-center gap-2 text-[11px] text-muted-foreground mt-1">
 
                         <div className="flex items-center gap-1.5 ml-1" onClick={(e) => e.stopPropagation()}>
-                            <NextLink href={`/financial/transactions/${transaction.id}`} className="text-muted-foreground hover:text-foreground transition-colors p-1">
-                                <Eye className="h-[18px] w-[18px]" />
-                                <span className="sr-only">Detalles</span>
-                            </NextLink>
-
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
                                     <button className="text-muted-foreground hover:text-foreground transition-colors p-1 -mr-1">
@@ -313,37 +292,6 @@ export function TransactionCard({
                 </div>
             </CardHeader>
 
-            {/* ── Nivel 2: Detalles Extensos (Desplegable) ──────────────────── */}
-            {isExpanded && (
-                <CardContent className="space-y-4 px-4 py-3 sm:px-5 animate-in slide-in-from-top-2 duration-200">
-                    <div className="rounded-xl bg-bg-primary/50 p-3.5 border-none">
-                        <div className="mb-2 flex items-center gap-2 text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
-                            <Sparkles className="h-3.5 w-3.5 text-accent-primary shrink-0" />
-                            Resumen
-                        </div>
-                        <div className="w-full max-w-full overflow-hidden">
-                            <p className="text-xs sm:text-sm leading-relaxed text-muted-foreground whitespace-pre-wrap break-words [word-break:break-word]">
-                                {displayContext || "Sin resumen disponible para esta transacción."}
-                            </p>
-                        </div>
-                    </div>
-
-                    {/* Tags */}
-                    {transaction.tags && transaction.tags.length > 0 && (
-                        <div className="flex flex-wrap gap-1.5 pt-1">
-                            {transaction.tags.map((tag) => (
-                                <Badge
-                                    key={tag}
-                                    variant="outline"
-                                    className="rounded-full text-[10px] px-2 py-0"
-                                >
-                                    {tag}
-                                </Badge>
-                            ))}
-                        </div>
-                    )}
-                </CardContent>
-            )}
         </Card>
     );
 }

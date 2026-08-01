@@ -402,7 +402,7 @@ export function TransactionTimeline({ initialTransactions, allFilteredTransactio
     const grouped = groupTransactionsByDate(visibleTransactions);
 
     return (
-        <div className="flex flex-col gap-8">
+        <div className="flex flex-col gap-4 sm:gap-6">
             {isFromCache && (
                 <div className="flex items-center gap-2 rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-4 py-2.5 text-sm text-yellow-400">
                     <WifiOff className="h-4 w-4 shrink-0" />
@@ -418,23 +418,28 @@ export function TransactionTimeline({ initialTransactions, allFilteredTransactio
                     No se encontraron transacciones.
                 </div>
             ) : (
-                Object.entries(grouped).map(([dateLabel, items]) => (
-                    <div key={dateLabel} className="flex flex-col gap-3">
-                        <h3 className="text-sm font-medium text-muted-foreground tracking-tight sticky top-0 bg-background/80 backdrop-blur-sm py-2 z-10">
-                            {dateLabel}
-                        </h3>
-                        <div className="flex flex-col gap-2">
-                            {items.map(t => (
-                                <TransactionCard 
-                                    key={t.id} 
-                                    transaction={t} 
-                                    onStatusChange={(status) => updateLocalTransaction(t.id!, { status })}
-                                    onDeleted={() => setTransactions(prev => prev.filter(x => x.id !== t.id))}
-                                />
-                            ))}
+                /* The gaps are deliberately tight: the day headings are short
+                   labels, and the air around them was pushing transactions —
+                   the thing the user came for — off the screen. */
+                <div className="flex flex-col gap-3 sm:gap-5">
+                    {Object.entries(grouped).map(([dateLabel, items]) => (
+                        <div key={dateLabel} className="flex flex-col gap-1.5">
+                            <h3 className="text-sm font-medium text-muted-foreground tracking-tight sticky top-0 bg-background/80 backdrop-blur-sm py-1.5 z-10">
+                                {dateLabel}
+                            </h3>
+                            <div className="flex flex-col gap-1.5 sm:gap-2">
+                                {items.map(t => (
+                                    <TransactionCard
+                                        key={t.id}
+                                        transaction={t}
+                                        onStatusChange={(status) => updateLocalTransaction(t.id!, { status })}
+                                        onDeleted={() => setTransactions(prev => prev.filter(x => x.id !== t.id))}
+                                    />
+                                ))}
+                            </div>
                         </div>
-                    </div>
-                ))
+                    ))}
+                </div>
             )}
 
             {/* Infinite-scroll sentinel */}
