@@ -11,15 +11,24 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
+import { DateRangePicker } from '@/components/ui/date-range-picker';
 import { useFinancialRealtime } from '../hooks/useFinancialRealtime';
 
 type ScanRange = 'today' | 'week' | 'custom' | 'recommended';
 
-function getWeekRange(): { start: string; end: string } {
+/**
+ * The current week, Monday through today.
+ *
+ * The end is clamped to today on purpose: the rest of the week hasn't happened,
+ * so asking the scanner for it can only return nothing — and those future days
+ * then show up in the calendar as if they had been scanned.
+ */
+export function getWeekRange(): { start: string; end: string } {
     const today = new Date();
+    const weekEnd = endOfWeek(today, { weekStartsOn: 1 });
     return {
         start: format(startOfWeek(today, { weekStartsOn: 1 }), 'yyyy-MM-dd'),
-        end: format(endOfWeek(today, { weekStartsOn: 1 }), 'yyyy-MM-dd'),
+        end: format(isAfter(weekEnd, today) ? today : weekEnd, 'yyyy-MM-dd'),
     };
 }
 
@@ -63,22 +72,49 @@ function formatEcuadorDayMonth(value: string | Date): string {
     }).format(new Date(value));
 }
 
-// Normalize a scan-window boundary to the viewer's LOCAL calendar date
-// (YYYY-MM-DD). The trigger may store endDate as a UTC instant (e.g.
-// "2026-06-30T02:13:21Z"); taking its literal date part would bleed into the
-// next day for users west of UTC (Ecuador, UTC-5). Converting the instant to a
-// local date keeps the calendar coloring and the shown range in local time.
-function toLocalDatePart(value: unknown): string | undefined {
+// `en-CA` renders as YYYY-MM-DD, which is the shape the calendar compares.
+const ecuadorDayFormatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: ECUADOR_TZ,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+});
+
+/**
+ * Normalize a scan-window boundary to the ECUADOR calendar date (YYYY-MM-DD).
+ *
+ * Automated scans store their boundaries as UTC instants (e.g.
+ * "2026-08-03T04:59:59.999+00:00"), and that instant is still 02-ago in Ecuador
+ * — taking the literal date part would attribute the scan to 03-ago and light
+ * up a day that was never scanned. Anything between 00:00 and 04:59 UTC lands a
+ * day ahead this way.
+ *
+ * Ecuador rather than the device's timezone, matching every other date shown on
+ * this screen: which day a scan covered is a property of the scan, not of where
+ * the phone happens to be.
+ */
+export function toEcuadorDatePart(value: unknown): string | undefined {
     if (typeof value !== 'string' || value === '') return undefined;
     // Already a plain calendar date (no time/zone) — keep verbatim.
     if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
-    const d = new Date(value);
-    if (isNaN(d.getTime())) {
-        const m = value.match(/(\d{4}-\d{2}-\d{2})/);
-        return m ? m[1] : undefined;
+    // Only a real ISO instant is converted. V8 happily parses loose strings as
+    // local midnight, and converting one of those would shift the day instead
+    // of correcting it — for anything else, take the date it contains.
+    if (/^\d{4}-\d{2}-\d{2}T/.test(value)) {
+        const d = new Date(value);
+        if (!isNaN(d.getTime())) return ecuadorDayFormatter.format(d);
     }
-    const pad = (n: number) => String(n).padStart(2, '0');
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    const m = value.match(/(\d{4}-\d{2}-\d{2})/);
+    return m ? m[1] : undefined;
+}
+
+/**
+ * A scan boundary as a comparable Date sitting at local noon of its Ecuador
+ * calendar day — noon so the day never drifts when compared across timezones.
+ * Used by the calendar to decide which days an execution covered.
+ */
+function parseScanDay(value: string): Date {
+    return new Date(`${toEcuadorDatePart(value) ?? ''}T12:00:00`);
 }
 
 function parsePayload(payload: any) {
@@ -125,12 +161,13 @@ function parsePayload(payload: any) {
         return typeof parsed === 'object' ? parsed : null;
     }
 
-    // Normalize the scan window to LOCAL calendar dates so the calendar coloring
-    // and the displayed range don't drift a day due to a UTC-stored endDate.
+    // Normalize the scan window to ECUADOR calendar dates so the calendar
+    // coloring and the displayed range don't drift a day due to a UTC-stored
+    // boundary.
     return {
         ...source,
-        startDate: toLocalDatePart(source.startDate),
-        endDate: toLocalDatePart(source.endDate),
+        startDate: toEcuadorDatePart(source.startDate),
+        endDate: toEcuadorDatePart(source.endDate),
     };
 }
 
@@ -499,12 +536,8 @@ export function ScannerManager() {
             const eDate = payload?.endDate || exec.stats?.endDate;
             if (!sDate || !eDate) return;
 
-            const parseSafe = (ds: string) => {
-                const datePart = ds.split('T')[0];
-                return new Date(`${datePart}T12:00:00`);
-            };
-            const startObj = parseSafe(sDate);
-            const endObj = parseSafe(eDate);
+            const startObj = parseScanDay(sDate);
+            const endObj = parseScanDay(eDate);
 
             const dTime = new Date(`${dateStr}T12:00:00`).getTime();
 
@@ -529,13 +562,8 @@ export function ScannerManager() {
                 const sDate = payload?.startDate || e.stats?.startDate;
                 const eDate = payload?.endDate || e.stats?.endDate;
                 if (!sDate || !eDate) return null;
-                const parseSafe = (d: string) => {
-                    if (!d) return new Date("");
-                    const datePart = d.split('T')[0];
-                    return new Date(`${datePart}T12:00:00`);
-                };
-                const startObj = parseSafe(sDate);
-                const endObj = parseSafe(eDate);
+                const startObj = parseScanDay(sDate);
+                const endObj = parseScanDay(eDate);
                 if (isNaN(startObj.getTime()) || isNaN(endObj.getTime())) return null;
                 return {
                     startStr: format(startObj, 'yyyy-MM-dd'),
@@ -618,8 +646,9 @@ export function ScannerManager() {
             setStartDate(format(today, 'yyyy-MM-dd'));
             setEndDate(format(today, 'yyyy-MM-dd'));
         } else if (newRange === 'week') {
-            setStartDate(format(startOfWeek(today, { weekStartsOn: 1 }), 'yyyy-MM-dd'));
-            setEndDate(format(endOfWeek(today, { weekStartsOn: 1 }), 'yyyy-MM-dd'));
+            const week = getWeekRange();
+            setStartDate(week.start);
+            setEndDate(week.end);
         } else if (newRange === 'recommended' && recommendedRanges.length > 0) {
             setSelectedRecommendedIndex(0);
         }
@@ -674,12 +703,8 @@ export function ScannerManager() {
             const eDate = payload?.endDate || exec.stats?.endDate;
             if (!sDate || !eDate) return false;
 
-            const parseSafe = (ds: string) => {
-                const datePart = ds.split('T')[0];
-                return new Date(`${datePart}T12:00:00`);
-            };
-            const startObj = parseSafe(sDate);
-            const endObj = parseSafe(eDate);
+            const startObj = parseScanDay(sDate);
+            const endObj = parseScanDay(eDate);
 
             const dTime = new Date(`${dateStr}T12:00:00`).getTime();
 
@@ -938,20 +963,23 @@ export function ScannerManager() {
                                         </div>
                                     )}
 
+                                    {/* One calendar for both ends: the range is a
+                                        single decision, and two separate fields let
+                                        the user pick an end before its start. */}
                                     {range === 'custom' && (
-                                        <div className="flex flex-col gap-3 w-full">
-                                            <input
-                                                type="date"
-                                                value={startDate}
-                                                onChange={(e) => setStartDate(e.target.value)}
-                                                className="w-full bg-bg-secondary border border-border/40 rounded-xl px-4 h-12 text-sm font-medium text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-primary/50 transition-shadow"
+                                        <div className="flex flex-col gap-2 w-full">
+                                            <DateRangePicker
+                                                start={startDate}
+                                                end={endDate}
+                                                onChange={(from, to) => {
+                                                    setStartDate(from);
+                                                    setEndDate(to);
+                                                }}
+                                                triggerClassName="h-12 rounded-xl bg-bg-secondary border-border/40 text-sm font-medium text-text-primary"
                                             />
-                                            <input
-                                                type="date"
-                                                value={endDate}
-                                                onChange={(e) => setEndDate(e.target.value)}
-                                                className="w-full bg-bg-secondary border border-border/40 rounded-xl px-4 h-12 text-sm font-medium text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-primary/50 transition-shadow"
-                                            />
+                                            <p className="text-[11px] text-text-tertiary">
+                                                Elige el día de inicio y luego el de fin. Máximo 15 días.
+                                            </p>
                                         </div>
                                     )}
                                 </div>
