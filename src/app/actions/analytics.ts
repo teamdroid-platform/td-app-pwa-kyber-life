@@ -73,25 +73,27 @@ export async function getGenericPriceAnalyticsAction(genericItemId: string) {
 
 // ── Dashboard hub: range-aware market analytics (data-source-agnostic auth) ──
 
-/** Daily market spend for a date range — powers the hub spend trend curve. */
-export async function getMarketDailySpendAction(startDate?: string, endDate?: string) {
+/**
+ * Both market blocks of the hub dashboard —the spend trend curve and the top
+ * products bar chart— in one action.
+ *
+ * They used to be two, which meant two HTTP requests each resolving the
+ * session on its own, right while the user stares at the loading robot on a
+ * cold launch. Bundled, the session is resolved once and the two queries run
+ * in parallel on the server.
+ */
+export async function getMarketOverviewAction(startDate?: string, endDate?: string, limit: number = 8) {
     try {
         const userId = await resolveUserId();
-        const s = startDate ? new Date(startDate) : undefined;
-        const e = endDate ? new Date(endDate) : undefined;
-        const data = await analyticsService.getDailyExpenses(userId, s, e);
-        return { success: true, data };
-    } catch (e) {
-        return { success: false, error: (e as Error).message };
-    }
-}
-
-/** Top products by amount spent for a date range — powers the hub bar chart. */
-export async function getMarketTopProductsAction(startDate?: string, endDate?: string, limit: number = 8) {
-    try {
-        const userId = await resolveUserId();
-        const data = await analyticsService.getTopSpendingProducts(userId, limit, startDate, endDate);
-        return { success: true, data };
+        const [daily, topProducts] = await Promise.all([
+            analyticsService.getDailyExpenses(
+                userId,
+                startDate ? new Date(startDate) : undefined,
+                endDate ? new Date(endDate) : undefined,
+            ),
+            analyticsService.getTopSpendingProducts(userId, limit, startDate, endDate),
+        ]);
+        return { success: true, data: { daily, topProducts } };
     } catch (e) {
         return { success: false, error: (e as Error).message };
     }

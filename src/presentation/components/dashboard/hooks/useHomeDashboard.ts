@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { getDashboardOverviewAction } from "@/app/actions/financial-dashboard";
-import { getMarketDailySpendAction, getMarketTopProductsAction } from "@/app/actions/analytics";
+import { getMarketOverviewAction } from "@/app/actions/analytics";
 import type {
     DailyBreakdown,
     CategoryBreakdown,
@@ -70,17 +70,17 @@ export function useMarketOverview(startDate?: string, endDate?: string) {
     const [data, setData] = useState<MarketOverviewData>(EMPTY_MARKET);
     const [loading, setLoading] = useState(true);
 
+    // One server action for both blocks: they used to be two parallel requests,
+    // each resolving the session on its own before touching any data.
     const fetchAll = useCallback(async () => {
         setLoading(true);
         try {
-            const [daily, top] = await Promise.all([
-                getMarketDailySpendAction(startDate, endDate),
-                getMarketTopProductsAction(startDate, endDate, 100),
-            ]);
-            setData({
-                daily: daily.success && daily.data ? daily.data : [],
-                topProducts: top.success && top.data ? top.data : [],
-            });
+            const result = await getMarketOverviewAction(startDate, endDate, 100);
+            setData(
+                result.success && result.data
+                    ? { daily: result.data.daily, topProducts: result.data.topProducts }
+                    : EMPTY_MARKET,
+            );
         } finally {
             setLoading(false);
         }

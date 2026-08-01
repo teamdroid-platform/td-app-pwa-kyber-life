@@ -14,11 +14,12 @@ export default async function DashboardLayout({
     let user = null;
 
     if (dataSource === 'SUPABASE') {
-        const { createClient } = await import("@/infrastructure/supabase/server");
-        const supabase = await createClient();
-        const { data: { user: supabaseUser }, error } = await supabase.auth.getUser();
+        // Memoized per request, so the page below reuses this answer instead of
+        // validating the session against the auth server a second time.
+        const { getAuthUser } = await import("@/infrastructure/supabase/auth-user");
+        const supabaseUser = await getAuthUser();
 
-        if (error || !supabaseUser) {
+        if (!supabaseUser) {
             redirect("/auth/login");
         }
 
