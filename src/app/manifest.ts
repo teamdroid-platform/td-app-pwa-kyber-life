@@ -5,7 +5,10 @@ export default function manifest(): MetadataRoute.Manifest {
         name: 'KyberLife',
         short_name: 'KyberLife',
         description: 'Gestión inteligente de gastos y vida',
-        start_url: '/',
+        // The panel, not `/`. `/` only exists to redirect here, so starting
+        // there cost every launch a whole extra round-trip —served behind the
+        // OS splash, which lasts exactly as long as the app takes to paint.
+        start_url: '/dashboard',
         display: 'standalone',
         background_color: '#0f172a',
         theme_color: '#0f172a',
