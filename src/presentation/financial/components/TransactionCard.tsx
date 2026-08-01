@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState, useTransition } from "react";
+import { usePathname, useRouter } from "next/navigation";
 
 import { FinancialTransaction } from "@/domain/entities/financial";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,6 +17,7 @@ import {
     Archive,
     Trash2,
     MoreVertical,
+    Loader2,
     TrendingDown,
     TrendingUp,
     ArrowRightLeft,
@@ -114,6 +115,27 @@ export function TransactionCard({
 }: TransactionCardProps) {
     const router = useRouter();
     const [isLoading, setIsLoading] = useState(false);
+    // The row says "I heard you" for as long as the detail screen takes to
+    // arrive. Own state rather than `useTransition` alone: the pending flag
+    // depends on the router suspending, and the guard against repeated taps
+    // has to hold either way.
+    const [isOpening, setIsOpening] = useState(false);
+    const [, startOpening] = useTransition();
+    const pathname = usePathname();
+
+    // Cleared once the navigation commits, so a row restored from the back
+    // stack never keeps spinning.
+    useEffect(() => {
+        setIsOpening(false);
+    }, [pathname]);
+
+    const openDetail = () => {
+        // Tapping again while it's already on its way does nothing: what made
+        // people tap twice was the silence, not a missed press.
+        if (isOpening) return;
+        setIsOpening(true);
+        startOpening(() => router.push(`/financial/transactions/${transaction.id}`));
+    };
 
     const isIncome = ["INCOME", "DEPOSIT", "REFUND"].includes(transaction.type);
     const isExpense = ["EXPENSE", "PAYMENT", "FEE", "TAX"].includes(transaction.type);
@@ -151,12 +173,20 @@ export function TransactionCard({
             className={cn(
                 "group relative overflow-hidden rounded-[1.75rem] border-border/60 bg-bg-secondary py-0 shadow-sm shadow-black/5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md",
                 "flex flex-col h-full",
+                // Presses land on the row itself, so the feedback is immediate
+                // and doesn't wait for anything on the network.
+                "active:scale-[0.985] active:shadow-sm",
+                isOpening && "scale-[0.985] border-accent-primary/50 ring-1 ring-accent-primary/30",
                 isLoading && "opacity-60 pointer-events-none",
             )}
         >
-            {/* Decorative gradient line */}
+            {/* Decorative gradient line — it doubles as the progress hint while
+                the detail screen loads. */}
             <div
-                className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-accent-primary/60 to-transparent"
+                className={cn(
+                    "absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-accent-primary/60 to-transparent",
+                    isOpening && "h-0.5 animate-pulse via-accent-primary",
+                )}
                 aria-hidden="true"
             />
 
@@ -171,11 +201,12 @@ export function TransactionCard({
                 // two behaviours competing for the same tap.
                 role="link"
                 tabIndex={0}
-                onClick={() => router.push(`/financial/transactions/${transaction.id}`)}
+                aria-busy={isOpening}
+                onClick={openDetail}
                 onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === " ") {
                         e.preventDefault();
-                        router.push(`/financial/transactions/${transaction.id}`);
+                        openDetail();
                     }
                 }}
             >
@@ -252,6 +283,10 @@ export function TransactionCard({
                     </span>
 
                     <div className="flex items-center gap-2 text-[11px] text-muted-foreground mt-1">
+
+                        {isOpening && (
+                            <Loader2 className="h-4 w-4 shrink-0 animate-spin text-accent-primary" aria-hidden="true" />
+                        )}
 
                         <div className="flex items-center gap-1.5 ml-1" onClick={(e) => e.stopPropagation()}>
                             <DropdownMenu>

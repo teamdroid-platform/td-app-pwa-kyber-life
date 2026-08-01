@@ -128,9 +128,13 @@ export function TransactionDetailClient({ initialTransaction }: TransactionDetai
         setInstitutions,
         setCategories,
     } = useTransactionFormOptions((opts) => {
-        const instName = opts.institutions.find(i => i.id === transaction.institutionId)?.name || transaction.merchant || "";
+        // Fall back to what the server already resolved, so a transaction whose
+        // category/institution isn't in the lists doesn't lose its name.
+        const instName = opts.institutions.find(i => i.id === transaction.institutionId)?.name
+            || transaction.institutionName || transaction.merchant || "";
         const accName = opts.accounts.find(a => a.id === transaction.accountId)?.name || "";
-        const catName = opts.categories.find(c => c.id === transaction.categoryId)?.name || "";
+        const catName = opts.categories.find(c => c.id === transaction.categoryId)?.name
+            || transaction.categoryName || "";
 
         setDisplayNames({ institution: instName, account: accName, category: catName });
         setEditState(prev => ({
@@ -149,13 +153,22 @@ export function TransactionDetailClient({ initialTransaction }: TransactionDetai
     // Institution inline-edit (staged; persisted when the edit is confirmed).
     const [pendingInstitutionEdit, setPendingInstitutionEdit] = useState<PendingInstitutionEdit | null>(null);
 
+    // Seeded from the transaction the server already resolved: it arrives with
+    // `institutionName` and `categoryName` filled in, so the screen shouldn't
+    // render "Sin categoría" and then pop once the option lists land. Only the
+    // account name still has to wait — it isn't resolved server-side.
     const [displayNames, setDisplayNames] = useState({
-        institution: transaction.merchant || "",
+        institution: transaction.institutionName || transaction.merchant || "",
         account: "",
-        category: "",
+        category: transaction.categoryName || "",
     });
 
+    // Tag suggestions only feed the legacy edit form's TagInput. Behind the
+    // flag the editor fetches its own, so asking for them here would spend a
+    // request — and its own session round-trip — on the detail's critical path
+    // for something nothing renders.
     useEffect(() => {
+        if (FINANCIAL_FLAGS.WIZARD_ENABLED) return;
         const fetchTags = async () => {
             const res = await getUniqueTagsAction();
             if (res.success && Array.isArray(res.data)) {
