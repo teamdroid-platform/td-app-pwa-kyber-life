@@ -32,6 +32,8 @@ import { isoToWallClockInput, wallClockInputToISO } from "@/lib/date-range";
 import { TagInput } from "@/components/ui/tag-input";
 import { FINANCIAL_FLAGS } from "@/lib/feature-flags";
 import { TransactionEditWizard } from "./transaction-wizard/TransactionEditWizard";
+import { TransactionDetailSummary } from "./TransactionDetailSummary";
+import type { WizardScreen } from "../hooks/useTransactionWizard";
 
 // ─── Helpers ──────────────────────────────────────────────────
 
@@ -97,6 +99,8 @@ export function TransactionDetailClient({ initialTransaction }: TransactionDetai
     const [transaction, setTransaction] = useState<FinancialTransaction>(initialTransaction);
     const [isLoading, setIsLoading] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
+    /** Which field the editor should open on, when entered from a detail row. */
+    const [editFocus, setEditFocus] = useState<WizardScreen | null>(null);
     const [suggestions, setSuggestions] = useState<string[]>([]);
 
     const formRef = useRef<HTMLDivElement>(null);
@@ -286,13 +290,81 @@ export function TransactionDetailClient({ initialTransaction }: TransactionDetai
                 transaction={transaction}
                 displayNames={displayNames}
                 notes={extractContext(transaction)}
+                // Set when the user tapped a specific field on the detail
+                // screen: the editor opens there instead of on the summary.
+                initialFocus={editFocus ?? undefined}
                 onSaved={(updated) => {
                     setTransaction(updated);
                     setIsEditing(false);
+                    setEditFocus(null);
                     router.refresh();
                 }}
-                onCancel={() => setIsEditing(false)}
+                onCancel={() => {
+                    setIsEditing(false);
+                    setEditFocus(null);
+                }}
             />
+        );
+    }
+
+    /**
+     * Read-only detail, behind the flag: the same hero and rows as the editor's
+     * summary, so one transaction doesn't look like two different products, and
+     * every row opens the editor on its own field.
+     */
+    if (FINANCIAL_FLAGS.WIZARD_ENABLED) {
+        return (
+            <div className="flex flex-col gap-4">
+                <DuplicateResolver
+                    transactionId={transaction.id!}
+                    isPossibleDuplicate={transaction.possibleDuplicate && transaction.status !== 'DUPLICATE'}
+                    onResolved={handleDuplicateResolved}
+                />
+
+                {showStatus && (
+                    <div className="flex flex-wrap items-center gap-2">
+                        <Badge variant={statusCfg.variant} className="rounded-full px-3 py-0.5 text-[10px] uppercase tracking-[0.14em]">
+                            {statusCfg.label}
+                        </Badge>
+                    </div>
+                )}
+
+                <TransactionDetailSummary
+                    transaction={transaction}
+                    displayNames={displayNames}
+                    notes={displayContext}
+                    date={isoToWallClockInput(transaction.date) ?? ""}
+                    onEditField={(screen) => {
+                        if (!canEdit) return;
+                        setEditFocus(screen === "summary" ? null : screen);
+                        setIsEditing(true);
+                    }}
+                />
+
+                {canEdit && (
+                    <StickyActionBar>
+                        <Button
+                            onClick={() => {
+                                setEditFocus(null);
+                                setIsEditing(true);
+                            }}
+                            className="h-12 w-full rounded-2xl bg-accent-primary text-base font-semibold text-accent-primary-foreground shadow-lg shadow-accent-primary/25 hover:bg-accent-primary/90"
+                        >
+                            <Edit2 className="h-4 w-4 mr-2" /> Editar transacción
+                        </Button>
+                    </StickyActionBar>
+                )}
+
+                <div className="rounded-2xl border border-border/40 bg-bg-secondary/50 p-4">
+                    <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-text-tertiary">
+                        <History className="h-4 w-4 text-accent-primary/70" />
+                        Historial de auditoría
+                    </div>
+                    <AuditTrail transactionId={transaction.id!} />
+                </div>
+
+                <OriginStatsViewer originStats={transaction.originStats as Record<string, unknown>} />
+            </div>
         );
     }
 

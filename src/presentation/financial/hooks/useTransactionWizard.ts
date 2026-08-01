@@ -111,6 +111,13 @@ export type WizardMode = "create" | "edit" | "confirm";
 export interface UseTransactionWizardOptions {
     mode: WizardMode;
     initialValues: WizardValues;
+    /**
+     * Open directly on one step, as if its summary row had been tapped —
+     * saving or cancelling returns to the summary. Used when the editor is
+     * entered from a specific field on the detail screen. Ignored in `create`,
+     * which always starts at step 1.
+     */
+    initialFocus?: WizardScreen;
 }
 
 /**
@@ -124,15 +131,23 @@ export interface UseTransactionWizardOptions {
  * Nothing here touches the server: the wizard edits a draft in memory and the
  * caller writes it once, at the end.
  */
-export function useTransactionWizard({ mode, initialValues }: UseTransactionWizardOptions) {
+export function useTransactionWizard({ mode, initialValues, initialFocus }: UseTransactionWizardOptions) {
+    // Entering on a single field only makes sense when the values already exist.
+    const startsFocused = mode !== "create" && !!initialFocus && initialFocus !== "summary";
+
     const [values, setValues] = useState<WizardValues>(initialValues);
     // Only a capture from scratch starts at step 1. When the values already
     // exist — an edit, or a scan waiting to be confirmed — the summary is the
     // right first screen: the task is to approve, not to re-enter.
-    const [screen, setScreen] = useState<WizardScreen>(mode === "create" ? "amount" : "summary");
-    const [focus, setFocus] = useState(false);
+    const [screen, setScreen] = useState<WizardScreen>(() => {
+        if (startsFocused) return initialFocus as WizardScreen;
+        return mode === "create" ? "amount" : "summary";
+    });
+    const [focus, setFocus] = useState(startsFocused);
     /** Value snapshot taken when a focus edit starts, so Cancel can restore it. */
-    const [focusSnapshot, setFocusSnapshot] = useState<WizardValues | null>(null);
+    const [focusSnapshot, setFocusSnapshot] = useState<WizardValues | null>(
+        startsFocused ? initialValues : null,
+    );
 
     const setValue = useCallback(<K extends keyof WizardValues>(key: K, value: WizardValues[K]) => {
         setValues((prev) => ({ ...prev, [key]: value }));

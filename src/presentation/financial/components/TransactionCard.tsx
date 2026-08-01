@@ -188,7 +188,7 @@ export function TransactionCard({
             {/* ── Nivel 1: Resumen (Siempre visible) ───────────────── */}
             <CardHeader
                 className={cn(
-                    "flex flex-row items-center justify-between w-full !space-y-0 !px-3 !py-3 sm:!px-4 select-none bg-bg-secondary/50 transition-colors gap-3",
+                    "flex flex-row items-center justify-between w-full !space-y-0 !px-2.5 !py-2 sm:!px-4 sm:!py-3 select-none bg-bg-secondary/50 transition-colors gap-2.5 sm:gap-3",
                     isExpanded && "border-b border-border/50",
                     hasContext && "cursor-pointer hover:bg-bg-secondary"
                 )}
@@ -201,14 +201,14 @@ export function TransactionCard({
                         <div className="relative">
                             <div
                                 className={cn(
-                                    "flex items-center justify-center rounded-2xl w-11 h-11 border",
+                                    "flex items-center justify-center rounded-xl w-9 h-9 sm:rounded-2xl sm:w-11 sm:h-11 border",
                                     style.badge
                                 )}
                                 title={typeLabel}
                             >
                                 {(() => {
                                     const Icon = style.icon;
-                                    return <Icon className="w-5 h-5" strokeWidth={2.5} />;
+                                    return <Icon className="w-4 h-4 sm:w-5 sm:h-5" strokeWidth={2.5} />;
                                 })()}
                             </div>
                             {transaction.paidWithCredit && (
@@ -220,7 +220,7 @@ export function TransactionCard({
                                 </span>
                             )}
                         </div>
-                        <span className="text-[10px] font-medium text-muted-foreground leading-none">
+                        <span className="text-[9px] sm:text-[10px] font-medium text-muted-foreground leading-none">
                             {formatTime(transaction.date)}
                         </span>
                     </div>
@@ -229,7 +229,7 @@ export function TransactionCard({
                     <div className="flex flex-col min-w-0 justify-center">
                         <CardTitle
                             className={cn(
-                                "text-sm sm:text-base tracking-tight line-clamp-3 break-words font-semibold transition-colors leading-tight",
+                                "text-[13px] sm:text-base tracking-tight line-clamp-2 sm:line-clamp-3 break-words font-semibold transition-colors leading-snug",
                                 hasContext && "group-hover:text-accent-primary"
                             )}
                             title={displayTitle}
@@ -240,14 +240,14 @@ export function TransactionCard({
                             {displayTitle}
                         </CardTitle>
                         <div className="flex items-start gap-2 mt-0.5 min-w-0">
-                            <span className="line-clamp-3 break-words text-[13px] font-medium text-zinc-400" title={transaction.institutionName || transaction.merchant || typeLabel}>
+                            <span className="line-clamp-1 sm:line-clamp-3 break-words text-[11px] sm:text-[13px] font-medium text-zinc-400" title={transaction.institutionName || transaction.merchant || typeLabel}>
                                 {transaction.institutionName || transaction.merchant || typeLabel}
                             </span>
                         </div>
                         <div className="flex items-center gap-2 mt-1 min-w-0">
                             {/* Category */}
                             {transaction.categoryName && (
-                                <span className="text-[11px] text-muted-foreground truncate" title={transaction.categoryName}>
+                                <span className="text-[10px] sm:text-[11px] text-muted-foreground truncate" title={transaction.categoryName}>
                                     {transaction.categoryName}
                                 </span>
                             )}
@@ -259,7 +259,7 @@ export function TransactionCard({
                 <div className="flex flex-col items-end shrink-0 gap-1.5 ml-2">
                     <span
                         className={cn(
-                            "text-sm sm:text-base font-bold tracking-tight whitespace-nowrap leading-none",
+                            "text-[13.5px] sm:text-base font-bold tracking-tight whitespace-nowrap leading-none",
                             style.amount
                         )}
                         title={formatAmount(transaction.amount, transaction.currency)}
