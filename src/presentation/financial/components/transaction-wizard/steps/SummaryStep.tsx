@@ -56,7 +56,7 @@ interface RowProps {
     marker?: React.ReactNode;
 }
 
-function SummaryRow({ icon: Icon, iconClass, label, children, onEdit, missing, changed, previous, marker }: RowProps) {
+export function SummaryRow({ icon: Icon, iconClass, label, children, onEdit, missing, changed, previous, marker }: RowProps) {
     return (
         <button
             type="button"
@@ -83,6 +83,45 @@ function SummaryRow({ icon: Icon, iconClass, label, children, onEdit, missing, c
             </span>
             <Pencil className="h-3.5 w-3.5 shrink-0 text-text-tertiary" />
         </button>
+    );
+}
+
+export interface SummaryHeroProps {
+    type: string;
+    description: string;
+    amount: string;
+    currency: string;
+    institutionName: string;
+    /** Wall-clock `YYYY-MM-DDTHH:mm`. */
+    date: string;
+}
+
+/**
+ * What the transaction *is*, before the detail of how it got there.
+ *
+ * One element per row, each with the card's full width — the type used to sit
+ * beside the description and force it to truncate, and pairing it with the
+ * amount instead let a long figure push it out.
+ *
+ * Shared with the read-only detail screen so both show the same thing the same
+ * way; a correction should not look like a different transaction.
+ */
+export function SummaryHero({ type, description, amount, currency, institutionName, date }: SummaryHeroProps) {
+    const typeOption = resolveTransactionTypeOption(type);
+    const sub = [institutionName, formatShortDate(date)].filter(Boolean).join(" · ");
+
+    return (
+        <div className="flex flex-col gap-1 rounded-2xl border border-accent-primary/35 bg-gradient-to-br from-accent-primary/20 to-accent-primary/5 p-4">
+            <div className="flex">
+                <span className="flex items-center gap-1.5 rounded-full border border-border/50 bg-bg-secondary/70 px-2.5 py-1 text-[11px] font-medium text-text-secondary">
+                    <typeOption.Icon className={cn("h-3.5 w-3.5", typeOption.color)} />
+                    {typeOption.label}
+                </span>
+            </div>
+            <p className="text-sm font-semibold text-text-primary">{description.trim() || "Sin descripción"}</p>
+            <p className="text-2xl font-bold tracking-tight text-text-primary">{formatAmount(amount, currency)}</p>
+            {sub && <p className="text-xs text-text-tertiary">{sub}</p>}
+        </div>
     );
 }
 
@@ -148,30 +187,16 @@ export function SummaryStep({
         return text.trim() || "Sin valor";
     };
 
-    const typeOption = resolveTransactionTypeOption(values.type);
-    const heroSub = [values.institutionName, formatShortDate(values.date)].filter(Boolean).join(" · ");
-
     return (
         <>
-            {/* Hero: what the transaction is, before the detail of how it got there.
-                One element per row, each with the card's full width — the type used
-                to sit beside the description and force it to truncate, and pairing
-                it with the amount instead let a long figure push it out. */}
-            <div className="flex flex-col gap-1 rounded-2xl border border-accent-primary/35 bg-gradient-to-br from-accent-primary/20 to-accent-primary/5 p-4">
-                <div className="flex">
-                    <span className="flex items-center gap-1.5 rounded-full border border-border/50 bg-bg-secondary/70 px-2.5 py-1 text-[11px] font-medium text-text-secondary">
-                        <typeOption.Icon className={cn("h-3.5 w-3.5", typeOption.color)} />
-                        {typeOption.label}
-                    </span>
-                </div>
-                <p className="text-sm font-semibold text-text-primary">
-                    {values.description.trim() || "Sin descripción"}
-                </p>
-                <p className="text-2xl font-bold tracking-tight text-text-primary">
-                    {formatAmount(values.amount, currency)}
-                </p>
-                {heroSub && <p className="text-xs text-text-tertiary">{heroSub}</p>}
-            </div>
+            <SummaryHero
+                type={values.type}
+                description={values.description}
+                amount={values.amount}
+                currency={currency}
+                institutionName={values.institutionName}
+                date={values.date}
+            />
 
             <div className="flex flex-col gap-1.5">
                 <SummaryRow

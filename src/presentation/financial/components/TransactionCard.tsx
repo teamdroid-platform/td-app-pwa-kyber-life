@@ -1,11 +1,10 @@
 "use client";
 
-import { useState } from "react";
-import NextLink from "next/link";
+import { useEffect, useState, useTransition } from "react";
+import { usePathname, useRouter } from "next/navigation";
 
 import { FinancialTransaction } from "@/domain/entities/financial";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -15,14 +14,10 @@ import {
 import {
     CheckCircle2,
     AlertCircle,
-    Sparkles,
     Archive,
     Trash2,
-    Eye,
-    ChevronDown,
-    ChevronUp,
     MoreVertical,
-    Clock,
+    Loader2,
     TrendingDown,
     TrendingUp,
     ArrowRightLeft,
@@ -34,7 +29,6 @@ import {
     Landmark,
     MoreHorizontal
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -97,22 +91,6 @@ function formatTime(dateStr: string): string {
     }).format(new Date(dateStr));
 }
 
-/**
- * Extract the best available context from a transaction.
- * Priority: notes → originStats.emailBody → originStats.snippet
- */
-function extractContext(tx: FinancialTransaction): string {
-    if (tx.notes) return tx.notes;
-    const stats = tx.originStats as Record<string, unknown> | null | undefined;
-    const emailBody = stats?.emailBody as string | undefined;
-    const snippet = stats?.snippet as string | undefined;
-    
-    if (emailBody) return `[MAIL] ${emailBody}`;
-    if (snippet) return `[MAIL] ${snippet}`;
-    
-    return "";
-}
-
 function getFallbackDescription(tx: FinancialTransaction, typeLabel: string): string {
     if (tx.description && tx.description.trim() !== "") return tx.description;
     
@@ -135,8 +113,29 @@ export function TransactionCard({
     onStatusChange,
     onDeleted,
 }: TransactionCardProps) {
+    const router = useRouter();
     const [isLoading, setIsLoading] = useState(false);
-    const [isExpanded, setIsExpanded] = useState(false);
+    // The row says "I heard you" for as long as the detail screen takes to
+    // arrive. Own state rather than `useTransition` alone: the pending flag
+    // depends on the router suspending, and the guard against repeated taps
+    // has to hold either way.
+    const [isOpening, setIsOpening] = useState(false);
+    const [, startOpening] = useTransition();
+    const pathname = usePathname();
+
+    // Cleared once the navigation commits, so a row restored from the back
+    // stack never keeps spinning.
+    useEffect(() => {
+        setIsOpening(false);
+    }, [pathname]);
+
+    const openDetail = () => {
+        // Tapping again while it's already on its way does nothing: what made
+        // people tap twice was the silence, not a missed press.
+        if (isOpening) return;
+        setIsOpening(true);
+        startOpening(() => router.push(`/financial/transactions/${transaction.id}`));
+    };
 
     const isIncome = ["INCOME", "DEPOSIT", "REFUND"].includes(transaction.type);
     const isExpense = ["EXPENSE", "PAYMENT", "FEE", "TAX"].includes(transaction.type);
@@ -144,8 +143,6 @@ export function TransactionCard({
     const amountSign = isIncome ? "+" : isExpense ? "-" : "";
     const style = TYPE_STYLE[transaction.type] ?? DEFAULT_TYPE_STYLE;
     const typeLabel = style.label;
-    const displayContext = extractContext(transaction);
-    const hasContext = displayContext.trim().length > 0;
     const displayTitle = getFallbackDescription(transaction, typeLabel);
 
     const handleAction = async (
@@ -176,23 +173,42 @@ export function TransactionCard({
             className={cn(
                 "group relative overflow-hidden rounded-[1.75rem] border-border/60 bg-bg-secondary py-0 shadow-sm shadow-black/5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md",
                 "flex flex-col h-full",
+                // Presses land on the row itself, so the feedback is immediate
+                // and doesn't wait for anything on the network.
+                "active:scale-[0.985] active:shadow-sm",
+                isOpening && "scale-[0.985] border-accent-primary/50 ring-1 ring-accent-primary/30",
                 isLoading && "opacity-60 pointer-events-none",
             )}
         >
-            {/* Decorative gradient line */}
+            {/* Decorative gradient line — it doubles as the progress hint while
+                the detail screen loads. */}
             <div
-                className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-accent-primary/60 to-transparent"
+                className={cn(
+                    "absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-accent-primary/60 to-transparent",
+                    isOpening && "h-0.5 animate-pulse via-accent-primary",
+                )}
                 aria-hidden="true"
             />
 
             {/* ── Nivel 1: Resumen (Siempre visible) ───────────────── */}
             <CardHeader
                 className={cn(
-                    "flex flex-row items-center justify-between w-full !space-y-0 !px-3 !py-3 sm:!px-4 select-none bg-bg-secondary/50 transition-colors gap-3",
-                    isExpanded && "border-b border-border/50",
-                    hasContext && "cursor-pointer hover:bg-bg-secondary"
+                    "flex flex-row items-center justify-between w-full !space-y-0 !px-2.5 !py-2 sm:!px-4 sm:!py-3 select-none bg-bg-secondary/50 transition-colors gap-2.5 sm:gap-3",
+                    "cursor-pointer hover:bg-bg-secondary",
                 )}
-                onClick={() => hasContext && setIsExpanded(!isExpanded)}
+                // The whole row opens the transaction. It used to expand an
+                // inline summary while a small eye icon did the navigation —
+                // two behaviours competing for the same tap.
+                role="link"
+                tabIndex={0}
+                aria-busy={isOpening}
+                onClick={openDetail}
+                onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        openDetail();
+                    }
+                }}
             >
                 {/* Left Side: Badge + Title/Subtitle */}
                 <div className="flex items-center gap-3 min-w-0 flex-1">
@@ -201,14 +217,14 @@ export function TransactionCard({
                         <div className="relative">
                             <div
                                 className={cn(
-                                    "flex items-center justify-center rounded-2xl w-11 h-11 border",
+                                    "flex items-center justify-center rounded-xl w-9 h-9 sm:rounded-2xl sm:w-11 sm:h-11 border",
                                     style.badge
                                 )}
                                 title={typeLabel}
                             >
                                 {(() => {
                                     const Icon = style.icon;
-                                    return <Icon className="w-5 h-5" strokeWidth={2.5} />;
+                                    return <Icon className="w-4 h-4 sm:w-5 sm:h-5" strokeWidth={2.5} />;
                                 })()}
                             </div>
                             {transaction.paidWithCredit && (
@@ -220,7 +236,7 @@ export function TransactionCard({
                                 </span>
                             )}
                         </div>
-                        <span className="text-[10px] font-medium text-muted-foreground leading-none">
+                        <span className="text-[9px] sm:text-[10px] font-medium text-muted-foreground leading-none">
                             {formatTime(transaction.date)}
                         </span>
                     </div>
@@ -229,8 +245,7 @@ export function TransactionCard({
                     <div className="flex flex-col min-w-0 justify-center">
                         <CardTitle
                             className={cn(
-                                "text-sm sm:text-base tracking-tight line-clamp-3 break-words font-semibold transition-colors leading-tight",
-                                hasContext && "group-hover:text-accent-primary"
+                                "text-[13px] sm:text-base tracking-tight line-clamp-2 sm:line-clamp-3 break-words font-semibold transition-colors leading-snug group-hover:text-accent-primary",
                             )}
                             title={displayTitle}
                         >
@@ -240,14 +255,14 @@ export function TransactionCard({
                             {displayTitle}
                         </CardTitle>
                         <div className="flex items-start gap-2 mt-0.5 min-w-0">
-                            <span className="line-clamp-3 break-words text-[13px] font-medium text-zinc-400" title={transaction.institutionName || transaction.merchant || typeLabel}>
+                            <span className="line-clamp-1 sm:line-clamp-3 break-words text-[11px] sm:text-[13px] font-medium text-zinc-400" title={transaction.institutionName || transaction.merchant || typeLabel}>
                                 {transaction.institutionName || transaction.merchant || typeLabel}
                             </span>
                         </div>
                         <div className="flex items-center gap-2 mt-1 min-w-0">
                             {/* Category */}
                             {transaction.categoryName && (
-                                <span className="text-[11px] text-muted-foreground truncate" title={transaction.categoryName}>
+                                <span className="text-[10px] sm:text-[11px] text-muted-foreground truncate" title={transaction.categoryName}>
                                     {transaction.categoryName}
                                 </span>
                             )}
@@ -259,7 +274,7 @@ export function TransactionCard({
                 <div className="flex flex-col items-end shrink-0 gap-1.5 ml-2">
                     <span
                         className={cn(
-                            "text-sm sm:text-base font-bold tracking-tight whitespace-nowrap leading-none",
+                            "text-[13.5px] sm:text-base font-bold tracking-tight whitespace-nowrap leading-none",
                             style.amount
                         )}
                         title={formatAmount(transaction.amount, transaction.currency)}
@@ -269,12 +284,11 @@ export function TransactionCard({
 
                     <div className="flex items-center gap-2 text-[11px] text-muted-foreground mt-1">
 
-                        <div className="flex items-center gap-1.5 ml-1" onClick={(e) => e.stopPropagation()}>
-                            <NextLink href={`/financial/transactions/${transaction.id}`} className="text-muted-foreground hover:text-foreground transition-colors p-1">
-                                <Eye className="h-[18px] w-[18px]" />
-                                <span className="sr-only">Detalles</span>
-                            </NextLink>
+                        {isOpening && (
+                            <Loader2 className="h-4 w-4 shrink-0 animate-spin text-accent-primary" aria-hidden="true" />
+                        )}
 
+                        <div className="flex items-center gap-1.5 ml-1" onClick={(e) => e.stopPropagation()}>
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
                                     <button className="text-muted-foreground hover:text-foreground transition-colors p-1 -mr-1">
@@ -313,37 +327,6 @@ export function TransactionCard({
                 </div>
             </CardHeader>
 
-            {/* ── Nivel 2: Detalles Extensos (Desplegable) ──────────────────── */}
-            {isExpanded && (
-                <CardContent className="space-y-4 px-4 py-3 sm:px-5 animate-in slide-in-from-top-2 duration-200">
-                    <div className="rounded-xl bg-bg-primary/50 p-3.5 border-none">
-                        <div className="mb-2 flex items-center gap-2 text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
-                            <Sparkles className="h-3.5 w-3.5 text-accent-primary shrink-0" />
-                            Resumen
-                        </div>
-                        <div className="w-full max-w-full overflow-hidden">
-                            <p className="text-xs sm:text-sm leading-relaxed text-muted-foreground whitespace-pre-wrap break-words [word-break:break-word]">
-                                {displayContext || "Sin resumen disponible para esta transacción."}
-                            </p>
-                        </div>
-                    </div>
-
-                    {/* Tags */}
-                    {transaction.tags && transaction.tags.length > 0 && (
-                        <div className="flex flex-wrap gap-1.5 pt-1">
-                            {transaction.tags.map((tag) => (
-                                <Badge
-                                    key={tag}
-                                    variant="outline"
-                                    className="rounded-full text-[10px] px-2 py-0"
-                                >
-                                    {tag}
-                                </Badge>
-                            ))}
-                        </div>
-                    )}
-                </CardContent>
-            )}
         </Card>
     );
 }

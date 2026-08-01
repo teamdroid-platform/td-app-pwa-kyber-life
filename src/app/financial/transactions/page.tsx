@@ -107,11 +107,15 @@ export default async function TransactionsPage({
             </div>
 
             <Suspense fallback={<div className="h-10 animate-pulse bg-muted rounded-md" />}>
-                <TransactionTabs>
-                    <Suspense fallback={<div className="h-10 animate-pulse bg-muted rounded-md" />}>
-                        <TransactionFilters categories={categories} institutions={institutions} />
-                    </Suspense>
-
+                {/* The filters travel as their own prop, not as children: the
+                    tabs own the toggle that folds them away on mobile. */}
+                <TransactionTabs
+                    filters={
+                        <Suspense fallback={<div className="h-10 animate-pulse bg-muted rounded-md" />}>
+                            <TransactionFilters categories={categories} institutions={institutions} />
+                        </Suspense>
+                    }
+                >
                     <Suspense fallback={<div className="h-40 flex items-center justify-center">Cargando transacciones...</div>}>
                         <TransactionTimeline
                             key={JSON.stringify(params)}
