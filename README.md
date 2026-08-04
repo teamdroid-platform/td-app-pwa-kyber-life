@@ -1,4 +1,4 @@
-# Kyber Life (V1)
+# Kyber Life
 
 ![KyberLife Dashboard](./public/cover.png)
 
