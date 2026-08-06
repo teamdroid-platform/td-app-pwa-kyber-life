@@ -41,6 +41,7 @@ export interface FinancialScanExecution extends BaseEntity {
     ownerUserId: UUID;
     status: FinancialScanStatus;
     source: string;
+    triggerSource?: string | null;
     stats?: Record<string, any> | null;
     startedAt: ISODate;
     completedAt?: ISODate | null;

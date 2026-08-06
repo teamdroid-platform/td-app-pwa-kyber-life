@@ -493,13 +493,13 @@ export function FinancialInbox() {
                         <Button className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-medium" asChild>
                             <Link href="/financial/scanner" className="gap-2">
                                 <Search className="w-4 h-4" />
-                                Iniciar Nuevo Escaneo
+                                Escanear
                             </Link>
                         </Button>
                         <Button variant="outline" className="rounded-xl font-medium" asChild>
                             <Link href="/financial/transactions" className="gap-2">
                                 <Receipt className="w-4 h-4" />
-                                Ver transacciones
+                                Transacciones
                             </Link>
                         </Button>
                     </div>

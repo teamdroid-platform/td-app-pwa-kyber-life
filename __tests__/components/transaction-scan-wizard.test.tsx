@@ -182,7 +182,7 @@ describe("TransactionScanWizard", () => {
         await summaryHeading();
 
         expect(await screen.findByText("Datos originales extraídos")).toBeInTheDocument();
-        expect(screen.getByText("47.9 USD")).toBeInTheDocument();
+        expect(screen.getByText("email")).toBeInTheDocument(); // Origin
         expect(screen.getByText("abc123")).toBeInTheDocument();
     });
 

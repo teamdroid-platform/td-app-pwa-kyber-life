@@ -9,6 +9,7 @@ import { updateInstitutionAction } from "@/app/actions/financial-settings";
 import { useTransactionFormOptions } from "../hooks/useTransactionFormOptions";
 import { getUniqueTagsAction } from "@/app/actions/financial-transactions";
 import { useScrollFieldIntoView } from "@/hooks/use-scroll-field-into-view";
+import { createClient } from "@/infrastructure/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -31,7 +32,7 @@ import { isoToWallClockInput, wallClockInputToISO } from "@/lib/date-range";
 import type { FinancialTransactionType } from "@/domain/entities/financial";
 import {
     FileText, Building2, Tag, CreditCard, DollarSign, Landmark, Calendar, Sparkles, Tags,
-    FileJson, Hash, Mail, Check, X,
+    FileJson, Hash, Mail, Check, X, Database, Zap
 } from "lucide-react";
 
 const CREDIT_ELIGIBLE_TYPES: readonly FinancialTransactionType[] = ["EXPENSE"];
@@ -80,6 +81,34 @@ export function LegacyScanDetailsForm({ initialData, resolvedInstitutionName, in
     const [isProcessing, setIsProcessing] = useState(false);
     const formRef = useRef<HTMLDivElement>(null);
     useScrollFieldIntoView(formRef);
+
+    const [triggerSource, setTriggerSource] = useState<string>("Cargando...");
+    
+    useEffect(() => {
+        if (!initialData.executionId) {
+            setTriggerSource("N/A");
+            return;
+        }
+
+        async function fetchExecution() {
+            const supabase = createClient();
+            const { data, error } = await supabase
+                .from("financial_scanner_executions")
+                .select("*")
+                .eq("execution_id", initialData.executionId)
+                .single();
+
+            if (data) {
+                const src = data.trigger_source || data.source || data.request_payload?.trigger_source || "N/A";
+                setTriggerSource(src);
+            } else {
+                setTriggerSource("N/A");
+                if (error) console.error("Error fetching execution:", error);
+            }
+        }
+
+        fetchExecution();
+    }, [initialData.executionId]);
 
     // Which accordion section is open (only one or none).
     const [expanded, setExpanded] = useState<SectionId | null>(null);
@@ -407,13 +436,13 @@ export function LegacyScanDetailsForm({ initialData, resolvedInstitutionName, in
                     onToggle={() => toggle("original")}
                 >
                     <div className="grid grid-cols-2 gap-2">
-                        <FieldCard icon={<DollarSign className="h-3.5 w-3.5" />} iconClass="bg-emerald-500/15 text-emerald-500" label="Monto original">
-                            <p className="text-sm font-bold text-text-primary">
-                                {initialData.amount !== null && initialData.amount !== undefined ? `${initialData.amount} ${initialData.currency || "USD"}` : "N/A"}
+                        <FieldCard icon={<Database className="h-3.5 w-3.5" />} iconClass="bg-blue-500/15 text-blue-500" label="Origin (Payload)">
+                            <p className="break-all font-mono text-xs text-text-secondary">
+                                {String(originStats?.origin || "N/A")}
                             </p>
                         </FieldCard>
-                        <FieldCard icon={<Tag className="h-3.5 w-3.5" />} iconClass="bg-amber-500/15 text-amber-500" label="Categoría original">
-                            <p className="text-sm font-bold text-text-primary">{initialData.category || "N/A"}</p>
+                        <FieldCard icon={<Zap className="h-3.5 w-3.5" />} iconClass="bg-purple-500/15 text-purple-500" label="Trigger Source">
+                            <p className="break-all font-mono text-xs text-text-secondary">{triggerSource}</p>
                         </FieldCard>
                         <FieldCard icon={<Hash className="h-3.5 w-3.5" />} iconClass="bg-slate-500/15 text-slate-400" label="Hash / Ref">
                             <p className="break-all font-mono text-xs text-text-secondary">{initialData.hash || "N/A"}</p>
