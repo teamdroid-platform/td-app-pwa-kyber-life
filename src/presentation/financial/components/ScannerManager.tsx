@@ -48,13 +48,19 @@ function getFormattedDuration(start: string | Date, end: string | Date): string 
 // (America/Guayaquil, UTC-5) regardless of the viewer's device timezone.
 const ECUADOR_TZ = 'America/Guayaquil';
 function formatEcuadorTime(value: string | Date, withSeconds = false): string {
+    const d = new Date(value);
+    if (!isNaN(d.getTime()) && !withSeconds) {
+        // Zero out seconds/milliseconds to prevent browsers (like Chrome) from 
+        // rounding 23:59:59.999 up to the next minute (00:00).
+        d.setUTCSeconds(0, 0);
+    }
     return new Intl.DateTimeFormat('es-EC', {
         timeZone: ECUADOR_TZ,
         hour: '2-digit',
         minute: '2-digit',
         ...(withSeconds ? { second: '2-digit' as const } : {}),
         hour12: false,
-    }).format(new Date(value));
+    }).format(d);
 }
 function formatEcuadorDate(value: string | Date): string {
     return new Intl.DateTimeFormat('es-EC', {
