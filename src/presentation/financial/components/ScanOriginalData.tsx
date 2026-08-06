@@ -1,8 +1,10 @@
 "use client";
 
-import { DollarSign, FileJson, Hash, Mail, Tag } from "lucide-react";
+import { useEffect, useState } from "react";
+import { DollarSign, FileJson, Hash, Mail, Tag, Zap, Database } from "lucide-react";
 import { FieldCard } from "@/components/ui/field-card";
 import type { FinancialScannerTransaction } from "@/domain/entities/financial";
+import { createClient } from "@/infrastructure/supabase/client";
 
 interface ScanOriginalDataProps {
     transaction: FinancialScannerTransaction;
@@ -19,6 +21,35 @@ export function ScanOriginalData({ transaction }: ScanOriginalDataProps) {
     const originStats = transaction.originStats as Record<string, unknown> | null | undefined;
     const isEmailOrigin = originStats?.origin === "email";
 
+    const [triggerSource, setTriggerSource] = useState<string>("Cargando...");
+
+    useEffect(() => {
+        if (!transaction.executionId) {
+            setTriggerSource("N/A");
+            return;
+        }
+
+        async function fetchExecution() {
+            const supabase = createClient();
+            const { data, error } = await supabase
+                .from("financial_scanner_executions")
+                .select("*")
+                .eq("execution_id", transaction.executionId)
+                .single();
+
+            if (data) {
+                // Some sources might use the `source` column, others might embed it in `request_payload` or `stats`
+                const src = data.trigger_source || data.source || data.request_payload?.trigger_source || "N/A";
+                setTriggerSource(src);
+            } else {
+                setTriggerSource("N/A");
+                if (error) console.error("Error fetching execution:", error);
+            }
+        }
+
+        fetchExecution();
+    }, [transaction.executionId]);
+
     return (
         <div className="rounded-2xl border border-border/40 bg-bg-secondary/30 p-3">
             <p className="mb-2 flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.1em] text-text-tertiary">
@@ -26,15 +57,13 @@ export function ScanOriginalData({ transaction }: ScanOriginalDataProps) {
             </p>
 
             <div className="grid grid-cols-2 gap-2">
-                <FieldCard icon={<DollarSign className="h-3.5 w-3.5" />} iconClass="bg-emerald-500/15 text-emerald-500" label="Monto original">
-                    <p className="text-sm font-bold text-text-primary">
-                        {transaction.amount !== null && transaction.amount !== undefined
-                            ? `${transaction.amount} ${transaction.currency || "USD"}`
-                            : "N/A"}
+                <FieldCard icon={<Database className="h-3.5 w-3.5" />} iconClass="bg-blue-500/15 text-blue-500" label="Origin (Payload)">
+                    <p className="break-all font-mono text-xs text-text-secondary">
+                        {String(originStats?.origin || "N/A")}
                     </p>
                 </FieldCard>
-                <FieldCard icon={<Tag className="h-3.5 w-3.5" />} iconClass="bg-amber-500/15 text-amber-500" label="Categoría original">
-                    <p className="text-sm font-bold text-text-primary">{transaction.category || "N/A"}</p>
+                <FieldCard icon={<Zap className="h-3.5 w-3.5" />} iconClass="bg-purple-500/15 text-purple-500" label="Trigger Source">
+                    <p className="break-all font-mono text-xs text-text-secondary">{triggerSource}</p>
                 </FieldCard>
                 <FieldCard icon={<Hash className="h-3.5 w-3.5" />} iconClass="bg-slate-500/15 text-slate-400" label="Hash / Ref">
                     <p className="break-all font-mono text-xs text-text-secondary">{transaction.hash || "N/A"}</p>

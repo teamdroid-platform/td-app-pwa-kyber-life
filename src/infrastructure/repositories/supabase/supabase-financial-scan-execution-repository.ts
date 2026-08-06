@@ -32,6 +32,7 @@ export class SupabaseFinancialScanExecutionRepository implements IFinancialScanE
             ownerUserId: data.owner_user_id,
             status: data.status,
             source: data.source || 'GMAIL_N8N_WEBHOOK',
+            triggerSource: data.trigger_source || null,
             stats: Object.keys(stats).length > 0 ? stats : undefined,
             requestPayload: parsedPayload,
             startedAt: data.started_at || data.created_at,

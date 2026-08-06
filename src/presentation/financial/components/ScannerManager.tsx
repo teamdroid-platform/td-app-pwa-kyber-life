@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { toast } from 'sonner';
 import { triggerFinancialScanAction, getScanExecutionsAction, getScannerDayCountsAction } from '@/app/actions/financial-scanner';
-import { Calendar, Search, RefreshCw, CheckCircle2, XCircle, Clock, ChevronLeft, ChevronRight, Mail, AlertCircle, Timer, ChevronDown, ChevronUp, Plus, Database } from 'lucide-react';
+import { Calendar, Search, RefreshCw, CheckCircle2, XCircle, Clock, ChevronLeft, ChevronRight, Mail, AlertCircle, Timer, ChevronDown, ChevronUp, Plus, Database, Zap } from 'lucide-react';
 import { FinancialScanExecution } from '@/domain/entities/financial';
 import { format, isAfter, isBefore, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, getDay } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -218,6 +218,49 @@ const EXECUTION_STATUS_STYLES: Record<string, { label: string; badge: string; ri
     FAILED: { label: 'FALLIDO', badge: 'bg-danger-bg/30 border-accent-danger/30 text-danger-text', ring: 'border-accent-danger/40', Icon: XCircle },
     PROCESSING: { label: 'EN PROGRESO', badge: 'bg-info-bg/30 border-accent-info/30 text-info-text', ring: 'border-accent-info/40', Icon: Clock },
 };
+
+function RealtimeExecutionHistoryCard({ count, defaultExpanded = false }: { count: number, defaultExpanded?: boolean }) {
+    const [isExpanded, setIsExpanded] = useState(defaultExpanded);
+    const meta = EXECUTION_STATUS_STYLES['COMPLETED'];
+
+    const statusBadge = (
+        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wide border ${meta.badge} uppercase shrink-0`}>
+            <Zap className="w-3 h-3" />
+            TIEMPO REAL
+        </span>
+    );
+
+    return (
+        <div
+            onClick={() => setIsExpanded((v) => !v)}
+            className={`p-4 rounded-[1.25rem] border bg-bg-secondary/60 hover:bg-bg-secondary transition-all cursor-pointer ${isExpanded ? meta.ring : 'border-border/40'}`}
+        >
+            <div className="flex items-center justify-between gap-2">
+                {statusBadge}
+                <div className="flex items-center gap-2 text-text-tertiary shrink-0">
+                    {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                </div>
+            </div>
+
+            <div className="mt-2.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+                <span className="text-text-secondary">Rango:</span>
+                <span className="font-semibold text-text-primary">En tiempo real</span>
+            </div>
+
+            {isExpanded && (
+                <div className="mt-3 pt-3 border-t border-border/30 flex flex-col gap-2" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex items-center justify-between gap-3">
+                        <span className="flex items-center gap-2 text-xs text-text-secondary min-w-0">
+                            <Database className="w-3.5 h-3.5 text-accent-primary shrink-0" />
+                            <span className="truncate">Transacciones detectadas</span>
+                        </span>
+                        <span className="text-base font-bold text-text-primary tabular-nums shrink-0">{count}</span>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
 
 function ExecutionHistoryCard({ exec, dayCount, defaultExpanded = false }: { exec: FinancialScanExecution, dayCount?: number, defaultExpanded?: boolean }) {
     const [isExpanded, setIsExpanded] = useState(defaultExpanded);
@@ -534,7 +577,15 @@ export function ScannerManager() {
             const payload = parsePayload(exec.requestPayload);
             const sDate = payload?.startDate || exec.stats?.startDate;
             const eDate = payload?.endDate || exec.stats?.endDate;
-            if (!sDate || !eDate) return;
+            if (!sDate || !eDate) {
+                const execDateStr = exec.startedAt ? format(new Date(exec.startedAt), 'yyyy-MM-dd') : null;
+                if (execDateStr === dateStr) {
+                    if (exec.status === 'COMPLETED') hasCompleted = true;
+                    if (exec.status === 'FAILED') hasFailed = true;
+                    if (exec.status === 'PROCESSING') hasProcessing = true;
+                }
+                return;
+            }
 
             const startObj = parseScanDay(sDate);
             const endObj = parseScanDay(eDate);
@@ -701,7 +752,10 @@ export function ScannerManager() {
             const payload = parsePayload(exec.requestPayload);
             const sDate = payload?.startDate || exec.stats?.startDate;
             const eDate = payload?.endDate || exec.stats?.endDate;
-            if (!sDate || !eDate) return false;
+            if (!sDate || !eDate) {
+                const execDateStr = exec.startedAt ? format(new Date(exec.startedAt), 'yyyy-MM-dd') : null;
+                return execDateStr === dateStr;
+            }
 
             const startObj = parseScanDay(sDate);
             const endObj = parseScanDay(eDate);
@@ -722,6 +776,20 @@ export function ScannerManager() {
             0,
         );
     }, [dayCountsByDate, selectedDate, selectedDayExecutions]);
+
+    const realtimeExecs = useMemo(() => {
+        return selectedDayExecutions.filter(exec => exec.source === 'REALTIME_GMAIL' || exec.triggerSource === 'REALTIME_GMAIL' || exec.requestPayload?.trigger_source === 'REALTIME_GMAIL');
+    }, [selectedDayExecutions]);
+
+    const normalExecs = useMemo(() => {
+        return selectedDayExecutions.filter(exec => exec.source !== 'REALTIME_GMAIL' && exec.triggerSource !== 'REALTIME_GMAIL' && exec.requestPayload?.trigger_source !== 'REALTIME_GMAIL');
+    }, [selectedDayExecutions]);
+
+    const realtimeCount = useMemo(() => {
+        const counts = dayCountsByDate[format(selectedDate, 'yyyy-MM-dd')];
+        if (!counts) return 0;
+        return realtimeExecs.reduce((sum, exec) => sum + (exec.id ? (counts[exec.id] ?? 0) : 0), 0);
+    }, [dayCountsByDate, selectedDate, realtimeExecs]);
 
     return (
         <div className="w-full flex flex-col relative pb-24">
@@ -830,7 +898,19 @@ export function ScannerManager() {
 
                         <div className="flex flex-col gap-2.5 overflow-y-auto overflow-x-hidden pr-1.5 pb-2 h-full">
                             {selectedDayExecutions.length > 0 ? (
-                                selectedDayExecutions.map((exec, idx) => <ExecutionHistoryCard key={exec.id} exec={exec} dayCount={getDayCount(exec.id)} defaultExpanded={idx === 0} />)
+                                <>
+                                    {realtimeExecs.length > 0 && (
+                                        <RealtimeExecutionHistoryCard count={realtimeCount} defaultExpanded={true} />
+                                    )}
+                                    {normalExecs.map((exec, idx) => (
+                                        <ExecutionHistoryCard 
+                                            key={exec.id} 
+                                            exec={exec} 
+                                            dayCount={getDayCount(exec.id)} 
+                                            defaultExpanded={realtimeExecs.length === 0 && idx === 0} 
+                                        />
+                                    ))}
+                                </>
                             ) : (
                                 <div className="p-6 text-center text-sm text-text-tertiary border border-border/30 rounded-2xl bg-bg-secondary/30">
                                     No hay registros de ejecución para esta fecha.
@@ -856,7 +936,19 @@ export function ScannerManager() {
 
                     <div className="flex flex-col gap-2.5">
                         {selectedDayExecutions.length > 0 ? (
-                            selectedDayExecutions.map((exec, idx) => <ExecutionHistoryCard key={exec.id} exec={exec} dayCount={getDayCount(exec.id)} defaultExpanded={idx === 0} />)
+                            <>
+                                {realtimeExecs.length > 0 && (
+                                    <RealtimeExecutionHistoryCard count={realtimeCount} defaultExpanded={true} />
+                                )}
+                                {normalExecs.map((exec, idx) => (
+                                    <ExecutionHistoryCard 
+                                        key={exec.id} 
+                                        exec={exec} 
+                                        dayCount={getDayCount(exec.id)} 
+                                        defaultExpanded={realtimeExecs.length === 0 && idx === 0} 
+                                    />
+                                ))}
+                            </>
                         ) : (
                             <div className="p-6 text-center text-sm text-text-tertiary border border-border/30 rounded-2xl bg-bg-secondary/30">
                                 No hay registros de ejecución para esta fecha.
