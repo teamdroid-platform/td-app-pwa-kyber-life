@@ -68,6 +68,15 @@ La aplicacion esta pensada como una experiencia privada por usuario: casi todo e
    - manifest, iconos, install prompt y pagina offline.
    - Nota: la capa completa de service worker esta desactivada actualmente en `next.config.ts`.
 
+11. **Gestion Financiera**
+   - dashboard financiero con graficos de dona y barras (responsive-first);
+   - registro integral de transacciones: ingresos, gastos y transferencias;
+   - busqueda de texto libre inteligente sobre descripcion, categoria e institucion;
+   - sincronizacion en tiempo real via WebSockets de Supabase;
+   - bandeja de entrada (AI Inbox) para procesar transacciones escaneadas desde notificaciones bancarias;
+   - escaner financiero integrado con N8N via webhooks: ejecucion manual o automatica con historial detallado;
+   - auditoria y trazabilidad del ciclo de vida de transacciones (Pendiente, Completado, Archivado) con soporte offline y hard-deletes.
+
 ---
 
 ## 3. Mapa funcional por rutas
@@ -93,6 +102,12 @@ La aplicacion esta pensada como una experiencia privada por usuario: casi todo e
 - `/market/categories` - CRUD de categorias.
 - `/market/units` - CRUD de unidades.
 - `/market/analytics` - analitica funcional.
+- `/financial` - dashboard financiero con graficos y filtros.
+- `/financial/transactions` - timeline de transacciones con filtros avanzados.
+- `/financial/transactions/new` - crear transaccion manual.
+- `/financial/transactions/[id]` - detalle/edicion de transaccion.
+- `/financial/scanner` - escaner financiero: ejecucion, historial y monitoreo.
+- `/financial/inbox` - bandeja de transacciones escaneadas para revision y aprobacion.
 - `/profile` - perfil del usuario.
 - `/~offline` - fallback visual offline.
 
@@ -162,6 +177,7 @@ Componentes de interfaz por dominio funcional.
 - `analytics/`
 - `auth/`
 - `dashboard/`
+- `financial/` - dashboard, transacciones, inbox y escaner financiero
 - `layout/`
 - `products/`
 - `purchase/`
@@ -225,6 +241,9 @@ Definidas en `src/domain/entities/index.ts`.
 - `PurchaseLine` - linea individual de compra.
 - `PriceObservation` - observacion historica de precio por producto/marca/supermercado.
 - `PasswordResetToken` - token para reset en modo no Supabase.
+- `FinancialTransaction` - transaccion financiera (ingreso, gasto, transferencia).
+- `FinancialScannerExecution` - registro de ejecucion del escaner financiero.
+- `FinancialScannedRecord` - transaccion detectada por el escaner, pendiente de revision.
 
 ### Relaciones importantes
 
@@ -522,3 +541,30 @@ Si vas a agregar algo a KyberLife, piensa asi:
 - si una funcionalidad toca compras, casi seguro afecta compras, productos, observaciones de precio y analitica.
 
 Con este mapa, una IA puede decidir con bastante precision **donde leer, donde implementar y que piezas revisar** antes de modificar el sistema.
+
+---
+
+## 17. Modulo Financiero - Arquitectura y flujo del escaner
+
+El modulo financiero es la funcionalidad principal activa del proyecto. Su arquitectura involucra tres capas que se comunican de la siguiente manera:
+
+### Flujo del escaner
+
+1. El usuario selecciona un rango de fechas en `ScannerManager.tsx` y lanza un escaneo.
+2. La server action `triggerFinancialScanAction` en `src/app/actions/financial-scanner.ts` convierte las fechas del calendario a instantes precisos en hora Ecuador (UTC-5): `startDay T00:00:00.000-05:00` y `endDay T23:59:59.999-05:00`.
+3. La action hace POST al webhook de N8N (`N8N_SCANNER_WEBHOOK_URL`).
+4. N8N ejecuta el workflow `financial-scanner`: construye un query de Gmail con epochs, busca correos, los parsea con IA y los inserta en `financial_scanner_transactions` de Supabase.
+5. El front-end monitorea el progreso de la ejecucion via polling y/o suscripciones realtime de Supabase.
+
+### Archivos clave del modulo financiero
+
+- `src/app/actions/financial-scanner.ts` - server action que dispara el escaneo.
+- `src/presentation/financial/components/ScannerManager.tsx` - UI completa del escaner: formulario, historial, monitoreo.
+- `src/domain/entities/financial.ts` - entidades del dominio financiero.
+- `src/infrastructure/repositories/supabase/financial-*` - repositorios Supabase.
+
+### Gotchas conocidos
+
+- **Formateo de horas en Ecuador**: Todas las fechas del escaner se muestran en zona `America/Guayaquil` usando `Intl.DateTimeFormat`. Al formatear sin segundos, Chrome redondea `.999` milisegundos al minuto siguiente. La funcion `formatEcuadorTime` trunca segundos/milisegundos antes de formatear para evitar este bug.
+- **Fechas del payload a N8N**: Siempre se envian con offset explicito `-05:00`, no en UTC. Esto evita que el literal de fecha cambie de dia al cruzar la medianoche UTC.
+- **Trigger source**: Las ejecuciones pueden ser `MANUAL` (usuario desde la UI) o `REALTIME_GMAIL` (disparadas automaticamente). La UI muestra ambas en el historial.

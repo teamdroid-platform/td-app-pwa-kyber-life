@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+- **Financial Scanner (UI)**: Corregido bug de redondeo en la hora de fin del rango de escaneo. `Intl.DateTimeFormat` en Chrome redondeaba `23:59:59.999` a `00:00` al formatear sin segundos, causando que el historial mostrara rangos `00:00 - 00:00`. Se truncan segundos y milisegundos antes de formatear (`formatEcuadorTime` en `ScannerManager.tsx`).
+
 ### Changed
 - **Financial Module (Dashboard & Charts)**:
   - Se optimizó el gráfico del resumen financiero (`TransactionSummary`) para usar datos globales basados en los filtros, independientemente del paginado o scroll de la línea de tiempo.
