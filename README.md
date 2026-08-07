@@ -84,8 +84,11 @@ Renombra `.env.example` a `.env` y configura las variables:
 | `NEXT_PUBLIC_FF_FINANCIAL_OFFLINE` | ❌ Opcional | Habilita caché offline IndexedDB (`true`/`false`). Default: `true` |
 | `NEXT_PUBLIC_FF_FINANCIAL_RECURRING` | ❌ Opcional | Habilita detección de transacciones recurrentes (`true`/`false`). Default: `false` |
 | `NEXT_PUBLIC_FF_FINANCIAL_WIZARD` | ❌ Opcional | Habilita el asistente por pasos para crear/editar transacciones (`true`/`false`). Con `false` vuelve el formulario de acordeones. Default: `true` |
+| `NEXT_PUBLIC_FF_FINANCIAL_AI_CAPTURE` | ❌ Opcional | Habilita registrar una transacción dictándola o escribiendo una frase (`true`/`false`). Requiere los dos webhooks `N8N_EXTRACT_*`. Default: `false` |
 | `NEXT_PUBLIC_FINANCIAL_POLLING_INTERVAL_MS` | ❌ Opcional | Intervalo de polling en ms. Default: `60000` |
 | `N8N_SCANNER_WEBHOOK_URL` | ❌ Opcional | Webhook de N8N para escaneo automático de transacciones |
+| `N8N_EXTRACT_TEXT_WEBHOOK_URL` | ❌ Opcional | Webhook de N8N que interpreta una frase y devuelve los campos de la transacción |
+| `N8N_EXTRACT_AUDIO_WEBHOOK_URL` | ❌ Opcional | Webhook de N8N que transcribe una grabación y devuelve los mismos campos |
 
 > **Nota:** `DATA_SOURCE` y `NEXT_PUBLIC_AUTH_STRATEGY` deben tener **el mismo valor**. Next.js no expone variables sin prefijo `NEXT_PUBLIC_` al navegador; por eso existen las dos.
 

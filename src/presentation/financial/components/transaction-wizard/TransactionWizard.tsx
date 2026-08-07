@@ -8,7 +8,7 @@ import { financialOfflineStore } from "@/infrastructure/offline/financial-offlin
 import { wallClockInputToISO } from "@/lib/date-range";
 import { getTransactionSuggestionsAction } from "@/app/actions/financial-transactions";
 import { updateInstitutionAction } from "@/app/actions/financial-settings";
-import { useTransactionFormOptions } from "../../hooks/useTransactionFormOptions";
+import { useTransactionFormOptions, type TransactionFormOptions } from "../../hooks/useTransactionFormOptions";
 import {
     WIZARD_STEPS,
     useTransactionWizard,
@@ -23,7 +23,19 @@ import { AmountStep } from "./steps/AmountStep";
 import { CategoryStep, InstitutionStep } from "./steps/PickerSteps";
 import { PaymentStep } from "./steps/PaymentStep";
 import { DateStep } from "./steps/DateStep";
-import { SummaryStep } from "./steps/SummaryStep";
+import { SummaryStep, type FieldMarkers } from "./steps/SummaryStep";
+
+/** Everything a decorator gets to reason about, without loading it a second time. */
+export interface SummaryDecoratorContext extends TransactionFormOptions {
+    values: WizardValues;
+}
+
+export interface SummaryDecoration {
+    /** Small markers beside a value, e.g. "nueva" or a scan's match confidence. */
+    fieldMarkers?: FieldMarkers;
+    /** Read-only content appended after the rows. */
+    extra?: ReactNode;
+}
 
 export interface TransactionWizardProps {
     mode: WizardMode;
@@ -40,16 +52,20 @@ export interface TransactionWizardProps {
     onClose?: () => void;
     submitLabel?: string;
     /**
-     * Read-only content appended to the summary — used by the scan flow to keep
-     * the originally extracted data consultable before confirming.
+     * Everything the summary shows beyond the plain values: the scan flow keeps
+     * its originally extracted data consultable here, the capture flow marks
+     * which records are about to be created.
+     *
+     * It is a function, not two static nodes, because those decorations depend
+     * on the user's institutions and categories — which this component already
+     * loads. Passing them down costs nothing; loading them again in the caller
+     * would cost a second request and a second auth round-trip.
      */
-    summaryExtra?: ReactNode;
+    decorateSummary?: (context: SummaryDecoratorContext) => SummaryDecoration;
     /** Extra action rendered under the primary button on the summary (e.g. Descartar). */
     secondaryAction?: ReactNode;
     /** Shown inside the institution step, e.g. how confident the scan's match is. */
     institutionHint?: ReactNode;
-    /** Marker beside the institution on the summary, e.g. that same confidence. */
-    institutionMarker?: ReactNode;
     /**
      * Open straight on one field, as if its summary row had been tapped. Set
      * when the editor is entered from a specific row on the detail screen.
@@ -73,10 +89,9 @@ export function TransactionWizard({
     onSubmit,
     onClose,
     submitLabel,
-    summaryExtra,
+    decorateSummary,
     secondaryAction,
     institutionHint,
-    institutionMarker,
     initialFocus,
 }: TransactionWizardProps) {
     const wizard = useTransactionWizard({ mode, initialValues, initialFocus });
@@ -214,14 +229,21 @@ export function TransactionWizard({
         }
     };
 
+    // Choosing from the picker makes the name authoritative again: any id a
+    // pre-filled flow had resolved refers to a different record than the one
+    // just selected, and keeping it would silently override the choice.
     const handleSelectInstitution = (name: string) => {
-        setValue("institutionName", name);
+        wizard.patch({ institutionName: name, institutionId: null });
         setInstitutionQuery("");
     };
 
     const handleSelectCategory = (name: string) => {
-        setValue("categoryName", name);
+        wizard.patch({ categoryName: name, categoryId: null });
         setCategoryQuery("");
+    };
+
+    const handleSelectAccount = (name: string) => {
+        wizard.patch({ accountName: name, accountId: null });
     };
 
     const stepDefinition = WIZARD_STEPS.find((s) => s.id === screen);
@@ -298,7 +320,7 @@ export function TransactionWizard({
                     <PaymentStep
                         accounts={accountsList}
                         value={values.accountName}
-                        onSelect={(v) => setValue("accountName", v)}
+                        onSelect={handleSelectAccount}
                         creditEligible={wizard.creditEligible}
                         paidWithCredit={values.paidWithCredit}
                         onPaidWithCreditChange={(v) => setValue("paidWithCredit", v)}
@@ -306,7 +328,8 @@ export function TransactionWizard({
                 );
             case "date":
                 return <DateStep value={values.date} onChange={(v) => setValue("date", v)} />;
-            case "summary":
+            case "summary": {
+                const decoration = decorateSummary?.({ values, institutions, institutionTypes, accounts, categories }) ?? {};
                 return (
                     <SummaryStep
                         values={values}
@@ -320,10 +343,11 @@ export function TransactionWizard({
                         onTagsChange={(v) => setValue("tags", v)}
                         tagSuggestions={tagSuggestions}
                         notesOrigin={notesOrigin}
-                        extra={summaryExtra}
-                        institutionMarker={institutionMarker}
+                        extra={decoration.extra}
+                        fieldMarkers={decoration.fieldMarkers}
                     />
                 );
+            }
         }
     };
 

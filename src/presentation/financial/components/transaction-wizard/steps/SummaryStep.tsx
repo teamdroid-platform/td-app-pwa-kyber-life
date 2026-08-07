@@ -125,6 +125,11 @@ export function SummaryHero({ type, description, amount, currency, institutionNa
     );
 }
 
+/** Rows that can carry a small non-interactive marker after their value. */
+export type MarkableField = "institutionName" | "categoryName" | "accountName";
+
+export type FieldMarkers = Partial<Record<MarkableField, ReactNode>>;
+
 interface SummaryStepProps {
     values: WizardValues;
     initialValues: WizardValues;
@@ -140,8 +145,11 @@ interface SummaryStepProps {
     notesOrigin: "auto" | "scan" | "manual";
     /** Read-only content appended after the rows (e.g. the scan's original data). */
     extra?: ReactNode;
-    /** Marker for the institution row, e.g. how confident a scan's match was. */
-    institutionMarker?: ReactNode;
+    /**
+     * Markers shown beside a value — a scan's match confidence, or whether
+     * confirming will reuse a record or create one.
+     */
+    fieldMarkers?: FieldMarkers;
 }
 
 const NOTES_ORIGIN_LABEL: Record<SummaryStepProps["notesOrigin"], string> = {
@@ -171,7 +179,7 @@ export function SummaryStep({
     tagSuggestions,
     notesOrigin,
     extra,
-    institutionMarker,
+    fieldMarkers,
 }: SummaryStepProps) {
     const [openEditor, setOpenEditor] = useState<"notes" | "tags" | null>(null);
 
@@ -231,7 +239,7 @@ export function SummaryStep({
                     missing={missingFor("institutionName")}
                     changed={didChange("institutionName")}
                     previous={previousOf("institutionName")}
-                    marker={institutionMarker}
+                    marker={fieldMarkers?.institutionName}
                 >
                     {values.institutionName || missingLabel("institutionName")}
                 </SummaryRow>
@@ -243,6 +251,7 @@ export function SummaryStep({
                     onEdit={() => onEdit("category")}
                     changed={didChange("categoryName")}
                     previous={previousOf("categoryName")}
+                    marker={fieldMarkers?.categoryName}
                 >
                     {values.categoryName || <span className="text-text-tertiary">Sin categoría</span>}
                 </SummaryRow>
@@ -254,6 +263,7 @@ export function SummaryStep({
                     onEdit={() => onEdit("payment")}
                     changed={didChange("accountName") || didChange("paidWithCredit")}
                     previous={previousOf("accountName")}
+                    marker={fieldMarkers?.accountName}
                 >
                     {values.accountName || <span className="text-text-tertiary">Sin cuenta</span>}
                     {values.paidWithCredit && " · Tarjeta de crédito"}
