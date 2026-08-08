@@ -22,6 +22,20 @@ export interface WizardValues {
     date: string;
     notes: string;
     tags: string[];
+    /**
+     * Ids of records an external source already resolved, when it resolved them.
+     *
+     * The form is driven by names — the service creates a missing institution
+     * from its name alone — but an extractor that answers with both an id and a
+     * slightly different spelling would otherwise create a near-duplicate of a
+     * record the user already has. Carrying the id makes that case exact.
+     *
+     * Only ever set by a pre-filled flow, and cleared the moment the user picks
+     * something else, at which point the name is again the source of truth.
+     */
+    institutionId?: string | null;
+    categoryId?: string | null;
+    accountId?: string | null;
 }
 
 export interface StepDefinition {
@@ -56,8 +70,11 @@ export const FIELD_STEP: Record<keyof WizardValues, WizardScreen> = {
     amount: "amount",
     description: "amount",
     institutionName: "institution",
+    institutionId: "institution",
     categoryName: "category",
+    categoryId: "category",
     accountName: "payment",
+    accountId: "payment",
     paidWithCredit: "payment",
     date: "date",
     notes: "summary",
@@ -87,9 +104,17 @@ export function canLeaveStep(step: WizardStepId, values: WizardValues): boolean 
     return collectMissing(values).every((m) => m.step !== step);
 }
 
+/**
+ * Resolved ids are plumbing, not values the user edits: picking an institution
+ * from the list clears its id, and counting that as an unsaved change would
+ * inflate "N cambios" for an edit that never happened.
+ */
+const DIFF_IGNORED: readonly (keyof WizardValues)[] = ["institutionId", "categoryId", "accountId"];
+
 /** Fields whose value differs from the one the wizard opened with. */
 export function diffValues(initial: WizardValues, current: WizardValues): (keyof WizardValues)[] {
     return (Object.keys(current) as (keyof WizardValues)[]).filter((key) => {
+        if (DIFF_IGNORED.includes(key)) return false;
         if (key === "tags") {
             const a = initial.tags ?? [];
             const b = current.tags ?? [];

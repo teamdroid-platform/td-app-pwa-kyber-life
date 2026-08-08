@@ -7,19 +7,13 @@ import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { isoToWallClockInput, wallClockInputToISO } from "@/lib/date-range";
 import { mapInboxTransactionAction, dismissInboxTransactionAction } from "@/app/actions/financial-inbox";
-import type { FinancialScannerTransaction, FinancialTransactionType } from "@/domain/entities/financial";
+import type { FinancialScannerTransaction } from "@/domain/entities/financial";
 import type { InstitutionMatchInfo } from "@/lib/institution-match";
 import type { WizardValues } from "../../hooks/useTransactionWizard";
+import { normalizeTransactionType, SCANNER_TRANSACTION_TYPES } from "../../lib/transaction-type";
 import { InstitutionMatchHint, InstitutionMatchIcon } from "../InstitutionMatchBadge";
 import { ScanOriginalData } from "../ScanOriginalData";
 import { TransactionWizard } from "./TransactionWizard";
-
-const TYPE_OPTIONS = ["EXPENSE", "INCOME", "TRANSFER", "WITHDRAWAL"] as const;
-
-function normalizeType(type?: string | null): FinancialTransactionType {
-    const normalized = type?.toUpperCase();
-    return (TYPE_OPTIONS as readonly string[]).includes(normalized || "") ? (normalized as FinancialTransactionType) : "EXPENSE";
-}
 
 /**
  * The scan's own summary of the movement, which seeds the notes.
@@ -63,7 +57,7 @@ export function TransactionScanWizard({ initialData, resolvedInstitutionName, in
     const [isDismissing, setIsDismissing] = useState(false);
 
     const initialValues = useMemo<WizardValues>(() => ({
-        type: normalizeType(initialData.type),
+        type: normalizeTransactionType(initialData.type, SCANNER_TRANSACTION_TYPES),
         amount: initialData.amount !== null && initialData.amount !== undefined ? String(initialData.amount) : "",
         description: initialData.description || "",
         institutionName: resolvedInstitutionName || initialData.merchant || "",
@@ -150,8 +144,10 @@ export function TransactionScanWizard({ initialData, resolvedInstitutionName, in
             )}
             // On the summary, the level shows beside the institution itself, so
             // whether it was identified is visible without opening anything.
-            institutionMarker={institutionMatch && <InstitutionMatchIcon info={institutionMatch} />}
-            summaryExtra={<ScanOriginalData transaction={initialData} />}
+            decorateSummary={() => ({
+                fieldMarkers: institutionMatch ? { institutionName: <InstitutionMatchIcon info={institutionMatch} /> } : undefined,
+                extra: <ScanOriginalData transaction={initialData} />,
+            })}
             secondaryAction={
                 <Button
                     type="button"

@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Plus, ScanLine, ListChecks } from "lucide-react";
 import Link from "next/link";
 import { RobotLoader } from "@/components/ui/RobotLoader";
+import { NewTransactionDialog } from "@/presentation/financial/components/ai-capture/NewTransactionDialog";
 
 export default function FinancialOverviewPage() {
     return (
@@ -28,12 +29,12 @@ export default function FinancialOverviewPage() {
                             Transacciones
                         </Link>
                     </Button>
-                    <Button asChild className="h-10 flex-1 rounded-xl sm:flex-initial">
-                        <Link href="/financial/transactions/new">
+                    <NewTransactionDialog>
+                        <Button className="h-10 flex-1 rounded-xl sm:flex-initial">
                             <Plus className="h-4 w-4" />
                             Agregar
-                        </Link>
-                    </Button>
+                        </Button>
+                    </NewTransactionDialog>
                 </div>
             </div>
 

@@ -43,6 +43,14 @@ export const FINANCIAL_FLAGS = {
      * Default: true
      */
     WIZARD_ENABLED: process.env.NEXT_PUBLIC_FF_FINANCIAL_WIZARD !== "false",
+
+    /**
+     * Toggles capturing a transaction by dictating it or writing a sentence,
+     * instead of filling the form. Depends on the two N8N_EXTRACT_* webhooks
+     * being reachable, so it stays off unless the deployment opts in.
+     * Default: false
+     */
+    AI_CAPTURE_ENABLED: process.env.NEXT_PUBLIC_FF_FINANCIAL_AI_CAPTURE === "true",
 } as const;
 
 export type FinancialFeatureFlags = typeof FINANCIAL_FLAGS;
