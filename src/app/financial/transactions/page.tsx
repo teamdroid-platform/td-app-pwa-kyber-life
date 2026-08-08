@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Plus, Inbox as InboxIcon } from "lucide-react";
 import Link from "next/link";
 import { TransactionTabs } from "@/presentation/financial/components/TransactionTabs";
+import { NewTransactionDialog } from "@/presentation/financial/components/ai-capture/NewTransactionDialog";
 import { defaultHubCustomRange } from "@/lib/date-range";
 
 // Always render fresh on the server so a type-filter navigation refetches the
@@ -97,12 +98,12 @@ export default async function TransactionsPage({
                             <span className="truncate">Bandeja</span>
                         </Link>
                     </Button>
-                    <Button asChild className="flex-1 sm:flex-none">
-                        <Link href="/financial/transactions/new">
+                    <NewTransactionDialog>
+                        <Button className="flex-1 sm:flex-none">
                             <Plus className="mr-2 h-4 w-4 shrink-0" />
                             <span className="truncate">Transacción</span>
-                        </Link>
-                    </Button>
+                        </Button>
+                    </NewTransactionDialog>
                 </div>
             </div>
 

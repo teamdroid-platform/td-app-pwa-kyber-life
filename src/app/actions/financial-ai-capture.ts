@@ -6,7 +6,9 @@ import {
     ACCEPTED_AUDIO_TYPES,
     aiExtractionSchema,
     extractFromTextSchema,
+    isEmptyExtraction,
     MAX_AUDIO_BYTES,
+    readReportedFailure,
     type AiExtraction,
 } from "@/lib/validators/ai-capture-schemas";
 
@@ -70,10 +72,26 @@ async function readExtraction(response: Response): Promise<ExtractionResult> {
         return { success: false, error: "El servicio de interpretación devolvió una respuesta ilegible." };
     }
 
+    // Some workflows report their own failure in a 200 body. Read it first:
+    // the extraction schema would happily parse it into an empty result.
+    const reportedFailure = readReportedFailure(payload);
+    if (reportedFailure) {
+        console.error("AI extraction reported a failure:", reportedFailure);
+        return { success: false, error: reportedFailure };
+    }
+
     const parsed = aiExtractionSchema.safeParse(payload);
     if (!parsed.success) {
         console.error("AI extraction payload rejected:", formatZodError(parsed.error));
         return { success: false, error: "No se entendió la respuesta del servicio de interpretación." };
+    }
+
+    // An empty result is not a valid extraction: every field is optional, so a
+    // shape we failed to unwrap parses cleanly into nothing. Saying so beats
+    // opening a blank summary that looks like the app lost the answer.
+    if (isEmptyExtraction(parsed.data)) {
+        console.error("AI extraction came back empty. Raw payload:", JSON.stringify(payload).slice(0, 500));
+        return { success: false, error: "No se pudo interpretar ningún dato del movimiento. Intenta de nuevo o llena el formulario." };
     }
 
     return { success: true, data: parsed.data };

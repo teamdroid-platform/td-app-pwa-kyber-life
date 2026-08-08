@@ -5,6 +5,7 @@ import { Check, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { CaptureMethod } from "./CaptureMethodChooser";
+import { CaptureShell } from "./CaptureShell";
 
 /**
  * Roughly how the work is ordered on the other end. The timings are a paced
@@ -46,14 +47,18 @@ export function ExtractingScreen({ method, onGiveUp }: ExtractingScreenProps) {
     }, []);
 
     return (
-        <div className="mx-auto flex w-full max-w-lg flex-1 flex-col">
-            <div className="flex flex-1 flex-col justify-center gap-8 py-12">
-                <div className="flex flex-col items-center gap-3 text-center">
+        <CaptureShell
+            title="Interpretando…"
+            subtitle="Esto suele tardar unos segundos"
+            footer={
+                <Button type="button" variant="outline" onClick={onGiveUp} className="h-11 w-full rounded-2xl">
+                    Cancelar y llenar el formulario
+                </Button>
+            }
+        >
+            <div className="flex flex-col justify-center gap-8 py-8">
+                <div className="flex justify-center">
                     <Loader2 className="h-8 w-8 animate-spin text-accent-primary" />
-                    <div>
-                        <h2 className="text-lg font-semibold tracking-tight text-text-primary">Interpretando…</h2>
-                        <p className="text-xs text-text-tertiary">Esto suele tardar unos segundos.</p>
-                    </div>
                 </div>
 
                 <ul className="mx-auto flex w-full max-w-xs flex-col gap-3">
@@ -90,17 +95,6 @@ export function ExtractingScreen({ method, onGiveUp }: ExtractingScreenProps) {
                     })}
                 </ul>
             </div>
-
-            <div className="sticky bottom-3 z-10 px-1">
-                <Button
-                    type="button"
-                    variant="outline"
-                    onClick={onGiveUp}
-                    className="h-11 w-full rounded-2xl"
-                >
-                    Cancelar y llenar el formulario
-                </Button>
-            </div>
-        </div>
+        </CaptureShell>
     );
 }

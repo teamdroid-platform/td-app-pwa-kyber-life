@@ -1,38 +1,28 @@
 "use client";
 
-import { Check, Mic, PenLine, Sparkles } from "lucide-react";
+import { Mic, PenLine } from "lucide-react";
 import type { EntityStatus, PendingCreation } from "../../lib/ai-extraction";
 import type { CaptureMethod } from "./CaptureMethodChooser";
 
 /**
- * Whether this value points at something the user already has.
+ * Marks only the values that are about to create a record.
  *
- * Only two states are worth a badge. "Empty" gets none: the row already reads
- * "Sin categoría", and decorating an absence adds noise where there is nothing
- * to decide.
+ * Reusing something you already have is the expected outcome, so it needs no
+ * badge — confirming a normal row would just add noise to every summary. The
+ * exception is what the badge exists for: this one will add a record to your
+ * catalogs.
  */
 export function EntityStatusBadge({ status }: { status: EntityStatus }) {
-    if (status === "existing") {
-        return (
-            <span
-                className="flex shrink-0 items-center gap-1 rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-[0.06em] text-emerald-400"
-                title="Ya existe en tus registros"
-            >
-                <Check className="h-2.5 w-2.5" /> Ya la tienes
-            </span>
-        );
-    }
-    if (status === "new") {
-        return (
-            <span
-                className="flex shrink-0 items-center gap-1 rounded-full bg-blue-500/15 px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-[0.06em] text-blue-400"
-                title="Se creará al confirmar"
-            >
-                <Sparkles className="h-2.5 w-2.5" /> Nueva
-            </span>
-        );
-    }
-    return null;
+    if (status !== "new") return null;
+
+    return (
+        <span
+            className="shrink-0 rounded-full bg-blue-500/15 px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-[0.06em] text-blue-400"
+            title="Se creará al confirmar"
+        >
+            Nueva
+        </span>
+    );
 }
 
 /**
@@ -47,8 +37,7 @@ export function PendingCreationsNotice({ pending }: { pending: PendingCreation[]
 
     return (
         <div className="flex flex-col gap-2 rounded-2xl border border-dashed border-blue-500/45 bg-blue-500/[0.07] p-3">
-            <p className="flex items-center gap-1.5 text-xs font-semibold text-blue-400">
-                <Sparkles className="h-3.5 w-3.5" />
+            <p className="text-xs font-semibold text-blue-400">
                 Si no lo cambias, al confirmar se crearán
             </p>
             <ul className="flex flex-col gap-1 pl-1">
@@ -87,7 +76,7 @@ export function CaptureSourceNote({ method, text }: CaptureSourceNoteProps) {
                 {isVoice ? "De tu grabación" : "Lo que escribiste"}
             </p>
             <p className="text-xs italic leading-relaxed text-text-secondary">
-                {text?.trim() || "Los datos de abajo se interpretaron a partir de lo que dictaste."}
+                {text?.trim() || "Los datos se interpretaron a partir de lo que dictaste."}
             </p>
         </div>
     );

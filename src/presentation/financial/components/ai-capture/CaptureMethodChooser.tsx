@@ -1,8 +1,9 @@
 "use client";
 
 import type { LucideIcon } from "lucide-react";
-import { ArrowLeft, ListChecks, Mic, PenLine } from "lucide-react";
+import { ListChecks, Mic, PenLine } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { CaptureShell } from "./CaptureShell";
 
 export type CaptureMethod = "voice" | "text" | "form";
 
@@ -11,37 +12,48 @@ interface MethodOption {
     title: string;
     description: string;
     Icon: LucideIcon;
-    /** Assisted methods are highlighted; the manual form stays the quiet default. */
-    assisted: boolean;
+    /** Card border + background. */
+    surface: string;
+    /** The icon tile, tinted to match the card. */
+    glyph: string;
 }
 
+/**
+ * Each method gets its own tint instead of a "new" tag.
+ *
+ * A tag ages badly — it is only true for a few weeks — and it made two of the
+ * three options look like an announcement rather than a choice. Colour does the
+ * same job of telling them apart, and stays correct.
+ */
 const METHODS: MethodOption[] = [
     {
         id: "voice",
         title: "Dictar",
         description: "«Gasté 20 dólares en el súper con la tarjeta»",
         Icon: Mic,
-        assisted: true,
+        surface: "border-indigo-500/30 bg-indigo-500/[0.07] hover:border-indigo-500/60",
+        glyph: "bg-indigo-500/15 text-indigo-300",
     },
     {
         id: "text",
         title: "Escribir una frase",
         description: "Describe el movimiento en tus palabras",
         Icon: PenLine,
-        assisted: true,
+        surface: "border-teal-500/30 bg-teal-500/[0.07] hover:border-teal-500/60",
+        glyph: "bg-teal-500/15 text-teal-300",
     },
     {
         id: "form",
         title: "Llenar el formulario",
         description: "Los cinco pasos de siempre, campo por campo",
         Icon: ListChecks,
-        assisted: false,
+        surface: "border-slate-500/30 bg-slate-500/[0.07] hover:border-slate-500/60",
+        glyph: "bg-slate-500/15 text-slate-300",
     },
 ];
 
 interface CaptureMethodChooserProps {
     onSelect: (method: CaptureMethod) => void;
-    onCancel: () => void;
     /** Voice is hidden where the browser cannot record, rather than shown broken. */
     voiceAvailable: boolean;
 }
@@ -52,73 +64,40 @@ interface CaptureMethodChooserProps {
  * All three paths converge on the same summary and the same write, so the
  * choice is only about effort — which is why the two assisted options lead and
  * the form stays available without apology.
+ *
+ * No footer: the options are the action, and a row of buttons under them would
+ * only add a second thing to decide.
  */
-export function CaptureMethodChooser({ onSelect, onCancel, voiceAvailable }: CaptureMethodChooserProps) {
+export function CaptureMethodChooser({ onSelect, voiceAvailable }: CaptureMethodChooserProps) {
     const available = METHODS.filter((method) => method.id !== "voice" || voiceAvailable);
 
     return (
-        <div className="mx-auto flex w-full max-w-lg flex-1 flex-col">
-            <header className="flex items-center gap-2.5">
-                <button
-                    type="button"
-                    onClick={onCancel}
-                    aria-label="Volver a transacciones"
-                    className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-border/40 bg-bg-secondary/60 text-text-secondary transition-colors hover:text-text-primary"
-                >
-                    <ArrowLeft className="h-4 w-4" />
-                </button>
-                <div className="min-w-0 flex-1">
-                    <h2 className="truncate text-sm font-semibold text-text-primary">Nueva transacción</h2>
-                    <p className="truncate text-xs text-text-tertiary">¿Cómo quieres registrarla?</p>
-                </div>
-            </header>
+        <CaptureShell title="Nueva transacción" subtitle="¿Cómo quieres registrarla?">
+            <p className="text-xs text-text-tertiary">
+                Cualquiera de las opciones termina en el mismo resumen antes de guardar.
+            </p>
 
-            <div className="flex flex-1 flex-col gap-4 pt-6">
-                <div className="flex flex-col gap-1">
-                    <h3 className="text-lg font-semibold leading-tight tracking-tight text-text-primary">
-                        Cuéntamelo como quieras
-                    </h3>
-                    <p className="text-xs text-text-tertiary">
-                        Cualquiera de las opciones termina en el mismo resumen antes de guardar.
-                    </p>
-                </div>
-
-                <div className="flex flex-col gap-2.5">
-                    {available.map(({ id, title, description, Icon, assisted }) => (
-                        <button
-                            key={id}
-                            type="button"
-                            onClick={() => onSelect(id)}
-                            className={cn(
-                                "flex items-center gap-3 rounded-2xl border p-3.5 text-left transition-colors",
-                                assisted
-                                    ? "border-accent-primary/40 bg-gradient-to-br from-accent-primary/15 to-accent-primary/5 hover:border-accent-primary/70"
-                                    : "border-border/40 bg-bg-secondary/50 hover:border-border",
-                            )}
-                        >
-                            <span
-                                className={cn(
-                                    "grid h-10 w-10 shrink-0 place-items-center rounded-xl",
-                                    assisted ? "bg-accent-primary/20 text-accent-primary" : "bg-bg-tertiary/70 text-text-secondary",
-                                )}
-                            >
-                                <Icon className="h-5 w-5" />
-                            </span>
-                            <span className="min-w-0 flex-1">
-                                <span className="flex items-center gap-2 text-sm font-semibold text-text-primary">
-                                    {title}
-                                    {assisted && (
-                                        <span className="rounded-full bg-accent-primary/20 px-2 py-0.5 text-[9px] font-medium uppercase tracking-[0.1em] text-accent-primary">
-                                            Nuevo
-                                        </span>
-                                    )}
-                                </span>
-                                <span className="block text-xs leading-snug text-text-tertiary">{description}</span>
-                            </span>
-                        </button>
-                    ))}
-                </div>
+            <div className="flex flex-col gap-2.5 pb-2">
+                {available.map(({ id, title, description, Icon, surface, glyph }) => (
+                    <button
+                        key={id}
+                        type="button"
+                        onClick={() => onSelect(id)}
+                        className={cn(
+                            "flex items-center gap-3 rounded-2xl border p-3.5 text-left transition-colors",
+                            surface,
+                        )}
+                    >
+                        <span className={cn("grid h-10 w-10 shrink-0 place-items-center rounded-xl", glyph)}>
+                            <Icon className="h-5 w-5" />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                            <span className="block text-sm font-semibold text-text-primary">{title}</span>
+                            <span className="block text-xs leading-snug text-text-tertiary">{description}</span>
+                        </span>
+                    </button>
+                ))}
             </div>
-        </div>
+        </CaptureShell>
     );
 }

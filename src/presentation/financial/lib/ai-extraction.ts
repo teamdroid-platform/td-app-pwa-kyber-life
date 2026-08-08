@@ -90,7 +90,11 @@ export function toWizardValues(extraction: AiExtraction, { fallbackDate }: ToWiz
 
     const institutionName = toText(extraction.institution_name);
     const categoryName = toText(extraction.category_name);
-    const accountName = toText(extraction.account_name);
+    // The account is identified by its number, not by what the sentence called
+    // it: "con débito" describes a payment method, and taking it as a name
+    // creates an account called "Débito" beside the real one. Without a number
+    // there is nothing to identify, so the row stays empty for the user to pick.
+    const accountName = toText(extraction.account_number);
 
     return {
         currency: toCurrency(extraction.currency),

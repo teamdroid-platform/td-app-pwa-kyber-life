@@ -84,6 +84,24 @@ describe("extractTransactionFromTextAction", () => {
         expect(fetchMock).not.toHaveBeenCalled();
     });
 
+    it("unwraps the success/data envelope the workflow returns", async () => {
+        fetchMock.mockResolvedValue(jsonResponse([{ success: true, data: PAYLOAD }]));
+        const result = await extractTransactionFromTextAction({ text: "Almuerzo 12,50 con débito" });
+        expect(result).toEqual({ success: true, data: expect.objectContaining({ title: "Gasto por servicios de IA" }) });
+    });
+
+    it("reports a failure the workflow returned with a 200", async () => {
+        fetchMock.mockResolvedValue(jsonResponse([{ success: false, error: "modelo no disponible" }]));
+        const result = await extractTransactionFromTextAction({ text: "Almuerzo 12,50" });
+        expect(result).toEqual({ success: false, error: "modelo no disponible" });
+    });
+
+    it("refuses an answer that carried no usable field", async () => {
+        fetchMock.mockResolvedValue(jsonResponse({ meta: { runId: 7 } }));
+        const result = await extractTransactionFromTextAction({ text: "Almuerzo 12,50" });
+        expect(result).toEqual({ success: false, error: expect.stringContaining("No se pudo interpretar") });
+    });
+
     it("turns a non-2xx answer into a message instead of throwing", async () => {
         fetchMock.mockResolvedValue(jsonResponse({ message: "boom" }, { ok: false, status: 500 }));
         const result = await extractTransactionFromTextAction({ text: "Gasté 12,50" });

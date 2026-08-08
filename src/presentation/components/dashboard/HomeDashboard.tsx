@@ -37,6 +37,7 @@ import { DashboardLoading } from "./DashboardLoading";
 import { RobotLoader } from "@/components/ui/RobotLoader";
 import { MobileCarousel } from "./MobileCarousel";
 import { KpiBreakdownModal } from "@/presentation/financial/components/KpiBreakdownModal";
+import { NewTransactionDialog } from "@/presentation/financial/components/ai-capture/NewTransactionDialog";
 import { CreditToggle } from "@/presentation/financial/components/CreditToggle";
 import { excludeCreditFromKpis, includeCreditInKpis, excludeCreditFromCategoryBreakdown, excludeCreditFromDailyBreakdown } from "@/presentation/financial/lib/credit-toggle";
 import { buildKpiModalConfig, type KpiModalKind } from "@/presentation/financial/lib/kpi-modal-config";
@@ -295,10 +296,10 @@ export function HomeDashboard({ userFirstName }: { userFirstName?: string }) {
                             {/* FINANZAS */}
                             <div className="flex flex-col gap-2 w-full sm:w-auto">
                                 <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-nowrap">
-                                    <Button asChild variant="ghost" className="h-auto p-0 hover:bg-transparent w-full sm:w-auto lg:w-[160px]">
-                                        <Link
-                                            href="/financial/transactions/new"
-                                            className="flex w-full items-center gap-2.5 lg:gap-3 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-500 px-3 py-2.5 lg:px-4 lg:py-3 text-white shadow-lg shadow-emerald-500/20 transition-opacity hover:opacity-90"
+                                    <NewTransactionDialog>
+                                        <button
+                                            type="button"
+                                            className="flex w-full items-center gap-2.5 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-500 px-3 py-2.5 text-white shadow-lg shadow-emerald-500/20 transition-opacity hover:opacity-90 sm:w-auto lg:w-[160px] lg:gap-3 lg:px-4 lg:py-3"
                                         >
                                             <div className="flex h-8 w-8 lg:h-9 lg:w-9 shrink-0 items-center justify-center rounded-xl bg-white/20">
                                                 <CircleDollarSign className="h-4 w-4 lg:h-5 lg:w-5 text-white" />
@@ -307,8 +308,8 @@ export function HomeDashboard({ userFirstName }: { userFirstName?: string }) {
                                                 <span className="text-[10px] lg:text-[11px] font-medium leading-tight text-white/90">Nueva</span>
                                                 <span className="text-xs lg:text-sm font-bold leading-tight">Transacción</span>
                                             </div>
-                                        </Link>
-                                    </Button>
+                                        </button>
+                                    </NewTransactionDialog>
                                     <Button asChild variant="ghost" className="h-auto p-0 hover:bg-transparent w-full sm:w-auto lg:w-[160px]">
                                         <Link
                                             href="/financial/scans"

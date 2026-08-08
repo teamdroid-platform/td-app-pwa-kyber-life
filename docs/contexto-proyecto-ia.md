@@ -104,7 +104,7 @@ La aplicacion esta pensada como una experiencia privada por usuario: casi todo e
 - `/market/analytics` - analitica funcional.
 - `/financial` - dashboard financiero con graficos y filtros.
 - `/financial/transactions` - timeline de transacciones con filtros avanzados.
-- `/financial/transactions/new` - crear transaccion. Con `NEXT_PUBLIC_FF_FINANCIAL_AI_CAPTURE=true` abre un selector de metodo (dictar / escribir / formulario) y el metodo elegido viaja en `?mode=`; con la bandera apagada es el formulario manual de siempre.
+- `/financial/transactions/new` - formulario manual de siempre. Con `?mode=review` muestra el resumen de una captura por voz o texto, que el modal deja en `sessionStorage` antes de navegar.
 - `/financial/transactions/[id]` - detalle/edicion de transaccion.
 - `/financial/scanner` - escaner financiero: ejecucion, historial y monitoreo.
 - `/financial/inbox` - bandeja de transacciones escaneadas para revision y aprobacion.
@@ -303,11 +303,11 @@ Implementado principalmente en `src/application/services/purchase-service.ts`.
 
 Alternativa asistida al formulario manual, detras de `NEXT_PUBLIC_FF_FINANCIAL_AI_CAPTURE`.
 
-1. El usuario elige metodo en `/financial/transactions/new` (dictar, escribir o formulario).
-2. Dicta con `MediaRecorder` (maximo 60 s, con escucha previa y repetir) o escribe una frase.
+1. Los botones de "nueva transaccion" (dashboard, resumen financiero y listado) abren `NewTransactionDialog` en lugar de navegar. El modal pregunta el metodo: dictar, escribir o formulario.
+2. Dentro del modal, el usuario dicta con `MediaRecorder` (maximo 60 s, con escucha previa y repetir) o escribe una frase. Elegir "formulario" cierra el modal y navega a `/financial/transactions/new`.
 3. Un Server Action de `src/app/actions/financial-ai-capture.ts` reenvia el contenido al webhook de n8n correspondiente. El `userId` lo resuelve el servidor desde la sesion de Supabase; el navegador nunca lo envia.
 4. La respuesta se valida con `aiExtractionSchema` (todos los campos opcionales y anulables) y se traduce a valores del asistente en `src/presentation/financial/lib/ai-extraction.ts`.
-5. `TransactionAiWizard` abre el `TransactionWizard` en modo `confirm`, es decir directo en el resumen. Los campos obligatorios que no se pudieron inferir se marcan y bloquean el guardado; un `amount` igual a 0 se trata como ausente.
+5. El modal deja la extraccion en `sessionStorage` (`ai-capture-handoff.ts`, se consume al leerse y caduca a los 10 min), cierra, y navega a `/financial/transactions/new?mode=review`. Alli `TransactionAiWizard` abre el `TransactionWizard` en modo `confirm`, es decir directo en el resumen, que necesita la pantalla completa. Los campos obligatorios que no se pudieron inferir se marcan y bloquean el guardado; un `amount` igual a 0 se trata como ausente. Si no hay nada que leer (recarga, URL guardada, captura caducada) cae al formulario manual con un aviso.
 6. Cada institucion, categoria o cuenta se marca como existente o nueva, y las nuevas se listan al pie antes de confirmar. Se crean recien al confirmar, con la misma logica de nombre que ya usa `FinancialTransactionService.createTransaction`.
 7. Nada se escribe hasta que el usuario confirma. La transaccion se guarda con la accion de crear de siempre, con el origen y el texto original en `originStats`.
 

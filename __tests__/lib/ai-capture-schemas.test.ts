@@ -1,4 +1,10 @@
-import { aiExtractionSchema, extractFromTextSchema } from "@/lib/validators/ai-capture-schemas";
+import {
+    aiExtractionSchema,
+    extractFromTextSchema,
+    extractionFieldsSchema,
+    isEmptyExtraction,
+    readReportedFailure,
+} from "@/lib/validators/ai-capture-schemas";
 
 /** The payload from the endpoint's own documentation, used as the happy path. */
 const SAMPLE = {
@@ -61,9 +67,48 @@ describe("aiExtractionSchema", () => {
         expect(aiExtractionSchema.parse([{ json: SAMPLE }]).title).toBe(SAMPLE.title);
     });
 
+    it("unwraps the success/data envelope the workflow actually returns", () => {
+        // The exact shape observed from the deployed n8n workflow.
+        const parsed = aiExtractionSchema.parse([{ success: true, data: SAMPLE }]);
+        expect(parsed.title).toBe(SAMPLE.title);
+        expect(parsed.category_name).toBe("Servicios");
+    });
+
     it("keeps a payload that merely happens to contain a data field", () => {
         const parsed = aiExtractionSchema.parse({ ...SAMPLE, data: "irrelevant" });
         expect(parsed.title).toBe(SAMPLE.title);
+    });
+});
+
+describe("isEmptyExtraction", () => {
+    it("flags an envelope that was never unwrapped", () => {
+        // What a `{success, data}` body used to parse into: valid, and useless.
+        expect(isEmptyExtraction(extractionFieldsSchema.parse({}))).toBe(true);
+    });
+
+    it("accepts an extraction carrying a single usable field", () => {
+        expect(isEmptyExtraction(extractionFieldsSchema.parse({ title: "Almuerzo" }))).toBe(false);
+    });
+
+    it("does not count empty strings or empty arrays as inferred", () => {
+        const blank = extractionFieldsSchema.parse({ title: "", notes: "", tags: [] });
+        expect(isEmptyExtraction(blank)).toBe(true);
+    });
+});
+
+describe("readReportedFailure", () => {
+    it("finds a failure the workflow reported inside a 200 body", () => {
+        expect(readReportedFailure([{ success: false, error: "modelo no disponible" }]))
+            .toBe("modelo no disponible");
+    });
+
+    it("names the failure even when no message came with it", () => {
+        expect(readReportedFailure({ success: false })).toContain("no pudo procesar");
+    });
+
+    it("stays quiet on a successful envelope", () => {
+        expect(readReportedFailure([{ success: true, data: SAMPLE }])).toBeNull();
+        expect(readReportedFailure(SAMPLE)).toBeNull();
     });
 
     it("drops an unusable id instead of rejecting the whole extraction", () => {
