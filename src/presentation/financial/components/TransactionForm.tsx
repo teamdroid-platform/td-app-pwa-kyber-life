@@ -235,7 +235,6 @@ export function LegacyTransactionForm() {
                 router.refresh();
             } catch (error) {
                 toast.error("Error al guardar localmente", { id: "tx-offline-error" });
-            } finally {
                 setIsSubmitting(false);
             }
             return;
@@ -265,6 +264,7 @@ export function LegacyTransactionForm() {
                 router.refresh();
             } else {
                 toast.error(result.error || "No se pudo crear la transacción", { id: "tx-create-error" });
+                setIsSubmitting(false);
             }
         } catch (error) {
             try {
@@ -274,9 +274,8 @@ export function LegacyTransactionForm() {
                 router.refresh();
             } catch (e) {
                 toast.error("Ocurrió un error inesperado y no se pudo guardar localmente.", { id: "tx-network-fallback-error" });
+                setIsSubmitting(false);
             }
-        } finally {
-            setIsSubmitting(false);
         }
     };
 

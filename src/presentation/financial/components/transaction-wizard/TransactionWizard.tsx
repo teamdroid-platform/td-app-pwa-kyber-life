@@ -222,9 +222,15 @@ export function TransactionWizard({
         }
         setIsSubmitting(true);
         try {
-            if (!(await flushInstitutionEdit())) return;
-            await onSubmit(values);
-        } finally {
+            if (!(await flushInstitutionEdit())) {
+                setIsSubmitting(false);
+                return;
+            }
+            const success = await onSubmit(values);
+            if (!success) {
+                setIsSubmitting(false);
+            }
+        } catch (e) {
             setIsSubmitting(false);
         }
     };
