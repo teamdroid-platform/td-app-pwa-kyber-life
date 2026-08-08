@@ -70,7 +70,7 @@ export function ResponsiveDialogBody({ className, ...props }: React.HTMLAttribut
 export function ResponsiveDialogFooter({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
     return (
         <DialogFooter
-            className={cn("shrink-0 flex-col gap-2 border-t border-border/60 px-6 pt-4 pb-6", className)}
+            className={cn("shrink-0 flex-col gap-2 border-t border-border/60 px-6 pt-4 pb-6 sm:flex-col sm:justify-center", className)}
             {...props}
         />
     );

@@ -4,7 +4,7 @@ import { TransactionFilters } from "@/presentation/financial/components/Transact
 import { searchPaginatedTransactionsAction, searchAllFilteredTransactionsAction } from "@/app/actions/financial-transactions";
 import { getCategoriesAction, getInstitutionsAction } from "@/app/actions/financial-settings";
 import { Button } from "@/components/ui/button";
-import { Plus, Inbox as InboxIcon } from "lucide-react";
+import { Plus, Inbox as InboxIcon, PieChart } from "lucide-react";
 import Link from "next/link";
 import { TransactionTabs } from "@/presentation/financial/components/TransactionTabs";
 import { NewTransactionDialog } from "@/presentation/financial/components/ai-capture/NewTransactionDialog";
@@ -24,8 +24,8 @@ export default async function TransactionsPage({
     const query = typeof params.query === 'string' ? params.query : undefined;
     const status = typeof params.status === 'string' ? params.status : undefined;
     const typeParam = params.type;
-    const types = typeof typeParam === 'string' && typeParam.length > 0 
-        ? typeParam.split(',') 
+    const types = typeof typeParam === 'string' && typeParam.length > 0
+        ? typeParam.split(',')
         : Array.isArray(typeParam) ? typeParam : undefined;
 
     const categoryId = typeof params.categoryId === 'string' ? params.categoryId : undefined;
@@ -91,17 +91,23 @@ export default async function TransactionsPage({
                         Revisa y gestiona tus transacciones financieras.
                     </p>
                 </div>
-                <div className="flex flex-row w-full sm:w-auto gap-2 mt-4 sm:mt-0">
-                    <Button variant="outline" asChild className="flex-1 sm:flex-none">
+                <div className="flex w-full sm:w-auto gap-2 mt-4 sm:mt-0">
+                    <Button variant="outline" asChild className="h-10 flex-1 px-2 sm:px-4 sm:flex-none">
+                        <Link href="/financial">
+                            <PieChart className="mr-1.5 h-4 w-4 shrink-0 text-accent-primary" />
+                            <span className="truncate text-xs sm:text-sm">Resumen</span>
+                        </Link>
+                    </Button>
+                    <Button variant="outline" asChild className="h-10 flex-1 px-2 sm:px-4 sm:flex-none">
                         <Link href="/financial/scans">
-                            <InboxIcon className="mr-2 h-4 w-4 shrink-0" />
-                            <span className="truncate">Bandeja</span>
+                            <InboxIcon className="mr-1.5 h-4 w-4 shrink-0 text-accent-primary" />
+                            <span className="truncate text-xs sm:text-sm">Escaneos</span>
                         </Link>
                     </Button>
                     <NewTransactionDialog>
-                        <Button className="flex-1 sm:flex-none">
-                            <Plus className="mr-2 h-4 w-4 shrink-0" />
-                            <span className="truncate">Transacción</span>
+                        <Button className="h-10 flex-1 px-2 sm:px-4 sm:flex-none">
+                            <Plus className="mr-1.5 h-4 w-4 shrink-0" />
+                            <span className="truncate text-xs sm:text-sm">Agregar</span>
                         </Button>
                     </NewTransactionDialog>
                 </div>

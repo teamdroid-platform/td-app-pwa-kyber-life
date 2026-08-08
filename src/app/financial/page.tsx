@@ -17,22 +17,22 @@ export default function FinancialOverviewPage() {
                     </p>
                 </div>
                 <div className="flex w-full gap-2 sm:w-auto">
-                    <Button variant="outline" asChild className="h-10 flex-1 rounded-xl sm:flex-initial">
+                    <Button variant="outline" asChild className="h-10 flex-1 px-2 sm:px-4 sm:flex-none rounded-xl">
                         <Link href="/financial/scans">
-                            <ScanLine className="h-4 w-4 text-accent-primary" />
-                            Escaneos
+                            <ScanLine className="mr-1.5 h-4 w-4 shrink-0 text-accent-primary" />
+                            <span className="truncate text-xs sm:text-sm">Escaneos</span>
                         </Link>
                     </Button>
-                    <Button variant="outline" asChild className="h-10 flex-1 rounded-xl sm:flex-initial">
+                    <Button variant="outline" asChild className="h-10 flex-1 px-2 sm:px-4 sm:flex-none rounded-xl">
                         <Link href="/financial/transactions">
-                            <ListChecks className="h-4 w-4 text-accent-primary" />
-                            Transacciones
+                            <ListChecks className="mr-1.5 h-4 w-4 shrink-0 text-accent-primary" />
+                            <span className="truncate text-xs sm:text-sm">Transacciones</span>
                         </Link>
                     </Button>
                     <NewTransactionDialog>
-                        <Button className="h-10 flex-1 rounded-xl sm:flex-initial">
-                            <Plus className="h-4 w-4" />
-                            Agregar
+                        <Button className="h-10 flex-1 px-2 sm:px-4 sm:flex-none rounded-xl">
+                            <Plus className="mr-1.5 h-4 w-4 shrink-0" />
+                            <span className="truncate text-xs sm:text-sm">Agregar</span>
                         </Button>
                     </NewTransactionDialog>
                 </div>
