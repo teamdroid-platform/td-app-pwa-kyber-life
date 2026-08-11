@@ -45,19 +45,22 @@ export function WizardShell({
 }: WizardShellProps) {
     const stepIndex = WIZARD_STEPS.findIndex((s) => s.id === screen);
     const isSummary = screen === "summary";
+    const canGoBack = focus || isSummary || stepIndex > 0;
 
     return (
         <div className="mx-auto flex w-full max-w-lg flex-1 flex-col">
             <header className="flex flex-col gap-2.5">
                 <div className="flex items-center gap-2.5">
-                    <button
-                        type="button"
-                        onClick={onBack}
-                        aria-label="Volver"
-                        className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-border/40 bg-bg-secondary/60 text-text-secondary transition-colors hover:text-text-primary"
-                    >
-                        <ArrowLeft className="h-4 w-4" />
-                    </button>
+                    {canGoBack && (
+                        <button
+                            type="button"
+                            onClick={onBack}
+                            aria-label="Volver"
+                            className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-border/40 bg-bg-secondary/60 text-text-secondary transition-colors hover:text-text-primary"
+                        >
+                            <ArrowLeft className="h-4 w-4" />
+                        </button>
+                    )}
 
                     <div className="min-w-0 flex-1">
                         <h2 className="truncate text-sm font-semibold text-text-primary">{title}</h2>
