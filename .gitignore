@@ -56,3 +56,6 @@ supabase/.temp/
 
 # SWC compiler cache
 .swc/
+
+# Sentry Config File
+.env.sentry-build-plugin
