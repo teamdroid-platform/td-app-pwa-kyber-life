@@ -7,14 +7,21 @@ import type {
     FinancialInstitutionType,
     FinancialCategory,
 } from "@/domain/entities/financial";
+import type { BankAccount, BankCard } from "@/domain/entities/bank";
 
 export interface TransactionFormOptions {
     institutions: FinancialInstitution[];
     categories: FinancialCategory[];
     institutionTypes: FinancialInstitutionType[];
+    /** Cuentas y tarjetas confirmadas, para el paso de pago. */
+    bankAccounts: BankAccount[];
+    bankCards: BankCard[];
 }
 
-const EMPTY: TransactionFormOptions = { institutions: [], categories: [], institutionTypes: [] };
+const EMPTY: TransactionFormOptions = {
+    institutions: [], categories: [], institutionTypes: [],
+    bankAccounts: [], bankCards: [],
+};
 
 /** One retry covers the common transient case (a token refresh racing the request). */
 const RETRY_DELAY_MS = 600;

@@ -22,6 +22,8 @@ function emptyValues(): WizardValues {
         institutionName: "",
         categoryName: "",
         paidWithCredit: false,
+        bankSourceAccountId: null,
+        bankCardId: null,
         date: nowValue(),
         notes: "",
         tags: [],
@@ -88,6 +90,8 @@ export function TransactionCreateWizard() {
             categoryName: values.categoryName || undefined,
             tags: values.tags.length > 0 ? values.tags : undefined,
             paidWithCredit: values.type === "EXPENSE" ? values.paidWithCredit : undefined,
+            bankSourceAccountId: values.bankSourceAccountId ?? undefined,
+            bankCardId: values.bankCardId ?? undefined,
         };
 
         const queueOffline = async (message: string, id: string): Promise<boolean> => {

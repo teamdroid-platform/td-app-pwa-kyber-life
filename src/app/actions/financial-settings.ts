@@ -1,6 +1,6 @@
 "use server";
 
-import { financialSettingsService } from "@/infrastructure/container";
+import { financialSettingsService, bankService } from "@/infrastructure/container";
 import { FinancialInstitution, FinancialCategory } from "@/domain/entities/financial";
 import { requireUserId } from "@/infrastructure/supabase/auth-user";
 import { revalidatePath } from "next/cache";
@@ -95,10 +95,15 @@ export async function getCategoriesAction() {
 export async function getTransactionFormOptionsAction() {
     try {
         const user = await getRequiredUser();
-        const [institutions, categories, institutionTypes] = await Promise.all([
+        const [institutions, categories, institutionTypes, bankOverview] = await Promise.all([
             financialSettingsService.getInstitutions(user.id),
             financialSettingsService.getCategories(user.id),
             financialSettingsService.getInstitutionTypes(user.id),
+            // Las cuentas y tarjetas del módulo Bancos viajan en la misma
+            // llamada: el paso de pago las necesita y una request aparte
+            // costaría otro round-trip de auth, que es justo lo que este
+            // bundle existe para evitar.
+            bankService.getOverview(user.id),
         ]);
         return {
             success: true as const,
@@ -106,6 +111,8 @@ export async function getTransactionFormOptionsAction() {
                 institutions,
                 categories: categories.filter((c: FinancialCategory) => !c.isDeleted),
                 institutionTypes,
+                bankAccounts: bankOverview.accounts.filter(a => !a.isUnconfirmed),
+                bankCards: bankOverview.cards.filter(c => !c.isUnconfirmed),
             },
         };
     } catch (error) {

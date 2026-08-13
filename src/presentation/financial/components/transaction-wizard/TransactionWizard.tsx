@@ -112,6 +112,8 @@ export function TransactionWizard({
     const {
         institutions,
         institutionTypes,
+        bankAccounts,
+        bankCards,
         categories,
         loading: optionsLoading,
         error: optionsError,
@@ -317,15 +319,25 @@ export function TransactionWizard({
             case "payment":
                 return (
                     <PaymentStep
+                        accounts={bankAccounts}
+                        cards={bankCards}
                         creditEligible={wizard.creditEligible}
-                        paidWithCredit={values.paidWithCredit}
-                        onPaidWithCreditChange={(v) => setValue("paidWithCredit", v)}
+                        value={{
+                            accountId: values.bankSourceAccountId ?? undefined,
+                            cardId: values.bankCardId ?? undefined,
+                            paidWithCredit: values.paidWithCredit,
+                        }}
+                        onChange={(source) => wizard.patch({
+                            bankSourceAccountId: source.accountId ?? null,
+                            bankCardId: source.cardId ?? null,
+                            paidWithCredit: source.paidWithCredit,
+                        })}
                     />
                 );
             case "date":
                 return <DateStep value={values.date} onChange={(v) => setValue("date", v)} />;
             case "summary": {
-                const decoration = decorateSummary?.({ values, institutions, institutionTypes, categories }) ?? {};
+                const decoration = decorateSummary?.({ values, institutions, institutionTypes, categories, bankAccounts, bankCards }) ?? {};
                 return (
                     <SummaryStep
                         values={values}
@@ -403,7 +415,7 @@ export function TransactionWizard({
                         </Button>
                     )}
 
-                    {screen === "payment" && !values.paidWithCredit && (
+                    {screen === "payment" && !values.paidWithCredit && !values.bankSourceAccountId && !values.bankCardId && (
                         <Button type="button" variant="outline" onClick={wizard.next} className="h-10 w-full rounded-2xl">
                             Omitir
                         </Button>

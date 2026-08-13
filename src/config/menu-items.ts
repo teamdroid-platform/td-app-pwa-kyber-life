@@ -1,4 +1,4 @@
-import { Home, ShoppingCart, FileText, BarChart2, Settings, Store, Package, Tag, Scale, User, Wallet, Receipt, Inbox, LucideIcon } from "lucide-react";
+import { Home, ShoppingCart, FileText, BarChart2, Settings, Store, Package, Tag, Scale, User, Wallet, Receipt, Inbox, Landmark, LucideIcon } from "lucide-react";
 
 export type MenuItem = {
     label: string;
@@ -18,6 +18,7 @@ export const MENU_ITEMS: MenuItem[] = [
             { label: "Resumen", icon: BarChart2, href: "/financial" },
             { label: "Transacciones", icon: Receipt, href: "/financial/transactions" },
             { label: "Escaneos", icon: Inbox, href: "/financial/scans", activeAliases: ["/financial/scanner"] },
+            { label: "Bancos", icon: Landmark, href: "/financial/banks" },
             { label: "Configuración", icon: Settings, href: "/financial/settings" },
         ]
     },

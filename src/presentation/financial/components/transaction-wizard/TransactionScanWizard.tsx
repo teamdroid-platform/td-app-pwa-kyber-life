@@ -63,6 +63,8 @@ export function TransactionScanWizard({ initialData, resolvedInstitutionName, in
         institutionName: resolvedInstitutionName || initialData.merchant || "",
         categoryName: initialData.category || "",
         paidWithCredit: false,
+        bankSourceAccountId: null,
+        bankCardId: null,
         date: isoToWallClockInput(initialData.date) ?? "",
         notes: extractSummary(initialData),
         tags: [],
@@ -84,6 +86,8 @@ export function TransactionScanWizard({ initialData, resolvedInstitutionName, in
                 categoryName: values.categoryName || null,
                 tags: values.tags,
                 paidWithCredit: values.type === "EXPENSE" ? values.paidWithCredit : null,
+                bankSourceAccountId: values.bankSourceAccountId ?? undefined,
+                bankCardId: values.bankCardId ?? undefined,
             });
 
             if (!result.success) {
