@@ -60,8 +60,16 @@ supabase/.temp/
 # Sentry Config File
 .env.sentry-build-plugin
 
-# graphify: grafo de código local (regenerable con `graphify update .`)
-graphify-out/
+# graphify: el grafo SÍ se versiona, así que al clonar ya viene construido.
+# Solo se ignora el cache de extracción: es interno y se rehace solo.
+graphify-out/cache/
+graphify-out/cost.json
+graphify-out/.graphify_root
 
-# El gitignore global de la máquina ignora .mcp.json; acá SÍ lo versionamos (config MCP del proyecto)
+# El gitignore global de la máquina ignora .mcp.json y .claude/; acá SÍ los versionamos
+# (config MCP y hooks del proyecto), salvo lo personal de cada máquina.
 !.mcp.json
+!.claude/
+.claude/settings.local.json
+.claude/**/*.local.*
+CLAUDE.local.md
