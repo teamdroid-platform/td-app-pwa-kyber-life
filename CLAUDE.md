@@ -67,9 +67,9 @@ SQL migrations live in `supabase/migrations/`. Tables use RLS scoped to the owne
 
 ## Project rules (from AGENTS.md)
 
-`AGENTS.md` maps task types to skills under `.agent/skills/skills/<name>/SKILL.md` — consult them when relevant. Non-negotiable rules:
+`AGENTS.md` maps task types to skills under `.agent/skills/skills/<name>/SKILL.md` — consult them when relevant. Section 9 of `AGENTS.md` covers the **Superpowers** plugin (`superpowers:*` skills): process skills run first (brainstorming, systematic-debugging, TDD, verification-before-completion), then the local domain skills. Superpowers specs go to `docs/superpowers/specs/`, plans to `docs/superpowers/plans/`, worktrees to `.worktrees/`; its push/PR/merge steps are suspended by the rule below. Non-negotiable rules:
 
-- **Never commit, push, open PRs, or deploy without explicit user permission.**
+- **Local commits are allowed** (Conventional Commits); **never push, open PRs, merge, or deploy without explicit user permission.**
 - Strict TypeScript — no `any` unless strictly necessary.
 - Mobile-first responsive design is mandatory; visual changes must preserve the existing premium aesthetic.
 - Temporary/debug/experiment files go in `scratch/` (gitignored), never scattered in the repo.

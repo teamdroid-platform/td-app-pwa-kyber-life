@@ -54,6 +54,9 @@ supabase/.temp/
 # Temporary agent scratch files
 /scratch/
 
+# Git worktrees aislados (superpowers:using-git-worktrees)
+/.worktrees/
+
 # SWC compiler cache
 .swc/
 
