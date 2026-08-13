@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "Sentry": {
+      "url": "https://mcp.sentry.dev/mcp/teamdroid/kyberlife"
+    },
+    "graphify": {
+      "command": "graphify-mcp",
+      "args": ["graphify-out/graph.json"]
+    }
+  }
+}

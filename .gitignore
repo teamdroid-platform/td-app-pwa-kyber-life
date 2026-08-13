@@ -59,3 +59,9 @@ supabase/.temp/
 
 # Sentry Config File
 .env.sentry-build-plugin
+
+# graphify: grafo de código local (regenerable con `graphify update .`)
+graphify-out/
+
+# El gitignore global de la máquina ignora .mcp.json; acá SÍ lo versionamos (config MCP del proyecto)
+!.mcp.json
