@@ -21,6 +21,14 @@ import {
     InMemoryNotificationRepository,
     InMemoryPushSubscriptionRepository
 } from "./repositories/implementations";
+import {
+    InMemoryBankInstitutionRepository,
+    InMemoryBankAccountRepository,
+    InMemoryBankCardRepository,
+    InMemoryBankAccountBalanceSnapshotRepository,
+    InMemoryBankCardStatementRepository,
+    InMemoryBankMovementRepository
+} from "./repositories/bank-in-memory";
 import { seedRepositories } from "./seed/seed-data";
 import { randomUUID } from "crypto";
 
@@ -45,7 +53,13 @@ import {
     SupabaseFinancialInstitutionRepository,
     SupabaseFinancialCategoryRepository,
     SupabaseNotificationRepository,
-    SupabasePushSubscriptionRepository
+    SupabasePushSubscriptionRepository,
+    SupabaseBankInstitutionRepository,
+    SupabaseBankAccountRepository,
+    SupabaseBankCardRepository,
+    SupabaseBankAccountBalanceSnapshotRepository,
+    SupabaseBankCardStatementRepository,
+    SupabaseBankMovementRepository
 } from "./repositories/supabase"; // Need to create this index or import individually
 
 // ... Previous imports ...
@@ -101,6 +115,18 @@ export const financialScanExecutionRepository = singleton("financialScanExecutio
 export const financialInstitutionTypeRepository = singleton("financialInstitutionTypeRepo_v4", () => isSupabase ? new SupabaseInstitutionTypeRepository() : new InMemoryFinancialInstitutionTypeRepository());
 export const financialInstitutionRepository = singleton("financialInstitutionRepo_v4", () => isSupabase ? new SupabaseFinancialInstitutionRepository() : new InMemoryFinancialInstitutionRepository());
 export const financialCategoryRepository = singleton("financialCategoryRepo_v4", () => isSupabase ? new SupabaseFinancialCategoryRepository() : new InMemoryFinancialCategoryRepository());
+
+// Módulo Bancos
+export const bankInstitutionRepository = singleton("bankInstitutionRepo", () => isSupabase ? new SupabaseBankInstitutionRepository() : new InMemoryBankInstitutionRepository());
+export const bankAccountRepository = singleton("bankAccountRepo", () => isSupabase ? new SupabaseBankAccountRepository() : new InMemoryBankAccountRepository());
+export const bankCardRepository = singleton("bankCardRepo", () => isSupabase ? new SupabaseBankCardRepository() : new InMemoryBankCardRepository());
+export const bankSnapshotRepository = singleton("bankSnapshotRepo", () => isSupabase ? new SupabaseBankAccountBalanceSnapshotRepository() : new InMemoryBankAccountBalanceSnapshotRepository());
+export const bankStatementRepository = singleton("bankStatementRepo", () => isSupabase ? new SupabaseBankCardStatementRepository() : new InMemoryBankCardStatementRepository());
+export const bankMovementRepository = singleton("bankMovementRepo", () => isSupabase
+    ? new SupabaseBankMovementRepository()
+    // La versión in-memory deriva los movimientos de las transacciones, así que
+    // necesita los tres repos de los que la vista SQL hace JOIN.
+    : new InMemoryBankMovementRepository(financialTransactionRepository, bankCardRepository, bankStatementRepository));
 
 export const notificationRepository = singleton("notificationRepo", () => isSupabase ? new SupabaseNotificationRepository() : new InMemoryNotificationRepository());
 export const pushSubscriptionRepository = singleton("pushSubscriptionRepo", () => isSupabase ? new SupabasePushSubscriptionRepository() : new InMemoryPushSubscriptionRepository());
