@@ -129,3 +129,4 @@ export interface PriceObservation extends BaseEntity {
 
 export * from './financial';
 export * from './notification';
+export * from './bank';
