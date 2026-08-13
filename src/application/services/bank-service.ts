@@ -1,0 +1,498 @@
+import { randomUUID } from "crypto";
+import type { UUID } from "@/domain/core";
+import type {
+    BankInstitution, BankAccount, BankCard,
+    BankAccountBalanceSnapshot, BankCardStatement, BankMovement,
+} from "@/domain/entities/bank";
+import type { FinancialTransaction } from "@/domain/entities/financial";
+import type {
+    IBankInstitutionRepository, IBankAccountRepository, IBankCardRepository,
+    IBankAccountBalanceSnapshotRepository, IBankCardStatementRepository,
+    IBankMovementRepository,
+} from "@/domain/repositories/bank";
+import type { IFinancialTransactionRepository } from "@/domain/repositories/financial";
+import {
+    computeAccountBalance, computeCardDebt, computeAvailableCredit,
+    computeStatementDue, runningBalances, statementPeriodFor,
+} from "@/domain/services/bank-balance";
+
+function round2(value: number): number {
+    return Math.round(value * 100) / 100;
+}
+
+function stamps() {
+    const now = new Date().toISOString();
+    return { createdAt: now, updatedAt: now, isDeleted: false };
+}
+
+export interface BankAccountWithBalance extends BankAccount {
+    balance: number;
+    lastSnapshotAt?: string | null;
+}
+
+export interface BankCardWithDebt extends BankCard {
+    debt: number;
+    availableCredit: number | null;
+    openStatement?: BankCardStatement | null;
+}
+
+export interface BankOverview {
+    institutions: BankInstitution[];
+    accounts: BankAccountWithBalance[];
+    cards: BankCardWithDebt[];
+    /** Cuentas bancarias confirmadas y activas. El efectivo va aparte. */
+    totalAvailable: number;
+    totalDebt: number;
+    totalAvailableCredit: number;
+    cashBalance: number;
+    nextDueDate: string | null;
+    unconfirmedCount: number;
+}
+
+export interface BankAccountDetail {
+    account: BankAccountWithBalance;
+    snapshots: BankAccountBalanceSnapshot[];
+    movements: BankMovement[];
+    /** Paralelo a `movements`: el saldo que quedó tras cada uno. */
+    running: number[];
+}
+
+export interface BankCardDetail {
+    card: BankCardWithDebt;
+    statements: BankCardStatement[];
+    movements: BankMovement[];
+    periodMovements: BankMovement[];
+    /** Cuentas desde las que se puede pagar el estado. */
+    payableAccounts: BankAccountWithBalance[];
+}
+
+export interface CreateInstitutionInput {
+    name: string;
+    kind?: BankInstitution["kind"];
+    shortName?: string | null;
+    logoUrl?: string | null;
+    color?: string | null;
+    country?: string | null;
+    financialInstitutionId?: UUID | null;
+}
+
+export interface CreateAccountInput {
+    institutionId?: UUID | null;
+    name: string;
+    accountType: BankAccount["accountType"];
+    lastFour?: string | null;
+    prefixDigits?: string | null;
+    currency?: string;
+}
+
+export interface CreateCardInput {
+    institutionId: UUID;
+    accountId?: UUID | null;
+    name: string;
+    cardType: BankCard["cardType"];
+    brand?: string | null;
+    bin?: string | null;
+    lastFour?: string | null;
+    prefixDigits?: string | null;
+    currency?: string;
+    creditLimit?: number | null;
+    statementDay?: number | null;
+    dueDay?: number | null;
+}
+
+export class BankService {
+    constructor(
+        private readonly institutions: IBankInstitutionRepository,
+        private readonly accounts: IBankAccountRepository,
+        private readonly cards: IBankCardRepository,
+        private readonly snapshots: IBankAccountBalanceSnapshotRepository,
+        private readonly statements: IBankCardStatementRepository,
+        private readonly movements: IBankMovementRepository,
+        private readonly transactions: IFinancialTransactionRepository,
+    ) {}
+
+    // ─── Efectivo ────────────────────────────────────────────
+
+    /**
+     * La cuenta de efectivo del usuario, creándola si aún no existe. Es donde
+     * aterriza el dinero de un retiro: baja del banco, sube aquí, el patrimonio
+     * no cambia.
+     */
+    async ensureCashAccount(userId: UUID): Promise<BankAccount> {
+        const existing = await this.accounts.findCashAccount(userId);
+        if (existing) return existing;
+
+        return this.accounts.create({
+            id: randomUUID(),
+            ownerUserId: userId,
+            institutionId: null,
+            name: "Efectivo",
+            accountType: "CASH",
+            lastFour: null,
+            prefixDigits: null,
+            currency: "USD",
+            status: "ACTIVE",
+            isUnconfirmed: false,
+            ...stamps(),
+        });
+    }
+
+    // ─── Lecturas agregadas ──────────────────────────────────
+
+    async getOverview(userId: UUID): Promise<BankOverview> {
+        await this.closeDueStatements(userId, new Date());
+
+        const [institutions, rawAccounts, rawCards, allMovements] = await Promise.all([
+            this.institutions.findByOwnerId(userId),
+            this.accounts.findByOwnerId(userId),
+            this.cards.findByOwnerId(userId),
+            this.movements.findAllForOwner(userId),
+        ]);
+
+        const accounts = await Promise.all(rawAccounts.map(a => this.withBalance(a, allMovements)));
+        const cards = await Promise.all(rawCards.map(c => this.withDebt(c, allMovements)));
+
+        const countable = accounts.filter(a => !a.isUnconfirmed && a.status === "ACTIVE");
+        const countableCards = cards.filter(c => !c.isUnconfirmed && c.cardType === "CREDIT");
+
+        const dueDates = countableCards
+            .map(c => c.openStatement?.dueDate)
+            .filter((d): d is string => Boolean(d))
+            .sort();
+
+        return {
+            institutions,
+            accounts,
+            cards,
+            totalAvailable: round2(countable
+                .filter(a => a.accountType !== "CASH")
+                .reduce((sum, a) => sum + a.balance, 0)),
+            totalDebt: round2(countableCards.reduce((sum, c) => sum + c.debt, 0)),
+            totalAvailableCredit: round2(countableCards
+                .reduce((sum, c) => sum + (c.availableCredit ?? 0), 0)),
+            cashBalance: countable.find(a => a.accountType === "CASH")?.balance ?? 0,
+            nextDueDate: dueDates[0] ?? null,
+            unconfirmedCount:
+                accounts.filter(a => a.isUnconfirmed).length +
+                cards.filter(c => c.isUnconfirmed).length,
+        };
+    }
+
+    async getAccountDetail(userId: UUID, accountId: UUID): Promise<BankAccountDetail | null> {
+        const account = await this.accounts.findById(accountId);
+        if (!account || account.ownerUserId !== userId) return null;
+
+        const [snapshots, movements] = await Promise.all([
+            this.snapshots.findByAccountId(accountId),
+            this.movements.find(userId, { accountId }),
+        ]);
+
+        const withBalance = await this.withBalance(account, movements);
+
+        return {
+            account: withBalance,
+            snapshots,
+            movements,
+            running: runningBalances(withBalance.balance, movements),
+        };
+    }
+
+    async getCardDetail(userId: UUID, cardId: UUID): Promise<BankCardDetail | null> {
+        const card = await this.cards.findById(cardId);
+        if (!card || card.ownerUserId !== userId) return null;
+
+        await this.closeDueStatements(userId, new Date());
+
+        const [statements, movements, allAccounts, allMovements] = await Promise.all([
+            this.statements.findByCardId(cardId),
+            this.movements.find(userId, { cardId }),
+            this.accounts.findByOwnerId(userId),
+            this.movements.findAllForOwner(userId),
+        ]);
+
+        const withDebt = await this.withDebt(card, movements);
+        const open = withDebt.openStatement;
+        const periodMovements = open
+            ? movements.filter(m =>
+                m.date >= `${open.periodStart}T00:00:00Z` &&
+                m.date <= `${open.periodEnd}T23:59:59Z`)
+            : [];
+
+        const payableAccounts = await Promise.all(
+            allAccounts
+                .filter(a => !a.isUnconfirmed && a.status === "ACTIVE")
+                .map(a => this.withBalance(a, allMovements)),
+        );
+
+        return { card: withDebt, statements, movements, periodMovements, payableAccounts };
+    }
+
+    // ─── Cortes de saldo ─────────────────────────────────────
+
+    async registerBalanceSnapshot(
+        userId: UUID, accountId: UUID, balance: number, asOf: string, note?: string,
+    ): Promise<BankAccountBalanceSnapshot> {
+        return this.snapshots.create({
+            id: randomUUID(),
+            ownerUserId: userId,
+            accountId,
+            balance,
+            asOf,
+            source: "MANUAL",
+            note: note ?? null,
+            ...stamps(),
+        });
+    }
+
+    // ─── Ciclo de facturación ────────────────────────────────
+
+    /**
+     * Cierre perezoso: al leer, cualquier estado cuyo período ya venció pasa a
+     * CLOSED y se abre el período en curso. La app no tiene proceso programado,
+     * así que la lectura es el disparador. Idempotente a propósito — corre en
+     * cada `getOverview` y `getCardDetail`.
+     */
+    async closeDueStatements(userId: UUID, reference: Date): Promise<void> {
+        const cards = (await this.cards.findByOwnerId(userId))
+            .filter(c => c.cardType === "CREDIT" && c.statementDay && c.dueDay);
+
+        for (const card of cards) {
+            const period = statementPeriodFor(card.statementDay!, card.dueDay!, reference);
+
+            const open = await this.statements.findOpenForCard(card.id);
+            if (open && open.periodStart < period.periodStart) {
+                await this.statements.update({ ...open, status: "CLOSED" });
+            }
+
+            const current = await this.statements.findByCardAndPeriodStart(card.id, period.periodStart);
+            if (current) continue;
+
+            const movements = await this.movements.find(userId, { cardId: card.id });
+            const computed = movements
+                .filter(m => m.direction === "CHARGE" &&
+                    m.date >= `${period.periodStart}T00:00:00Z` &&
+                    m.date <= `${period.periodEnd}T23:59:59Z`)
+                .reduce((sum, m) => sum + m.amount, 0);
+
+            await this.statements.create({
+                id: randomUUID(),
+                ownerUserId: userId,
+                cardId: card.id,
+                periodStart: period.periodStart,
+                periodEnd: period.periodEnd,
+                dueDate: period.dueDate,
+                computedAmount: round2(computed),
+                totalAmount: null,
+                paidAmount: 0,
+                status: "OPEN",
+                ...stamps(),
+            });
+        }
+    }
+
+    /**
+     * Paga un estado de cuenta. Crea una transacción de gasto **real** que sale
+     * de la cuenta elegida y queda ligada al estado — es la única forma en que
+     * la deuda de la tarjeta baja.
+     *
+     * `paidWithCredit` va en false a propósito: el pago no es un consumo
+     * diferido, es dinero que sale hoy. Eso es lo que evita el doble conteo,
+     * porque los consumos con la tarjeta ya se excluyeron del balance global
+     * mientras estaban diferidos.
+     */
+    async payStatement(
+        userId: UUID, statementId: UUID, sourceAccountId: UUID,
+        amount: number, date: string,
+    ): Promise<FinancialTransaction> {
+        const statement = await this.statements.findById(statementId);
+        if (!statement || statement.ownerUserId !== userId) {
+            throw new Error("Estado de cuenta no encontrado");
+        }
+        const card = await this.cards.findById(statement.cardId);
+        if (!card) throw new Error("Tarjeta no encontrada");
+
+        const due = computeStatementDue(statement);
+
+        const transaction = await this.transactions.create({
+            id: randomUUID(),
+            ownerUserId: userId,
+            type: "PAYMENT",
+            status: "MANUAL",
+            amount,
+            currency: card.currency,
+            description: `Pago ${card.name}`,
+            merchant: card.institutionName ?? card.name,
+            date,
+            paidWithCredit: false,
+            possibleDuplicate: false,
+            bankSourceAccountId: sourceAccountId,
+            bankCardStatementId: statementId,
+            bankInstitutionId: card.institutionId,
+            ...stamps(),
+        } as FinancialTransaction);
+
+        await this.statements.update({
+            ...statement,
+            paidAmount: round2(Number(statement.paidAmount) + amount),
+            status: amount >= due ? "PAID" : statement.status,
+        });
+
+        return transaction;
+    }
+
+    /** Corrige el total de un estado con lo que declara el banco. */
+    async setStatementTotal(userId: UUID, statementId: UUID, totalAmount: number): Promise<BankCardStatement> {
+        const statement = await this.statements.findById(statementId);
+        if (!statement || statement.ownerUserId !== userId) {
+            throw new Error("Estado de cuenta no encontrado");
+        }
+        return this.statements.update({ ...statement, totalAmount });
+    }
+
+    // ─── CRUD ────────────────────────────────────────────────
+
+    async createInstitution(userId: UUID, input: CreateInstitutionInput): Promise<BankInstitution> {
+        return this.institutions.create({
+            id: randomUUID(),
+            ownerUserId: userId,
+            name: input.name,
+            shortName: input.shortName ?? null,
+            kind: input.kind ?? "BANK",
+            logoUrl: input.logoUrl ?? null,
+            color: input.color ?? null,
+            country: input.country ?? "EC",
+            financialInstitutionId: input.financialInstitutionId ?? null,
+            isUnconfirmed: false,
+            ...stamps(),
+        });
+    }
+
+    async updateInstitution(userId: UUID, id: UUID, input: Partial<CreateInstitutionInput>): Promise<BankInstitution> {
+        const existing = await this.requireInstitution(userId, id);
+        return this.institutions.update({ ...existing, ...input, updatedAt: new Date().toISOString() });
+    }
+
+    async deleteInstitution(userId: UUID, id: UUID): Promise<void> {
+        await this.requireInstitution(userId, id);
+        return this.institutions.delete(id);
+    }
+
+    async createAccount(userId: UUID, input: CreateAccountInput): Promise<BankAccount> {
+        return this.accounts.create({
+            id: randomUUID(),
+            ownerUserId: userId,
+            institutionId: input.institutionId ?? null,
+            name: input.name,
+            accountType: input.accountType,
+            lastFour: input.lastFour ?? null,
+            prefixDigits: input.prefixDigits ?? null,
+            currency: input.currency ?? "USD",
+            status: "ACTIVE",
+            isUnconfirmed: false,
+            ...stamps(),
+        });
+    }
+
+    async updateAccount(userId: UUID, id: UUID, input: Partial<CreateAccountInput>): Promise<BankAccount> {
+        const existing = await this.requireAccount(userId, id);
+        return this.accounts.update({ ...existing, ...input, updatedAt: new Date().toISOString() });
+    }
+
+    async deleteAccount(userId: UUID, id: UUID): Promise<void> {
+        await this.requireAccount(userId, id);
+        return this.accounts.delete(id);
+    }
+
+    async createCard(userId: UUID, input: CreateCardInput): Promise<BankCard> {
+        const isCredit = input.cardType === "CREDIT";
+        return this.cards.create({
+            id: randomUUID(),
+            ownerUserId: userId,
+            institutionId: input.institutionId,
+            // Los mismos invariantes que los CHECK de la tabla, para fallar
+            // antes de llegar a Postgres con un estado imposible.
+            accountId: isCredit ? null : (input.accountId ?? null),
+            name: input.name,
+            cardType: input.cardType,
+            brand: input.brand ?? null,
+            bin: input.bin ?? null,
+            lastFour: input.lastFour ?? null,
+            prefixDigits: input.prefixDigits ?? null,
+            currency: input.currency ?? "USD",
+            creditLimit: isCredit ? (input.creditLimit ?? null) : null,
+            statementDay: isCredit ? (input.statementDay ?? null) : null,
+            dueDay: isCredit ? (input.dueDay ?? null) : null,
+            status: "ACTIVE",
+            isUnconfirmed: false,
+            ...stamps(),
+        });
+    }
+
+    async updateCard(userId: UUID, id: UUID, input: Partial<CreateCardInput>): Promise<BankCard> {
+        const existing = await this.requireCard(userId, id);
+        return this.cards.update({ ...existing, ...input, updatedAt: new Date().toISOString() });
+    }
+
+    async deleteCard(userId: UUID, id: UUID): Promise<void> {
+        await this.requireCard(userId, id);
+        return this.cards.delete(id);
+    }
+
+    /**
+     * Marca una cuenta como sin confirmar. La usa la conciliación del historial;
+     * mientras lo esté, la cuenta no suma a ningún agregado.
+     */
+    async markUnconfirmed(accountId: UUID): Promise<BankAccount> {
+        const account = await this.accounts.findById(accountId);
+        if (!account) throw new Error("Cuenta no encontrada");
+        return this.accounts.update({ ...account, isUnconfirmed: true });
+    }
+
+    // ─── Privados ────────────────────────────────────────────
+
+    private async requireInstitution(userId: UUID, id: UUID): Promise<BankInstitution> {
+        const found = await this.institutions.findById(id);
+        if (!found || found.ownerUserId !== userId) throw new Error("Institución no encontrada");
+        return found;
+    }
+
+    private async requireAccount(userId: UUID, id: UUID): Promise<BankAccount> {
+        const found = await this.accounts.findById(id);
+        if (!found || found.ownerUserId !== userId) throw new Error("Cuenta no encontrada");
+        return found;
+    }
+
+    private async requireCard(userId: UUID, id: UUID): Promise<BankCard> {
+        const found = await this.cards.findById(id);
+        if (!found || found.ownerUserId !== userId) throw new Error("Tarjeta no encontrada");
+        return found;
+    }
+
+    private async withBalance(
+        account: BankAccount, movements: readonly BankMovement[],
+    ): Promise<BankAccountWithBalance> {
+        const own = movements.filter(m => m.accountId === account.id);
+        const snapshot = await this.snapshots.findLatestForAccount(account.id, new Date().toISOString());
+        return {
+            ...account,
+            balance: computeAccountBalance(snapshot, own),
+            lastSnapshotAt: snapshot?.asOf ?? null,
+        };
+    }
+
+    private async withDebt(
+        card: BankCard, movements: readonly BankMovement[],
+    ): Promise<BankCardWithDebt> {
+        const own = movements.filter(m => m.cardId === card.id);
+        const debt = computeCardDebt(own);
+        const openStatement = card.cardType === "CREDIT"
+            ? await this.statements.findOpenForCard(card.id)
+            : null;
+        return {
+            ...card,
+            debt,
+            availableCredit: computeAvailableCredit(card.creditLimit, debt),
+            openStatement,
+        };
+    }
+}
