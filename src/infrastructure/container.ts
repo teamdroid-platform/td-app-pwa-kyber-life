@@ -17,7 +17,6 @@ import {
     InMemoryFinancialScanExecutionRepository,
     InMemoryFinancialInstitutionRepository,
     InMemoryFinancialInstitutionTypeRepository,
-    InMemoryFinancialAccountRepository,
     InMemoryFinancialCategoryRepository,
     InMemoryNotificationRepository,
     InMemoryPushSubscriptionRepository
@@ -44,7 +43,6 @@ import {
     SupabaseFinancialScanExecutionRepository,
     SupabaseInstitutionTypeRepository,
     SupabaseFinancialInstitutionRepository,
-    SupabaseFinancialAccountRepository,
     SupabaseFinancialCategoryRepository,
     SupabaseNotificationRepository,
     SupabasePushSubscriptionRepository
@@ -102,7 +100,6 @@ export const financialScanExecutionRepository = singleton("financialScanExecutio
 
 export const financialInstitutionTypeRepository = singleton("financialInstitutionTypeRepo_v4", () => isSupabase ? new SupabaseInstitutionTypeRepository() : new InMemoryFinancialInstitutionTypeRepository());
 export const financialInstitutionRepository = singleton("financialInstitutionRepo_v4", () => isSupabase ? new SupabaseFinancialInstitutionRepository() : new InMemoryFinancialInstitutionRepository());
-export const financialAccountRepository = singleton("financialAccountRepo_v4", () => isSupabase ? new SupabaseFinancialAccountRepository() : new InMemoryFinancialAccountRepository());
 export const financialCategoryRepository = singleton("financialCategoryRepo_v4", () => isSupabase ? new SupabaseFinancialCategoryRepository() : new InMemoryFinancialCategoryRepository());
 
 export const notificationRepository = singleton("notificationRepo", () => isSupabase ? new SupabaseNotificationRepository() : new InMemoryNotificationRepository());
@@ -129,19 +126,17 @@ export const financialTransactionService = new FinancialTransactionService(
     financialTransactionRepository, 
     financialTransactionAuditLogRepository,
     financialInstitutionRepository,
-    financialAccountRepository,
     financialCategoryRepository
 );
 export const financialInboxService = new FinancialInboxService(
-    financialScannerTransactionRepository, 
-    financialTransactionRepository, 
-    financialTransactionAuditLogRepository, 
+    financialScannerTransactionRepository,
+    financialTransactionRepository,
+    financialTransactionAuditLogRepository,
     financialInstitutionRepository,
-    financialAccountRepository,
     financialCategoryRepository
 );
 export const financialDashboardService = new FinancialDashboardService(financialTransactionRepository, financialCategoryRepository, financialInstitutionRepository, financialScannerTransactionRepository);
-export const financialSettingsService = new FinancialSettingsService(financialInstitutionTypeRepository, financialInstitutionRepository, financialAccountRepository, financialCategoryRepository, financialTransactionRepository);
+export const financialSettingsService = new FinancialSettingsService(financialInstitutionTypeRepository, financialInstitutionRepository, financialCategoryRepository, financialTransactionRepository);
 export const notificationService = new NotificationService(notificationRepository);
 export const pushSubscriptionService = new PushSubscriptionService(pushSubscriptionRepository);
 export const masterDataService = new MasterDataService(supermarketRepository, categoryRepository, unitRepository);

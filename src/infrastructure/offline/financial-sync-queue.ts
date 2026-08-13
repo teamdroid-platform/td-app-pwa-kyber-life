@@ -1,17 +1,15 @@
 import { financialOfflineStore } from "./financial-offline-store";
 import { 
     createInstitutionAction, updateInstitutionAction, deleteInstitutionAction,
-    createAccountAction, updateAccountAction, deleteAccountAction,
     createCategoryAction, updateCategoryAction, deleteCategoryAction
 } from "@/app/actions/financial-settings";
 
 export type SyncActionType = 
     | 'CREATE_INSTITUTION' | 'UPDATE_INSTITUTION' | 'DELETE_INSTITUTION'
-    | 'CREATE_ACCOUNT' | 'UPDATE_ACCOUNT' | 'DELETE_ACCOUNT'
     | 'CREATE_CATEGORY' | 'UPDATE_CATEGORY' | 'DELETE_CATEGORY';
 
 export interface SyncJob {
-    id: string; // The ID of the item being synced (institutionId, accountId, categoryId)
+    id: string; // The ID of the item being synced (institutionId, categoryId)
     action: SyncActionType;
     payload?: any;
     timestamp: number;
@@ -67,15 +65,6 @@ export class FinancialSyncQueue {
                             break;
                         case 'DELETE_INSTITUTION':
                             await deleteInstitutionAction(job.id);
-                            break;
-                        case 'CREATE_ACCOUNT':
-                            await createAccountAction(job.payload);
-                            break;
-                        case 'UPDATE_ACCOUNT':
-                            await updateAccountAction(job.id, job.payload);
-                            break;
-                        case 'DELETE_ACCOUNT':
-                            await deleteAccountAction(job.id);
                             break;
                         case 'CREATE_CATEGORY':
                             await createCategoryAction(job.payload);

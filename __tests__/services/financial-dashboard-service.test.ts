@@ -19,7 +19,6 @@ describe("FinancialDashboardService", () => {
         status: "CONFIRMED",
         categoryId: null,
         institutionId: null,
-        accountId: null,
         merchant: "Test Merchant", description: "Test Transaction",
         notes: "Test Description",
         possibleDuplicate: false,

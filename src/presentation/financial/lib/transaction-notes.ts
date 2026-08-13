@@ -28,7 +28,6 @@ export interface AutoNotesInput {
     institutionName: string;
     amount: string;
     date: string;
-    accountName: string;
 }
 
 /** Build the auto-generated notes sentence from the current form fields. */
@@ -40,6 +39,5 @@ export function buildAutoNotes(p: AutoNotesInput): string {
     if (p.amount && Number(p.amount) > 0) s += ` por un monto de $${p.amount}`;
     const dateStr = formatNotesDateTime(p.date);
     if (dateStr) s += ` el ${dateStr}`;
-    if (p.accountName.trim()) s += ` desde la cuenta ${p.accountName.trim()}`;
     return s;
 }

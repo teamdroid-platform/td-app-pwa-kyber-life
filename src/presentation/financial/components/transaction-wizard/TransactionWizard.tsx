@@ -112,14 +112,12 @@ export function TransactionWizard({
     const {
         institutions,
         institutionTypes,
-        accounts,
         categories,
         loading: optionsLoading,
         error: optionsError,
         setInstitutions,
         setCategories,
     } = useTransactionFormOptions();
-    const accountsList = useMemo(() => accounts.map((a) => a.name), [accounts]);
 
     useEffect(() => {
         if (optionsError) toast.error("No se pudieron cargar categorías e instituciones. Reintenta.");
@@ -158,9 +156,8 @@ export function TransactionWizard({
             institutionName: values.institutionName,
             amount: values.amount,
             date: values.date,
-            accountName: values.accountName,
         }),
-        [values.type, values.description, values.institutionName, values.amount, values.date, values.accountName],
+        [values.type, values.description, values.institutionName, values.amount, values.date],
     );
 
     useEffect(() => {
@@ -248,10 +245,6 @@ export function TransactionWizard({
         setCategoryQuery("");
     };
 
-    const handleSelectAccount = (name: string) => {
-        wizard.patch({ accountName: name, accountId: null });
-    };
-
     const stepDefinition = WIZARD_STEPS.find((s) => s.id === screen);
     const stepNumber = WIZARD_STEPS.findIndex((s) => s.id === screen) + 1;
 
@@ -324,9 +317,6 @@ export function TransactionWizard({
             case "payment":
                 return (
                     <PaymentStep
-                        accounts={accountsList}
-                        value={values.accountName}
-                        onSelect={handleSelectAccount}
                         creditEligible={wizard.creditEligible}
                         paidWithCredit={values.paidWithCredit}
                         onPaidWithCreditChange={(v) => setValue("paidWithCredit", v)}
@@ -335,7 +325,7 @@ export function TransactionWizard({
             case "date":
                 return <DateStep value={values.date} onChange={(v) => setValue("date", v)} />;
             case "summary": {
-                const decoration = decorateSummary?.({ values, institutions, institutionTypes, accounts, categories }) ?? {};
+                const decoration = decorateSummary?.({ values, institutions, institutionTypes, categories }) ?? {};
                 return (
                     <SummaryStep
                         values={values}
@@ -413,7 +403,7 @@ export function TransactionWizard({
                         </Button>
                     )}
 
-                    {screen === "payment" && !values.accountName && !values.paidWithCredit && (
+                    {screen === "payment" && !values.paidWithCredit && (
                         <Button type="button" variant="outline" onClick={wizard.next} className="h-10 w-full rounded-2xl">
                             Omitir
                         </Button>

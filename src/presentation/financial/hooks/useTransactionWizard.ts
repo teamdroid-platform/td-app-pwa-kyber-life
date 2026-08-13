@@ -16,7 +16,6 @@ export interface WizardValues {
     amount: string;
     description: string;
     institutionName: string;
-    accountName: string;
     categoryName: string;
     paidWithCredit: boolean;
     date: string;
@@ -35,7 +34,6 @@ export interface WizardValues {
      */
     institutionId?: string | null;
     categoryId?: string | null;
-    accountId?: string | null;
 }
 
 export interface StepDefinition {
@@ -73,8 +71,6 @@ export const FIELD_STEP: Record<keyof WizardValues, WizardScreen> = {
     institutionId: "institution",
     categoryName: "category",
     categoryId: "category",
-    accountName: "payment",
-    accountId: "payment",
     paidWithCredit: "payment",
     date: "date",
     notes: "summary",
@@ -109,7 +105,7 @@ export function canLeaveStep(step: WizardStepId, values: WizardValues): boolean 
  * from the list clears its id, and counting that as an unsaved change would
  * inflate "N cambios" for an edit that never happened.
  */
-const DIFF_IGNORED: readonly (keyof WizardValues)[] = ["institutionId", "categoryId", "accountId"];
+const DIFF_IGNORED: readonly (keyof WizardValues)[] = ["institutionId", "categoryId"];
 
 /** Fields whose value differs from the one the wizard opened with. */
 export function diffValues(initial: WizardValues, current: WizardValues): (keyof WizardValues)[] {

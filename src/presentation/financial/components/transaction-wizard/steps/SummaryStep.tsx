@@ -259,14 +259,13 @@ export function SummaryStep({
                 <SummaryRow
                     icon={Landmark}
                     iconClass="bg-emerald-500/15 text-emerald-500"
-                    label="Cuenta"
+                    label="Forma de pago"
                     onEdit={() => onEdit("payment")}
-                    changed={didChange("accountName") || didChange("paidWithCredit")}
-                    previous={previousOf("accountName")}
-                    marker={fieldMarkers?.accountName}
+                    changed={didChange("paidWithCredit")}
                 >
-                    {values.accountName || <span className="text-text-tertiary">Sin cuenta</span>}
-                    {values.paidWithCredit && " · Tarjeta de crédito"}
+                    {values.paidWithCredit
+                        ? "Tarjeta de crédito"
+                        : <span className="text-text-tertiary">Efectivo o débito</span>}
                 </SummaryRow>
 
                 <SummaryRow

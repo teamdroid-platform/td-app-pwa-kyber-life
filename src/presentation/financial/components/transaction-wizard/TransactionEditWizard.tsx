@@ -12,7 +12,7 @@ import { TransactionWizard } from "./TransactionWizard";
 export interface TransactionEditWizardProps {
     transaction: FinancialTransaction;
     /** Names already resolved from ids by the detail screen. */
-    displayNames: { institution: string; account: string; category: string };
+    displayNames: { institution: string; category: string };
     /** Notes/context as the detail screen resolved them (may come from a scan). */
     notes: string;
     onSaved: (updated: FinancialTransaction) => void;
@@ -40,7 +40,6 @@ export function TransactionEditWizard({
         // already shows for them so the required field starts answered.
         description: transaction.description?.trim() || getTransactionDisplayTitle(transaction),
         institutionName: displayNames.institution,
-        accountName: displayNames.account,
         categoryName: displayNames.category,
         paidWithCredit: transaction.paidWithCredit ?? false,
         date: isoToWallClockInput(transaction.date) ?? "",
@@ -57,7 +56,6 @@ export function TransactionEditWizard({
                 institutionId: null, // Force the backend to resolve by name
                 institutionName: values.institutionName || undefined,
                 accountId: null,
-                accountName: values.accountName || undefined,
                 categoryId: null,
                 categoryName: values.categoryName || undefined,
                 type: values.type,

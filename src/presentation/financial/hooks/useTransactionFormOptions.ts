@@ -5,18 +5,16 @@ import { getTransactionFormOptionsAction } from "@/app/actions/financial-setting
 import type {
     FinancialInstitution,
     FinancialInstitutionType,
-    FinancialAccount,
     FinancialCategory,
 } from "@/domain/entities/financial";
 
 export interface TransactionFormOptions {
     institutions: FinancialInstitution[];
-    accounts: FinancialAccount[];
     categories: FinancialCategory[];
     institutionTypes: FinancialInstitutionType[];
 }
 
-const EMPTY: TransactionFormOptions = { institutions: [], accounts: [], categories: [], institutionTypes: [] };
+const EMPTY: TransactionFormOptions = { institutions: [], categories: [], institutionTypes: [] };
 
 /** One retry covers the common transient case (a token refresh racing the request). */
 const RETRY_DELAY_MS = 600;
@@ -24,8 +22,8 @@ const RETRY_DELAY_MS = 600;
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
- * Loads the institutions / accounts / categories / types that every transaction
- * form's pickers need, through a single server action.
+ * Loads the institutions / categories / types that every transaction form's
+ * pickers need, through a single server action.
  *
  * Resilience matters here: when this data failed to load the pickers silently
  * rendered as "you have none yet", which reads as data loss. So a failed attempt

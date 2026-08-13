@@ -18,8 +18,10 @@ export interface MapScannerTransactionDTO {
     categoryName?: string;
     institutionId?: UUID;
     institutionName?: string;
-    accountId?: UUID;
-    accountName?: string;
+    bankSourceAccountId?: UUID;
+    bankDestinationAccountId?: UUID;
+    bankCardId?: UUID;
+    bankInstitutionId?: UUID;
     description?: string;
     type?: FinancialTransaction['type'];
     notes?: string;
@@ -36,7 +38,6 @@ export class FinancialInboxService {
         private transactionRepo: IFinancialTransactionRepository,
         private auditLogRepo: IFinancialTransactionAuditLogRepository,
         private institutionRepo: IFinancialInstitutionRepository,
-        private accountRepo?: import("../../domain/repositories/financial").IFinancialAccountRepository,
         private categoryRepo?: import("../../domain/repositories/financial").IFinancialCategoryRepository
     ) {}
 
@@ -76,7 +77,6 @@ export class FinancialInboxService {
         const validExecutionId = isValidUuid(scannerTx.executionId) ? scannerTx.executionId : undefined;
 
         let finalInstitutionId = dto.institutionId ?? null;
-        let finalAccountId = dto.accountId ?? null;
         let finalCategoryId = dto.categoryId ?? null;
 
         // Auto-create or reuse institution if name is provided but no ID
@@ -98,20 +98,6 @@ export class FinancialInboxService {
                     updatedAt: now
                 });
                 finalInstitutionId = newInstitution.id!;
-            }
-        }
-
-        if (!finalAccountId && dto.accountName && this.accountRepo) {
-            const accounts = await this.accountRepo.findByOwnerId(dto.userId);
-            const normalizedTarget = normalizeForMatch(dto.accountName);
-            const existing = accounts.find(a => normalizeForMatch(a.name) === normalizedTarget && !a.isDeleted);
-            if (existing && existing.id) {
-                finalAccountId = existing.id;
-            } else {
-                const newAcc = await this.accountRepo.create({
-                    id: crypto.randomUUID(), ownerUserId: dto.userId, name: dto.accountName, accountType: 'CASH', currency: scannerTx.currency || 'USD', isDeleted: false, createdAt: now, updatedAt: now
-                });
-                finalAccountId = newAcc.id!;
             }
         }
 
@@ -149,7 +135,10 @@ export class FinancialInboxService {
             merchant: dto.merchant ?? scannerTx.merchant ?? null,
             categoryId: finalCategoryId,
             institutionId: finalInstitutionId,
-            accountId: finalAccountId,
+            bankSourceAccountId: dto.bankSourceAccountId ?? null,
+            bankDestinationAccountId: dto.bankDestinationAccountId ?? null,
+            bankCardId: dto.bankCardId ?? null,
+            bankInstitutionId: dto.bankInstitutionId ?? null,
             tags: dto.tags ?? [],
             description: resolvedDescription,
             notes: dto.notes ?? (scannerTx.originStats as Record<string, string>)?.emailBody ?? (scannerTx.originStats as Record<string, string>)?.snippet ?? null,

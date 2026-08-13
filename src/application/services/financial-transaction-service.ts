@@ -17,8 +17,11 @@ export interface CreateFinancialTransactionDTO {
     categoryName?: string | null;
     institutionId?: UUID | null;
     institutionName?: string | null;
-    accountId?: UUID | null;
-    accountName?: string | null;
+    bankSourceAccountId?: UUID | null;
+    bankDestinationAccountId?: UUID | null;
+    bankCardId?: UUID | null;
+    bankInstitutionId?: UUID | null;
+    bankCardStatementId?: UUID | null;
     tags?: string[] | null;
     notes?: string | null;
     executionId?: UUID | null;
@@ -60,7 +63,6 @@ export class FinancialTransactionService {
         private transactionRepo: IFinancialTransactionRepository,
         private auditLogRepo: IFinancialTransactionAuditLogRepository,
         private institutionRepo?: import("../../domain/repositories/financial").IFinancialInstitutionRepository,
-        private accountRepo?: import("../../domain/repositories/financial").IFinancialAccountRepository,
         private categoryRepo?: import("../../domain/repositories/financial").IFinancialCategoryRepository
     ) {}
 
@@ -72,7 +74,6 @@ export class FinancialTransactionService {
         const hasDuplicate = duplicateIds.length > 0;
 
         let finalInstitutionId = dto.institutionId ?? null;
-        let finalAccountId = dto.accountId ?? null;
         let finalCategoryId = dto.categoryId ?? null;
         const now = new Date().toISOString();
 
@@ -86,19 +87,6 @@ export class FinancialTransactionService {
                     id: crypto.randomUUID(), ownerUserId: dto.ownerUserId, name: dto.institutionName, institutionTypeId: null, isDeleted: false, createdAt: now, updatedAt: now
                 });
                 finalInstitutionId = newInst.id!;
-            }
-        }
-
-        if (!finalAccountId && dto.accountName && this.accountRepo) {
-            const accounts = await this.accountRepo.findByOwnerId(dto.ownerUserId);
-            const existing = accounts.find(a => a.name.toLowerCase() === dto.accountName!.toLowerCase() && !a.isDeleted);
-            if (existing) {
-                finalAccountId = existing.id!;
-            } else {
-                const newAcc = await this.accountRepo.create({
-                    id: crypto.randomUUID(), ownerUserId: dto.ownerUserId, name: dto.accountName, accountType: 'CASH', currency: dto.currency, isDeleted: false, createdAt: now, updatedAt: now
-                });
-                finalAccountId = newAcc.id!;
             }
         }
 
@@ -131,7 +119,11 @@ export class FinancialTransactionService {
             description: dto.description,
             categoryId: finalCategoryId,
             institutionId: finalInstitutionId,
-            accountId: finalAccountId,
+            bankSourceAccountId: dto.bankSourceAccountId ?? null,
+            bankDestinationAccountId: dto.bankDestinationAccountId ?? null,
+            bankCardId: dto.bankCardId ?? null,
+            bankInstitutionId: dto.bankInstitutionId ?? null,
+            bankCardStatementId: dto.bankCardStatementId ?? null,
             tags: dto.tags ?? null,
             notes: dto.notes ?? null,
             possibleDuplicate: hasDuplicate,
@@ -166,7 +158,6 @@ export class FinancialTransactionService {
         const previousState = { ...tx } as unknown as Record<string, unknown>;
 
         let finalInstitutionId = data.institutionId !== undefined ? data.institutionId : tx.institutionId;
-        let finalAccountId = data.accountId !== undefined ? data.accountId : tx.accountId;
         let finalCategoryId = data.categoryId !== undefined ? data.categoryId : tx.categoryId;
         const now = new Date().toISOString();
 
@@ -183,19 +174,6 @@ export class FinancialTransactionService {
             }
         }
 
-        if (!finalAccountId && data.accountName && this.accountRepo) {
-            const accounts = await this.accountRepo.findByOwnerId(userId);
-            const existing = accounts.find(a => a.name.toLowerCase() === data.accountName!.toLowerCase() && !a.isDeleted);
-            if (existing) {
-                finalAccountId = existing.id!;
-            } else {
-                const newAcc = await this.accountRepo.create({
-                    id: crypto.randomUUID(), ownerUserId: userId, name: data.accountName, accountType: 'CASH', currency: data.currency || tx.currency, isDeleted: false, createdAt: now, updatedAt: now
-                });
-                finalAccountId = newAcc.id!;
-            }
-        }
-
         if (!finalCategoryId && data.categoryName && this.categoryRepo) {
             const categories = await this.categoryRepo.findAllBaseAndUser(userId);
             const existing = categories.find(c => c.name.toLowerCase() === data.categoryName!.toLowerCase() && !c.isDeleted);
@@ -209,7 +187,7 @@ export class FinancialTransactionService {
             }
         }
 
-        const { categoryName, institutionName, accountName, ...restData } = data;
+        const { categoryName, institutionName, ...restData } = data;
 
         const updatedTx: FinancialTransaction = {
             ...tx,
@@ -217,7 +195,6 @@ export class FinancialTransactionService {
             categoryName: categoryName === null ? undefined : (categoryName ?? tx.categoryName),
             institutionName: institutionName === null ? undefined : (institutionName ?? tx.institutionName),
             institutionId: finalInstitutionId,
-            accountId: finalAccountId,
             categoryId: finalCategoryId,
             updatedAt: now,
         };

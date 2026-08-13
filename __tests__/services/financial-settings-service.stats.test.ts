@@ -3,7 +3,6 @@ import { InMemoryFinancialTransactionRepository } from "@/infrastructure/reposit
 import {
     IFinancialInstitutionTypeRepository,
     IFinancialInstitutionRepository,
-    IFinancialAccountRepository,
     IFinancialCategoryRepository,
 } from "@/domain/repositories/financial";
 import { FinancialTransaction } from "@/domain/entities/financial";
@@ -11,7 +10,6 @@ import { FinancialTransaction } from "@/domain/entities/financial";
 const USER = "user-1";
 const stub = {} as unknown as IFinancialInstitutionTypeRepository;
 const stubInst = {} as unknown as IFinancialInstitutionRepository;
-const stubAcc = {} as unknown as IFinancialAccountRepository;
 const stubCat = {} as unknown as IFinancialCategoryRepository;
 
 function tx(over: Partial<FinancialTransaction> & { id: string }): FinancialTransaction {
@@ -34,7 +32,7 @@ function tx(over: Partial<FinancialTransaction> & { id: string }): FinancialTran
 async function setup(txs: FinancialTransaction[]) {
     const transactionRepo = new InMemoryFinancialTransactionRepository();
     for (const t of txs) await transactionRepo.create(t);
-    const service = new FinancialSettingsService(stub, stubInst, stubAcc, stubCat, transactionRepo);
+    const service = new FinancialSettingsService(stub, stubInst, stubCat, transactionRepo);
     return service;
 }
 

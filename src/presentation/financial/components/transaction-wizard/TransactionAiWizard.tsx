@@ -60,14 +60,12 @@ export function TransactionAiWizard({ extraction, method, sourceText, onDiscard 
                 date: wallClockInputToISO(values.date)!,
                 notes: values.notes || undefined,
                 institutionName: values.institutionName || undefined,
-                accountName: values.accountName || undefined,
                 categoryName: values.categoryName || undefined,
                 // Sent only when the extractor resolved them and the user kept
                 // that choice; the service falls back to matching by name.
                 institutionId: values.institutionId || undefined,
                 categoryId: values.categoryId || undefined,
-                accountId: values.accountId || undefined,
-                tags: values.tags.length > 0 ? values.tags : undefined,
+                    tags: values.tags.length > 0 ? values.tags : undefined,
                 paidWithCredit: values.type === "EXPENSE" ? values.paidWithCredit : undefined,
                 // Keeps the capture auditable: what was said, and what came back.
                 originStats: {
@@ -102,7 +100,7 @@ export function TransactionAiWizard({ extraction, method, sourceText, onDiscard 
             submitLabel="Crear transacción"
             onSubmit={handleSubmit}
             onClose={() => router.push("/financial/transactions")}
-            decorateSummary={({ values, institutions, categories, accounts }) => {
+            decorateSummary={({ values, institutions, categories }) => {
                 const statuses = {
                     institution: resolveEntityStatus(
                         values.institutionName, values.institutionId, institutions.map((i) => i.name),
@@ -110,16 +108,12 @@ export function TransactionAiWizard({ extraction, method, sourceText, onDiscard 
                     category: resolveEntityStatus(
                         values.categoryName, values.categoryId, categories.map((c) => c.name),
                     ),
-                    account: resolveEntityStatus(
-                        values.accountName, values.accountId, accounts.map((a) => a.name),
-                    ),
                 };
 
                 return {
                     fieldMarkers: {
                         institutionName: <EntityStatusBadge status={statuses.institution} />,
                         categoryName: <EntityStatusBadge status={statuses.category} />,
-                        accountName: <EntityStatusBadge status={statuses.account} />,
                     },
                     extra: (
                         <>

@@ -40,13 +40,13 @@ const category: FinancialCategory = {
 };
 
 const EMPTY: WizardValues = {
-    type: "EXPENSE", amount: "", description: "", institutionName: "", accountName: "",
+    type: "EXPENSE", amount: "", description: "", institutionName: "",
     categoryName: "", paidWithCredit: false, date: "2026-07-28T19:40", notes: "", tags: [],
 };
 
 const FILLED: WizardValues = {
     ...EMPTY, amount: "47.90", description: "Compra semanal", institutionName: "Supermaxi",
-    categoryName: "Supermercado", accountName: "Visa Oro", notes: "Nota original",
+    categoryName: "Supermercado", notes: "Nota original",
 };
 
 function renderWizard(props: Partial<React.ComponentProps<typeof TransactionWizard>> = {}) {

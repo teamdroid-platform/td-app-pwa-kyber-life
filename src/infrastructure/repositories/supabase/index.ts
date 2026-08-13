@@ -14,7 +14,6 @@ export * from './supabase-financial-transaction-repository';
 // TODO: Create these Supabase repositories when needed
 export * from './supabase-financial-scan-execution-repository';
 export * from './supabase-financial-institution-repository';
-export * from './supabase-financial-account-repository';
 export * from './supabase-financial-category-repository';
 export * from './supabase-financial-transaction-audit-log-repository';
 export * from './supabase-financial-scanner-transaction-repository';
