@@ -2,6 +2,11 @@ import { render, screen } from "@testing-library/react";
 import { BankOverviewClient } from "@/presentation/bank/components/BankOverviewClient";
 import type { BankOverview } from "@/application/services/bank-service";
 
+// Los sheets de alta llaman useRouter para refrescar tras guardar.
+jest.mock("next/navigation", () => ({
+    useRouter: () => ({ refresh: jest.fn(), push: jest.fn() }),
+}));
+
 const STAMPS = { createdAt: "", updatedAt: "", isDeleted: false };
 
 const overview: BankOverview = {

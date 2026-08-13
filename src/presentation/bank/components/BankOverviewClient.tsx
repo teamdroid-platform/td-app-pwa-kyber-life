@@ -6,6 +6,10 @@ import { AlertTriangle, Landmark } from "lucide-react";
 import { BankBalanceHero } from "./BankBalanceHero";
 import { AccountRow } from "./AccountRow";
 import { CardRow } from "./CardRow";
+import { InstitutionFormSheet } from "./InstitutionFormSheet";
+import { AccountFormSheet } from "./AccountFormSheet";
+import { CardFormSheet } from "./CardFormSheet";
+import { Button } from "@/components/ui/button";
 import { money, shortDate } from "../lib/format-money";
 import type {
     BankOverview, BankAccountWithBalance, BankCardWithDebt,
@@ -98,12 +102,39 @@ export function BankOverviewClient({ initialData }: { initialData: BankOverview 
                 </Link>
             )}
 
+            {/* El orden de alta importa: sin institución no hay cuenta, y sin
+                cuenta no hay tarjeta de débito. */}
+            <div className="flex flex-wrap gap-2">
+                <InstitutionFormSheet
+                    trigger={<Button size="sm" variant="outline">+ Institución</Button>}
+                />
+                <AccountFormSheet
+                    institutions={institutions}
+                    trigger={
+                        <Button size="sm" variant="outline" disabled={institutions.length === 0}>
+                            + Cuenta
+                        </Button>
+                    }
+                />
+                <CardFormSheet
+                    institutions={institutions}
+                    accounts={accounts}
+                    trigger={
+                        <Button size="sm" variant="outline" disabled={institutions.length === 0}>
+                            + Tarjeta
+                        </Button>
+                    }
+                />
+            </div>
+
             {isEmpty ? (
                 <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed bg-muted/30 py-12 text-center">
                     <Landmark className="h-10 w-10 opacity-20" />
                     <p className="font-medium text-foreground">Todavía no registras cuentas</p>
                     <p className="max-w-xs text-sm text-muted-foreground">
-                        Añade tu banco y sus cuentas para empezar a ver saldos y deuda por tarjeta.
+                        {institutions.length === 0
+                            ? "Empieza por tu banco: sin institución no se puede registrar una cuenta."
+                            : "Añade una cuenta para empezar a ver saldos y deuda por tarjeta."}
                     </p>
                 </div>
             ) : (
