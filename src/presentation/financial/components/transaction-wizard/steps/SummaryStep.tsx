@@ -126,7 +126,7 @@ export function SummaryHero({ type, description, amount, currency, institutionNa
 }
 
 /** Rows that can carry a small non-interactive marker after their value. */
-export type MarkableField = "institutionName" | "categoryName" | "accountName";
+export type MarkableField = "institutionName" | "categoryName";
 
 export type FieldMarkers = Partial<Record<MarkableField, ReactNode>>;
 

@@ -69,7 +69,10 @@ export function useTransactionFormOptions(onLoaded?: (options: TransactionFormOp
             if (!activeRef.current) return;
 
             if (result.success) {
-                setOptions(result.data);
+                // Mezclado con EMPTY: una respuesta a la que le falte una lista
+                // dejaría un `undefined` donde los pickers esperan un array, y
+                // el fallo aparecería lejos de aquí.
+                setOptions({ ...EMPTY, ...result.data });
                 setError(null);
                 setLoading(false);
                 onLoadedRef.current?.(result.data);
