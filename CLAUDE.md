@@ -19,11 +19,13 @@ npx jest __tests__/services/purchase-service.test.ts
 # Filter by test name
 npm test -- -t "should create purchase"
 
-# Node-only unit config (babel-jest, no jsdom/next setup) — used for service tests
+# Node-only unit config (next/jest + node env, no jsdom) — runs every *.test.ts
 npx jest --config jest.unit.config.js
 ```
 
 Tests live in `__tests__/` (services, components, integration, validators, domain). `uuid` is mocked via `src/__mocks__/uuid.js` in both Jest configs.
+
+Both configs go through `next/jest` (SWC). There is deliberately **no `babel.config.js`** — adding one at the repo root disables Next's SWC compiler, which is why the old one is parked as `babel.config.js.bak`. `jest.unit.config.js` only picks up `*.test.ts`; component tests are `.tsx` and need the jsdom config.
 
 **Search tip:** scope searches to `src/` or `__tests__/` — repo-root searches can time out due to `node_modules/`, `.next/`, and `.agent/`.
 
