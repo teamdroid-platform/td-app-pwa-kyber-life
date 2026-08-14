@@ -27,6 +27,8 @@ import { InstitutionMatchBadge } from "./InstitutionMatchBadge";
 import { FINANCIAL_FLAGS } from "@/lib/feature-flags";
 import { TransactionScanWizard, extractSummary } from "./transaction-wizard/TransactionScanWizard";
 import type { InstitutionMatchInfo } from "@/lib/institution-match";
+import type { ScannedAccountView } from "@/application/services/bank-service";
+import { ScannedAccountsPanel } from "@/presentation/bank/components/ScannedAccountsPanel";
 import { isoToWallClockInput, wallClockInputToISO } from "@/lib/date-range";
 import type { FinancialTransactionType } from "@/domain/entities/financial";
 import {
@@ -47,6 +49,8 @@ interface ScanDetailsFormProps {
     resolvedInstitutionName?: string;
     /** Confidence of the scanned merchant → existing institution identification. */
     institutionMatch?: InstitutionMatchInfo;
+    /** Las cuentas del escaneo, ya identificadas contra las del usuario. */
+    scannedAccounts?: ScannedAccountView[];
 }
 
 function normalizeType(type?: string | null): FinancialTransactionType {
@@ -75,7 +79,9 @@ export function ScanDetailsForm(props: ScanDetailsFormProps) {
 }
 
 /** The original single-screen confirmation form. Superseded by the wizard. */
-export function LegacyScanDetailsForm({ initialData, resolvedInstitutionName, institutionMatch }: ScanDetailsFormProps) {
+export function LegacyScanDetailsForm({
+    initialData, resolvedInstitutionName, institutionMatch, scannedAccounts = [],
+}: ScanDetailsFormProps) {
     const router = useRouter();
     const [isProcessing, setIsProcessing] = useState(false);
     const formRef = useRef<HTMLDivElement>(null);
@@ -337,6 +343,8 @@ export function LegacyScanDetailsForm({ initialData, resolvedInstitutionName, in
                     expanded={expanded === "account"}
                     onToggle={() => toggle("account")}
                 >
+                    <ScannedAccountsPanel accounts={scannedAccounts} className="mt-3" />
+
                     {creditEligible && (
                         <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-border/40 bg-bg-secondary/40 p-3">
                             <div className="flex min-w-0 items-center gap-2.5">

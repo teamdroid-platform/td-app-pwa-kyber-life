@@ -128,6 +128,12 @@ export class BankIdentificationService {
         return touched;
     }
 
+    /** Una observación concreta del usuario, o `null` si no es suya. */
+    async findObservation(userId: UUID, id: UUID): Promise<BankNumberObservation | null> {
+        const observation = await this.observations.findById(id);
+        return observation?.ownerUserId === userId ? observation : null;
+    }
+
     /**
      * Las identidades del usuario con su huella acumulada: lo que cada cuenta o
      * tarjeta declara de sí misma en su alta, más todo lo que aportaron sus

@@ -13,6 +13,8 @@ import type { WizardValues } from "../../hooks/useTransactionWizard";
 import { normalizeTransactionType, SCANNER_TRANSACTION_TYPES } from "../../lib/transaction-type";
 import { InstitutionMatchHint, InstitutionMatchIcon } from "../InstitutionMatchBadge";
 import { ScanOriginalData } from "../ScanOriginalData";
+import { ScannedAccountsPanel } from "@/presentation/bank/components/ScannedAccountsPanel";
+import type { ScannedAccountView } from "@/application/services/bank-service";
 import { TransactionWizard } from "./TransactionWizard";
 
 /**
@@ -42,6 +44,12 @@ export interface TransactionScanWizardProps {
     resolvedInstitutionName?: string;
     /** Confidence of the scanned merchant → existing institution identification. */
     institutionMatch?: InstitutionMatchInfo;
+    /**
+     * Las cuentas del escaneo ya identificadas contra las del usuario. Se
+     * resuelven en el servidor, como el nombre de la institución, para que la
+     * pantalla abra completa y sin un salto al llegar los datos.
+     */
+    scannedAccounts?: ScannedAccountView[];
 }
 
 /**
@@ -52,7 +60,9 @@ export interface TransactionScanWizardProps {
  * match confidence sits in the institution step, and the originally extracted
  * data stays consultable on the summary, right where the decision is made.
  */
-export function TransactionScanWizard({ initialData, resolvedInstitutionName, institutionMatch }: TransactionScanWizardProps) {
+export function TransactionScanWizard({
+    initialData, resolvedInstitutionName, institutionMatch, scannedAccounts = [],
+}: TransactionScanWizardProps) {
     const router = useRouter();
     const [isDismissing, setIsDismissing] = useState(false);
 
@@ -148,9 +158,17 @@ export function TransactionScanWizard({ initialData, resolvedInstitutionName, in
             )}
             // On the summary, the level shows beside the institution itself, so
             // whether it was identified is visible without opening anything.
+            // El escaneo dice de dónde salió y a dónde fue; el paso solo elige
+            // con qué. Va como contexto, encima del selector.
+            paymentHint={<ScannedAccountsPanel accounts={scannedAccounts} />}
             decorateSummary={() => ({
                 fieldMarkers: institutionMatch ? { institutionName: <InstitutionMatchIcon info={institutionMatch} /> } : undefined,
-                extra: <ScanOriginalData transaction={initialData} />,
+                extra: (
+                    <>
+                        <ScannedAccountsPanel accounts={scannedAccounts} />
+                        <ScanOriginalData transaction={initialData} />
+                    </>
+                ),
             })}
             secondaryAction={
                 <Button

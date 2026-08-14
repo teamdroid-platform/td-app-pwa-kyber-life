@@ -2,7 +2,11 @@
 
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
-import { bankService } from "@/infrastructure/container";
+import {
+    bankService,
+    financialScannerTransactionRepository,
+    financialTransactionRepository,
+} from "@/infrastructure/container";
 import { requireUserId } from "@/infrastructure/supabase/auth-user";
 import {
     createInstitutionSchema, updateInstitutionSchema,
@@ -42,6 +46,39 @@ function revalidateBanks() {
 
 export async function getBankOverviewAction() {
     return run("getBankOverview", userId => bankService.getOverview(userId));
+}
+
+/**
+ * Las cuentas de una transacción confirmada, con la forma que espera el mismo
+ * panel que usa el escaneo.
+ */
+export async function getTransactionAccountsAction(transactionId: string) {
+    return run("getTransactionAccounts", async userId => {
+        const transaction = await financialTransactionRepository.findById(
+            idSchema.parse(transactionId),
+        );
+        if (!transaction || transaction.ownerUserId !== userId) return [];
+
+        return bankService.transactionAccounts(userId, transaction);
+    });
+}
+
+/**
+ * Las cuentas de un escaneo, listas para mostrar antes de confirmarlo.
+ *
+ * Recibe el id y no las cuentas: así lo que se lee es lo que hay guardado bajo
+ * el dueño, y no lo que quien llama diga que hay. Es una consulta pura — mirar
+ * un escaneo no debe crear nada en Bancos.
+ */
+export async function getScannedAccountsPreviewAction(scannerTransactionId: string) {
+    return run("getScannedAccountsPreview", async userId => {
+        const scan = await financialScannerTransactionRepository.findById(
+            idSchema.parse(scannerTransactionId),
+        );
+        if (!scan || scan.ownerUserId !== userId) return [];
+
+        return bankService.previewScannedAccounts(userId, scan.accounts ?? []);
+    });
 }
 
 export async function getBankAccountDetailAction(accountId: string) {

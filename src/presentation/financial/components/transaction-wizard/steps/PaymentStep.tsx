@@ -11,6 +11,8 @@ interface PaymentStepProps {
     onChange: (value: PaymentSource) => void;
     /** El crédito solo aplica a tipos de gasto; con otros se ocultan las tarjetas. */
     creditEligible: boolean;
+    /** Contexto sobre el pago que no es la elección, p. ej. lo que trajo un escaneo. */
+    hint?: React.ReactNode;
     /** Emisores para dar de alta una cuenta o tarjeta sin salir del paso. */
     institutions?: BankInstitution[];
     onAccountCreated?: (created: { account: BankAccount; institution: BankInstitution | null }) => void;
@@ -24,7 +26,7 @@ interface PaymentStepProps {
  * Elegir una tarjeta de crédito difiere el gasto; cualquier otra cosa no.
  */
 export function PaymentStep({
-    accounts, cards, value, onChange, creditEligible,
+    accounts, cards, value, onChange, creditEligible, hint,
     institutions, onAccountCreated, onCardCreated,
 }: PaymentStepProps) {
     // Un ingreso o una transferencia no se pagan con crédito, así que esas
@@ -37,6 +39,7 @@ export function PaymentStep({
                 question="¿Con qué lo pagaste?"
                 hint="Puedes omitirlo si no quieres asociar una cuenta."
             />
+            {hint}
             <PaymentSourcePicker
                 accounts={accounts}
                 cards={selectableCards}

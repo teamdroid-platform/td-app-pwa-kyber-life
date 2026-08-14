@@ -68,6 +68,12 @@ export interface TransactionWizardProps {
     /** Shown inside the institution step, e.g. how confident the scan's match is. */
     institutionHint?: ReactNode;
     /**
+     * Shown inside the payment step, above the picker — e.g. the accounts a scan
+     * already extracted, which are context for the choice rather than the choice
+     * itself.
+     */
+    paymentHint?: ReactNode;
+    /**
      * Open straight on one field, as if its summary row had been tapped. Set
      * when the editor is entered from a specific row on the detail screen.
      */
@@ -93,6 +99,7 @@ export function TransactionWizard({
     decorateSummary,
     secondaryAction,
     institutionHint,
+    paymentHint,
     initialFocus,
 }: TransactionWizardProps) {
     const wizard = useTransactionWizard({ mode, initialValues, initialFocus });
@@ -355,6 +362,7 @@ export function TransactionWizard({
                             bankCardId: source.cardId ?? null,
                             paidWithCredit: source.paidWithCredit,
                         })}
+                        hint={paymentHint}
                         institutions={bankInstitutions}
                         onAccountCreated={handleAccountCreated}
                         onCardCreated={handleCardCreated}

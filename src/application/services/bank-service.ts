@@ -21,6 +21,9 @@ import {
     computeStatementDue, runningBalances, statementPeriodFor,
 } from "@/domain/services/bank-balance";
 import { ISSUER_NAME, inferInstitutionKind } from "@/lib/bank-institution-kind";
+import { parseBankNumber } from "@/lib/bank-number-fingerprint";
+import { resolveFingerprint, type Resolution } from "@/lib/bank-number-match";
+import { formatBankNumber } from "@/lib/format-bank-number";
 import { BankIdentificationService } from "./bank-identification-service";
 
 function round2(value: number): number {
@@ -137,6 +140,36 @@ export interface ResolvedBankLinks {
     bankCounterpartyObservationId: UUID | null;
 }
 
+/**
+ * Si la entrada es el lado del que sale el dinero.
+ *
+ * El escáner escribe «origen» / «destino» en español y sin acentuar de forma
+ * fiable, así que basta el prefijo. Todo lo que no sea origen es destino.
+ */
+function isOriginEntry(entry: ScannedAccountEntry): boolean {
+    return entry.type?.toLowerCase().startsWith("orig") ?? false;
+}
+
+/** Un lado del movimiento, tal como se le muestra al usuario. */
+export interface ScannedAccountView {
+    role: "SOURCE" | "DESTINATION";
+    /** La cadena tal cual la escribió el banco. Es la evidencia. */
+    raw: string;
+    /** El mismo número al estándar de la app: `••••` cuenta, `XXXX` tarjeta. */
+    display: string;
+    kind: "ACCOUNT" | "CARD";
+    /** Qué tan segura es la lectura. `PENDING` = no se pudo atribuir. */
+    resolution: Resolution;
+    /** La cuenta o tarjeta del usuario, cuando el número corresponde a una. */
+    match: {
+        id: UUID;
+        name: string;
+        institutionName: string | null;
+    } | null;
+    /** El emisor que el propio texto nombra, cuando no hay identidad que consultar. */
+    institutionHint: string | null;
+}
+
 /** Sufijo mínimo para fundar una identidad sin preguntar. */
 const AUTOCREATE_MIN_SUFFIX = 4;
 
@@ -241,6 +274,153 @@ export class BankService {
      * como observación `EXTERNAL`, referenciada desde la transacción para que
      * el detalle pueda mostrar a dónde fue el dinero.
      */
+    /**
+     * Las cuentas de un escaneo, listas para mostrar. **No escribe nada.**
+     *
+     * Corre antes de confirmar, así que no puede dejar rastro: ni observaciones,
+     * ni cuentas fundadas, ni saldos tocados. Solo lee las identidades que el
+     * usuario ya tiene y contesta qué dice cada número.
+     *
+     * Lo que muestra de cada lado es el número del escaneo llevado al estándar
+     * de la app, no el de la cuenta registrada: la sección responde «qué trajo
+     * el banco», y el vínculo con la cuenta se enseña al lado.
+     */
+    async previewScannedAccounts(
+        userId: UUID, entries: readonly ScannedAccountEntry[],
+    ): Promise<ScannedAccountView[]> {
+        const usable = entries.filter(e => e.account?.trim());
+        if (usable.length === 0) return [];
+
+        const [candidates, accounts, cards, institutions] = await Promise.all([
+            this.identification.identityCandidates(userId),
+            this.accounts.findByOwnerId(userId),
+            this.cards.findByOwnerId(userId),
+            this.institutions.findByOwnerId(userId),
+        ]);
+
+        const institutionName = (id: UUID | null | undefined) =>
+            institutions.find(i => i.id === id)?.name ?? null;
+
+        return usable.map(entry => {
+            const raw = entry.account.trim();
+            const fingerprint = parseBankNumber(raw);
+            const { resolution, targetId, targetKind } = resolveFingerprint(fingerprint, candidates);
+
+            const account = targetKind === "ACCOUNT" ? accounts.find(a => a.id === targetId) : undefined;
+            const card = targetKind === "CARD" ? cards.find(c => c.id === targetId) : undefined;
+
+            // Sin identidad que lo diga, el BIN y la marca son lo único que
+            // distingue una tarjeta de una cuenta. Un número sin ninguna de las
+            // dos señales se muestra como cuenta: es el glifo neutro, y afirmar
+            // «tarjeta» sin evidencia sería inventar.
+            const kind: "ACCOUNT" | "CARD" = card
+                ? "CARD"
+                : account
+                    ? "ACCOUNT"
+                    : (fingerprint.bin || fingerprint.brand) ? "CARD" : "ACCOUNT";
+
+            const matched = account ?? card;
+
+            return {
+                role: isOriginEntry(entry) ? "SOURCE" : "DESTINATION",
+                raw,
+                display: formatBankNumber(
+                    { prefixDigits: fingerprint.prefixDigits, lastFour: fingerprint.suffixDigits },
+                    kind,
+                ) || raw,
+                kind,
+                resolution,
+                match: matched
+                    ? {
+                        id: matched.id,
+                        name: matched.name,
+                        institutionName: institutionName(matched.institutionId),
+                    }
+                    : null,
+                institutionHint: fingerprint.institutionHint,
+            };
+        });
+    }
+
+    /**
+     * Las cuentas de una transacción ya confirmada, con la misma forma que las
+     * del escaneo para que se muestren en el mismo sitio y con el mismo panel.
+     *
+     * Salen de los vínculos, que son la verdad una vez confirmado: la cadena
+     * del banco solo se conserva para la contraparte, que no tiene otra forma
+     * de nombrarse. Por eso las filas propias no llevan evidencia — no hay una
+     * lectura que juzgar, hay una cuenta elegida.
+     */
+    async transactionAccounts(
+        userId: UUID, links: Partial<ResolvedBankLinks>,
+    ): Promise<ScannedAccountView[]> {
+        const views: ScannedAccountView[] = [];
+
+        const institutions = await this.institutions.findByOwnerId(userId);
+        const institutionName = (id: UUID | null | undefined) =>
+            institutions.find(i => i.id === id)?.name ?? null;
+
+        const own = async (
+            id: UUID, kind: "ACCOUNT" | "CARD", role: ScannedAccountView["role"],
+        ): Promise<ScannedAccountView | null> => {
+            const entity = kind === "ACCOUNT"
+                ? await this.accounts.findById(id)
+                : await this.cards.findById(id);
+            if (!entity || entity.ownerUserId !== userId) return null;
+
+            return {
+                role,
+                raw: "",
+                display: formatBankNumber(entity, kind),
+                kind,
+                resolution: "EXACT",
+                match: {
+                    id: entity.id,
+                    name: entity.name,
+                    institutionName: institutionName(entity.institutionId),
+                },
+                institutionHint: null,
+            };
+        };
+
+        // La tarjeta describe el origen mejor que la cuenta de la que descuenta:
+        // el usuario pagó con la tarjeta, y su cuenta ya sale nombrada dentro.
+        if (links.bankCardId) {
+            const view = await own(links.bankCardId, "CARD", "SOURCE");
+            if (view) views.push(view);
+        } else if (links.bankSourceAccountId) {
+            const view = await own(links.bankSourceAccountId, "ACCOUNT", "SOURCE");
+            if (view) views.push(view);
+        }
+
+        if (links.bankDestinationAccountId) {
+            const view = await own(links.bankDestinationAccountId, "ACCOUNT", "DESTINATION");
+            if (view) views.push(view);
+        } else if (links.bankCounterpartyObservationId) {
+            const observation = await this.identification.findObservation(
+                userId, links.bankCounterpartyObservationId,
+            );
+            if (observation) {
+                const fingerprint = parseBankNumber(observation.raw);
+                const kind = (fingerprint.bin || fingerprint.brand) ? "CARD" as const : "ACCOUNT" as const;
+                views.push({
+                    role: "DESTINATION",
+                    raw: observation.raw,
+                    display: formatBankNumber(
+                        { prefixDigits: fingerprint.prefixDigits, lastFour: fingerprint.suffixDigits },
+                        kind,
+                    ) || observation.raw,
+                    kind,
+                    resolution: "PENDING",
+                    match: null,
+                    institutionHint: fingerprint.institutionHint,
+                });
+            }
+        }
+
+        return views;
+    }
+
     async resolveScannedAccounts(
         userId: UUID, scan: ScannedTransactionInput,
     ): Promise<ResolvedBankLinks> {
@@ -258,7 +438,7 @@ export class BankService {
             if (!raw) continue;
 
             let observation = await this.identification.observe(userId, raw);
-            const isOrigin = entry.type?.toLowerCase().startsWith("orig") ?? false;
+            const isOrigin = isOriginEntry(entry);
 
             if (isOrigin && this.canAutoCreate(observation, scan, institutionId)) {
                 await this.createIdentityFrom(userId, observation, institutionId!, scan);

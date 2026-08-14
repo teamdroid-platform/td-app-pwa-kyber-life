@@ -3,6 +3,8 @@
 import { useState, useEffect, useRef } from "react";
 import { FinancialTransaction, FinancialTransactionType } from "@/domain/entities/financial";
 import { getTransactionDisplayTitle } from "@/lib/financial-utils";
+import type { ScannedAccountView } from "@/application/services/bank-service";
+import { ScannedAccountsPanel } from "@/presentation/bank/components/ScannedAccountsPanel";
 import { AuditTrail } from "./AuditTrail";
 import { DuplicateResolver } from "./DuplicateResolver";
 import { OriginStatsViewer } from "./OriginStatsViewer";
@@ -91,9 +93,13 @@ function extractContext(tx: FinancialTransaction): string {
 // ─── Component ────────────────────────────────────────────────
 interface TransactionDetailClientProps {
     initialTransaction: FinancialTransaction;
+    /** Origen y destino según el módulo Bancos, resueltos en el servidor. */
+    bankAccounts?: ScannedAccountView[];
 }
 
-export function TransactionDetailClient({ initialTransaction }: TransactionDetailClientProps) {
+export function TransactionDetailClient({
+    initialTransaction, bankAccounts = [],
+}: TransactionDetailClientProps) {
     const router = useRouter();
     const [transaction, setTransaction] = useState<FinancialTransaction>(initialTransaction);
     const [isLoading, setIsLoading] = useState(false);
@@ -517,18 +523,23 @@ setDisplayNames({ institution: instName, category: catName });
                             )}
                         </AccordionField>
                     ) : (
-                        <FieldCard icon={<Landmark className="h-4 w-4" />} iconClass="bg-emerald-500/15 text-emerald-500" label="Forma de pago">
-                            <div className="flex flex-wrap items-center gap-2">
-                                <p className="text-base font-bold text-text-primary">
-                                    {transaction.paidWithCredit ? "Tarjeta de crédito" : "Efectivo o débito"}
-                                </p>
-                                {transaction.type === "EXPENSE" && transaction.paidWithCredit && (
-                                    <Badge variant="outline" className="gap-1.5 rounded-full px-2.5 text-xs">
-                                        <CreditCard className="h-3.5 w-3.5" /> Tarjeta de crédito
-                                    </Badge>
-                                )}
-                            </div>
-                        </FieldCard>
+                        <>
+                            <FieldCard icon={<Landmark className="h-4 w-4" />} iconClass="bg-emerald-500/15 text-emerald-500" label="Forma de pago">
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <p className="text-base font-bold text-text-primary">
+                                        {transaction.paidWithCredit ? "Tarjeta de crédito" : "Efectivo o débito"}
+                                    </p>
+                                    {transaction.type === "EXPENSE" && transaction.paidWithCredit && (
+                                        <Badge variant="outline" className="gap-1.5 rounded-full px-2.5 text-xs">
+                                            <CreditCard className="h-3.5 w-3.5" /> Tarjeta de crédito
+                                        </Badge>
+                                    )}
+                                </div>
+                            </FieldCard>
+
+                            {/* De dónde salió y a dónde fue, según el módulo Bancos. */}
+                            <ScannedAccountsPanel accounts={bankAccounts} title="Cuentas del movimiento" />
+                        </>
                     )}
 
                     {/* Categoría */}
