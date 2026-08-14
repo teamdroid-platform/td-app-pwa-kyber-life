@@ -174,6 +174,51 @@ describe("retiro de cajero, de punta a punta", () => {
         expect(segundo.bankSourceAccountId).toBe(cuenta.id);
     });
 
+    it("una compra en un comercio también registra la tarjeta usada", async () => {
+        const { service, cards, institutions } = build();
+
+        // El caso de la suscripción a ChatGPT: el correo lo manda el banco pero
+        // el comercio extraído es la tienda, así que no hay emisor que deducir.
+        const links = await service.syncTransactionBankLinks(USER, {
+            merchant: "GOOGLE *CHATGPT MOUNTAIN VIEW",
+            paidWithCredit: false,
+            scannedAccounts: [{ type: "origen", account: "Mastercard-8361" }],
+        });
+
+        expect(links.bankCardId).toBeTruthy();
+        const [tarjeta] = await cards.findByOwnerId(USER);
+        expect(tarjeta).toMatchObject({
+            lastFour: "8361",
+            brand: "Mastercard",
+            institutionId: null,
+            isUnconfirmed: true,
+        });
+        // Y sigue sin fundar un banco llamado GOOGLE *CHATGPT.
+        expect(await institutions.findByOwnerId(USER)).toHaveLength(0);
+    });
+
+    it("el mantenimiento le asigna el emisor que el correo no dijo", async () => {
+        const { service, cards } = build();
+
+        const links = await service.syncTransactionBankLinks(USER, {
+            merchant: "GOOGLE *CHATGPT MOUNTAIN VIEW",
+            paidWithCredit: false,
+            scannedAccounts: [{ type: "origen", account: "Mastercard-8361" }],
+        });
+
+        const emisor = await service.createInstitution(USER, { name: "Banco Pichincha", kind: "BANK" });
+        const cuenta = await service.createAccount(USER, {
+            institutionId: emisor.id, name: "Ahorros", accountType: "SAVINGS",
+        });
+        await service.updateCard(USER, links.bankCardId!, {
+            institutionId: emisor.id, accountId: cuenta.id, isUnconfirmed: false,
+        });
+
+        expect(await cards.findById(links.bankCardId!)).toMatchObject({
+            institutionId: emisor.id, isUnconfirmed: false,
+        });
+    });
+
     it("un consumo a crédito sí nace como tarjeta de crédito", async () => {
         const { service, cards } = build();
 

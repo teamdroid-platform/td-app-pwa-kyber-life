@@ -122,7 +122,7 @@ describe("resolveScannedAccounts — institución", () => {
     });
 
     it("un comercio cualquiera no funda un banco", async () => {
-        const { service, institutions, accounts } = await buildService();
+        const { service, institutions } = await buildService();
 
         const result = await service.resolveScannedAccounts(
             USER,
@@ -130,10 +130,27 @@ describe("resolveScannedAccounts — institución", () => {
         );
 
         expect(result.bankInstitutionId).toBeNull();
-        // Sin emisor no se puede fundar una cuenta.
-        expect(result.bankSourceAccountId).toBeNull();
+        // La institución de partida y ninguna más: FARMASHOP no es un emisor.
         expect(await institutions.findByOwnerId(USER)).toHaveLength(1);
-        expect(await accounts.findByOwnerId(USER)).toHaveLength(0);
+    });
+
+    it("la cuenta de una compra sí nace, aunque no se sepa de qué banco es", async () => {
+        const { service, accounts } = await buildService();
+
+        // En una compra el comercio es la tienda, no el banco. Exigir emisor
+        // dejaba sin crear justo las identidades que más aparecen.
+        const result = await service.resolveScannedAccounts(
+            USER,
+            scan([{ type: "origen", account: "XXXXXX1234" }], { merchant: "FARMASHOP" }),
+        );
+
+        expect(result.bankSourceAccountId).toBeTruthy();
+        const creada = await accounts.findById(result.bankSourceAccountId!);
+        expect(creada).toMatchObject({
+            lastFour: "1234",
+            institutionId: null,
+            isUnconfirmed: true,
+        });
     });
 
     it("una cooperativa desconocida sí se crea, sin confirmar", async () => {

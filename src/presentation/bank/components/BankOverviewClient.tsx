@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import Link from "next/link";
-import { AlertTriangle, Landmark, Pencil } from "lucide-react";
+import { AlertTriangle, Landmark, Pencil, Scale } from "lucide-react";
 import { BankBalanceHero } from "./BankBalanceHero";
 import { AccountRow } from "./AccountRow";
 import { CardRow } from "./CardRow";
@@ -10,6 +10,7 @@ import { InstitutionFormSheet } from "./InstitutionFormSheet";
 import { AccountFormSheet } from "./AccountFormSheet";
 import { CardFormSheet } from "./CardFormSheet";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { money, shortDate } from "../lib/format-money";
 import type {
     BankOverview, BankAccountWithBalance, BankCardWithDebt,
@@ -67,14 +68,28 @@ export function BankOverviewClient({ initialData }: { initialData: BankOverview 
             };
         });
 
-        const loose = accounts.filter(a => !a.institutionId);
-        if (loose.length > 0) {
+        // El efectivo no tiene emisor por diseño; lo demás sin emisor está a
+        // medio registrar y tiene que verse para poder arreglarlo.
+        const cash = accounts.filter(a => !a.institutionId && a.accountType === "CASH");
+        if (cash.length > 0) {
             byInstitution.push({
                 id: null,
                 name: "Efectivo",
-                accounts: loose,
+                accounts: cash,
                 cards: [],
-                total: loose.reduce((sum, a) => sum + a.balance, 0),
+                total: cash.reduce((sum, a) => sum + a.balance, 0),
+            });
+        }
+
+        const orphanAccounts = accounts.filter(a => !a.institutionId && a.accountType !== "CASH");
+        const orphanCards = cards.filter(c => !c.institutionId);
+        if (orphanAccounts.length > 0 || orphanCards.length > 0) {
+            byInstitution.push({
+                id: "__sin-institucion__",
+                name: "Sin institución",
+                accounts: orphanAccounts,
+                cards: orphanCards,
+                total: orphanAccounts.reduce((sum, a) => sum + a.balance, 0),
             });
         }
 
@@ -109,22 +124,40 @@ export function BankOverviewClient({ initialData }: { initialData: BankOverview 
                 </div>
             </div>
 
-            {initialData.unconfirmedCount > 0 && (
-                <Link
-                    href="/financial/banks/reconcile"
-                    className="flex items-start gap-2.5 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3 text-[11px] leading-relaxed text-amber-600 dark:text-amber-400"
-                >
-                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                    <span>
-                        <b>{initialData.unconfirmedCount} cuentas sin identificar</b> detectadas en
-                        escaneos anteriores. No entran a ningún saldo hasta que las confirmes.{" "}
-                        <b>Conciliar →</b>
-                    </span>
-                </Link>
-            )}
+            {/* Conciliar está siempre a mano: el aviso depende de que existan
+                identidades sin revisar, pero los números pendientes de atribuir
+                se acumulan aunque no haya ninguna, y sin este enlace la pantalla
+                quedaba inalcanzable salvo escribiendo la URL. */}
+            <Link
+                href="/financial/banks/reconcile"
+                className={cn(
+                    "flex items-start gap-2.5 rounded-2xl border p-3 text-[11px] leading-relaxed transition-colors",
+                    initialData.unconfirmedCount > 0
+                        ? "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                        : "bg-card text-muted-foreground hover:border-primary/50",
+                )}
+            >
+                {initialData.unconfirmedCount > 0
+                    ? <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                    : <Scale className="mt-0.5 h-4 w-4 shrink-0" />}
+                <span>
+                    {initialData.unconfirmedCount > 0 ? (
+                        <>
+                            <b>{initialData.unconfirmedCount} cuentas sin revisar</b> detectadas en
+                            escaneos. No entran a ningún saldo hasta que las confirmes.{" "}
+                        </>
+                    ) : (
+                        <>
+                            Revisa los números que los escaneos aún no han sabido atribuir a
+                            ninguna de tus cuentas.{" "}
+                        </>
+                    )}
+                    <b>Conciliar →</b>
+                </span>
+            </Link>
 
-            {/* El orden de alta importa: sin institución no hay cuenta, y sin
-                cuenta no hay tarjeta de débito. */}
+            {/* Ya no hay orden obligatorio: el formulario de cuenta y el de
+                tarjeta crean el emisor al vuelo si hace falta. */}
             <div className="flex flex-wrap gap-2">
                 <InstitutionFormSheet
                     trigger={<Button size="sm" variant="outline">+ Institución</Button>}
@@ -132,18 +165,14 @@ export function BankOverviewClient({ initialData }: { initialData: BankOverview 
                 <AccountFormSheet
                     institutions={institutions}
                     trigger={
-                        <Button size="sm" variant="outline" disabled={institutions.length === 0}>
-                            + Cuenta
-                        </Button>
+                        <Button size="sm" variant="outline">+ Cuenta</Button>
                     }
                 />
                 <CardFormSheet
                     institutions={institutions}
                     accounts={accounts}
                     trigger={
-                        <Button size="sm" variant="outline" disabled={institutions.length === 0}>
-                            + Tarjeta
-                        </Button>
+                        <Button size="sm" variant="outline">+ Tarjeta</Button>
                     }
                 />
             </div>

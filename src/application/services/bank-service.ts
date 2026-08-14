@@ -193,7 +193,7 @@ export interface ScannedAccountView {
 const AUTOCREATE_MIN_SUFFIX = 4;
 
 export interface CreateCardInput {
-    institutionId: UUID;
+    institutionId?: UUID | null;
     accountId?: UUID | null;
     name: string;
     cardType: BankCard["cardType"];
@@ -461,8 +461,8 @@ export class BankService {
             let observation = await this.identification.observe(userId, raw);
             const isOrigin = isOriginEntry(entry);
 
-            if (isOrigin && this.canAutoCreate(observation, scan, institutionId)) {
-                await this.createIdentityFrom(userId, observation, institutionId!, scan);
+            if (isOrigin && this.canAutoCreate(observation)) {
+                await this.createIdentityFrom(userId, observation, institutionId, scan);
                 // Re-observar para que quede ligada a lo recién creado.
                 observation = await this.identification.reobserve(userId, raw);
             }
@@ -564,21 +564,25 @@ export class BankService {
      * existe — mientras que crearla como débito exige una cuenta que aquí no
      * se conoce. Sin señal, el tipo lo elige el usuario en conciliación.
      */
-    private canAutoCreate(
-        observation: BankNumberObservation,
-        scan: ScannedTransactionInput,
-        institutionId: UUID | null,
-    ): boolean {
+    /**
+     * Si el número da para fundar una identidad sin preguntar.
+     *
+     * Ya no exige conocer al emisor: en una compra el comercio es la tienda, no
+     * el banco, así que exigirlo dejaba sin crear justo las tarjetas que más
+     * aparecen. La identidad nace sin emisor y el usuario lo asigna después.
+     *
+     * Lo que sí se exige es sufijo suficiente: con menos de cuatro dígitos el
+     * número no distingue una identidad de otra y crearía duplicados.
+     */
+    private canAutoCreate(observation: BankNumberObservation): boolean {
         if (observation.resolution !== "PENDING") return false;
-        if (!institutionId) return false;
-        if (observation.suffixDigits.length < AUTOCREATE_MIN_SUFFIX) return false;
-        return true;
+        return observation.suffixDigits.length >= AUTOCREATE_MIN_SUFFIX;
     }
 
     /** Crea la cuenta o la tarjeta que la observación describe, sin confirmar. */
     private async createIdentityFrom(
         userId: UUID, observation: BankNumberObservation,
-        institutionId: UUID, scan: ScannedTransactionInput,
+        institutionId: UUID | null, scan: ScannedTransactionInput,
     ): Promise<void> {
         const currency = scan.currency ?? "USD";
         const common = {
@@ -587,13 +591,16 @@ export class BankService {
             currency,
         };
 
-        if (observation.bin) {
+        // Tarjeta o cuenta: lo dice el BIN o, a falta de él, la marca que el
+        // propio texto nombra. «Mastercard-8361» no trae BIN y aun así no hay
+        // duda de qué es — la misma regla que usa el panel del escaneo.
+        if (observation.bin || observation.brand) {
             // Solo un gasto a crédito prueba que la tarjeta lo sea. Sin esa
             // señal nace como débito: es lo más frecuente y, sobre todo, es lo
             // que no inventa deuda. Queda sin cuenta y sin confirmar, a la
             // espera de que el usuario la ate desde Bancos.
             const cardType = scan.paidWithCredit ? "CREDIT" : "DEBIT";
-            const brand = observation.brand ?? brandFromBin(observation.bin);
+            const brand = observation.brand ?? brandFromBin(observation.bin ?? null);
             await this.createCard(userId, {
                 institutionId,
                 name: [brand, formatBankNumber(
@@ -947,7 +954,7 @@ export class BankService {
         return this.cards.create({
             id: randomUUID(),
             ownerUserId: userId,
-            institutionId: input.institutionId,
+            institutionId: input.institutionId ?? null,
             // Los mismos invariantes que los CHECK de la tabla, para fallar
             // antes de llegar a Postgres con un estado imposible.
             accountId: isCredit ? null : (input.accountId ?? null),

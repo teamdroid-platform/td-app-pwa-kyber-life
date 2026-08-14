@@ -54,7 +54,12 @@ export interface BankAccount extends BaseEntity {
  */
 export interface BankCard extends BaseEntity {
     ownerUserId: UUID;
-    institutionId: UUID;
+    /**
+     * El emisor. Solo puede faltar mientras la tarjeta está sin confirmar: una
+     * compra nombra la tarjeta pero no el banco que la emitió, así que se
+     * detecta primero y se asigna después, en el mantenimiento.
+     */
+    institutionId?: UUID | null;
     /** Obligatorio en DEBIT, siempre null en CREDIT. */
     accountId?: UUID | null;
     name: string;

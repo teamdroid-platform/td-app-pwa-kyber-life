@@ -65,14 +65,18 @@ describe("BankOverviewClient", () => {
         expect(screen.queryByText(/^−\$0,00$/)).not.toBeInTheDocument();
     });
 
-    it("avisa cuando hay cuentas sin identificar", () => {
+    it("avisa cuando hay cuentas sin revisar", () => {
         render(<BankOverviewClient initialData={{ ...overview, unconfirmedCount: 7 }} />);
-        expect(screen.getByText(/7 cuentas sin identificar/i)).toBeInTheDocument();
+        expect(screen.getByText(/7 cuentas sin revisar/i)).toBeInTheDocument();
     });
 
-    it("no muestra el aviso cuando no hay ninguna", () => {
+    it("sin ninguna pendiente baja el tono, pero no esconde Conciliar", () => {
         render(<BankOverviewClient initialData={overview} />);
-        expect(screen.queryByText(/sin identificar/i)).not.toBeInTheDocument();
+
+        expect(screen.queryByText(/cuentas sin revisar/i)).not.toBeInTheDocument();
+        // Los números por atribuir se acumulan aunque no haya identidades sin
+        // revisar; sin este enlace la pantalla solo se alcanzaba por URL.
+        expect(screen.getByRole("link", { name: /Conciliar/i })).toBeInTheDocument();
     });
 
     it("con la base vacía muestra el estado vacío en vez de reventar", () => {
