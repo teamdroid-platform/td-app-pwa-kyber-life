@@ -51,7 +51,7 @@ const COMPLETE_MIN_DIGITS = 8;
 export function parseBankNumber(raw: string): NumberFingerprint {
     const brand = BRANDS.find(b => b.pattern.test(raw))?.label ?? null;
     const accountTypeHint = TYPE_HINTS.find(t => t.pattern.test(raw))?.type ?? null;
-    const institutionHint = extractInstitutionHint(raw, brand);
+    const institutionHint = extractInstitutionHint(raw);
 
     // Deja solo dígitos y máscaras: las letras y separadores ya dieron lo suyo.
     const core = raw.replace(/[^0-9X×x*•·●#]/g, "");
@@ -105,7 +105,7 @@ function looksLikeCard(digits: string): boolean {
  * El nombre de institución que el banco metió en la cadena, si lo hizo.
  * Se queda con las palabras alfabéticas que no son la marca ni ruido.
  */
-function extractInstitutionHint(raw: string, brand: string | null): string | null {
+function extractInstitutionHint(raw: string): string | null {
     const words = raw.match(/[A-Za-zÁÉÍÓÚÜÑáéíóúüñ.]+/g);
     if (!words) return null;
 

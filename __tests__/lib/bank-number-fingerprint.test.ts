@@ -147,11 +147,12 @@ describe("parseBankNumber — robustez", () => {
         }
     });
 
-    it("ninguna cadena real produce un sufijo mayor que sus dígitos visibles", () => {
+    it("ninguna cadena real produce dígitos que no estuvieran visibles", () => {
         for (const raw of REAL_STRINGS) {
             const f = parseBankNumber(raw);
             const visibles = raw.replace(/[^0-9]/g, "");
             expect(visibles).toContain(f.suffixDigits);
+            expect(visibles).toContain(f.prefixDigits);
         }
     });
 });
