@@ -149,6 +149,7 @@ import { FinancialInboxService } from "@/application/services/financial-inbox-se
 import { FinancialDashboardService } from "@/application/services/financial-dashboard-service";
 import { FinancialSettingsService } from "@/application/services/financial-settings-service";
 import { BankService } from "@/application/services/bank-service";
+import { BankIdentificationService } from "@/application/services/bank-identification-service";
 import { NotificationService } from "@/application/services/notification-service";
 import { PushSubscriptionService } from "@/application/services/push-subscription-service";
 
@@ -169,6 +170,12 @@ export const financialInboxService = new FinancialInboxService(
 );
 export const financialDashboardService = new FinancialDashboardService(financialTransactionRepository, financialCategoryRepository, financialInstitutionRepository, financialScannerTransactionRepository);
 export const financialSettingsService = new FinancialSettingsService(financialInstitutionTypeRepository, financialInstitutionRepository, financialCategoryRepository, financialTransactionRepository);
+export const bankIdentificationService = new BankIdentificationService(
+    bankObservationRepository,
+    bankAccountRepository,
+    bankCardRepository,
+    bankInstitutionRepository,
+);
 export const bankService = new BankService(
     bankInstitutionRepository,
     bankAccountRepository,

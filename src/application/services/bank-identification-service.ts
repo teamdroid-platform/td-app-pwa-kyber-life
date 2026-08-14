@@ -1,0 +1,270 @@
+import { randomUUID } from "crypto";
+import type { UUID } from "@/domain/core";
+import type {
+    BankNumberObservation, BankAccount, BankCard,
+} from "@/domain/entities/bank";
+import type {
+    IBankNumberObservationRepository, IBankAccountRepository,
+    IBankCardRepository, IBankInstitutionRepository,
+} from "@/domain/repositories/bank";
+import { parseBankNumber, type NumberFingerprint } from "@/lib/bank-number-fingerprint";
+import {
+    resolveFingerprint, mergeFingerprints, type IdentityCandidate,
+} from "@/lib/bank-number-match";
+
+/** Un grupo de observaciones sin resolver, tal como lo ve la conciliación. */
+export interface PendingGroup {
+    prefixDigits: string;
+    suffixDigits: string;
+    occurrences: number;
+    /** Las cadenas crudas del grupo, como evidencia para el usuario. */
+    samples: string[];
+    observationIds: UUID[];
+    /** Identidades compatibles. Con más de una, el grupo es ambiguo. */
+    candidateIds: UUID[];
+    institutionHint: string | null;
+    brand: string | null;
+    accountTypeHint: string | null;
+}
+
+/** Las decisiones del usuario; nunca las pisa una re-resolución automática. */
+const USER_DECIDED = ["MANUAL", "EXTERNAL"] as const;
+
+function stamps() {
+    const now = new Date().toISOString();
+    return { createdAt: now, updatedAt: now, isDeleted: false };
+}
+
+/**
+ * Decide a qué cuenta o tarjeta pertenece un número enmascarado, y recuerda
+ * cada forma en que lo ha visto escrito.
+ *
+ * El aprendizaje está en `observe`: la primera vez que aparece una máscara se
+ * resuelve —sola o, si es ambigua, en conciliación— y a partir de ahí el
+ * emparejamiento de esa cadena exacta es una lectura directa.
+ */
+export class BankIdentificationService {
+    constructor(
+        private readonly observations: IBankNumberObservationRepository,
+        private readonly accounts: IBankAccountRepository,
+        private readonly cards: IBankCardRepository,
+        private readonly institutions: IBankInstitutionRepository,
+    ) {}
+
+    /**
+     * Registra una cadena vista y la liga a su identidad si puede.
+     *
+     * Si el `raw` exacto ya se vio, solo incrementa el contador y conserva el
+     * vínculo: cada máscara se aprende una sola vez.
+     */
+    async observe(userId: UUID, raw: string): Promise<BankNumberObservation> {
+        const existing = await this.observations.findByRaw(userId, raw);
+        if (existing) {
+            return this.observations.update({
+                ...existing,
+                occurrences: existing.occurrences + 1,
+                updatedAt: new Date().toISOString(),
+            });
+        }
+
+        const fingerprint = parseBankNumber(raw);
+        const resolved = resolveFingerprint(fingerprint, await this.identityCandidates(userId));
+
+        return this.observations.create({
+            id: randomUUID(),
+            ownerUserId: userId,
+            raw,
+            prefixDigits: fingerprint.prefixDigits,
+            suffixDigits: fingerprint.suffixDigits,
+            totalLength: fingerprint.totalLength,
+            bin: fingerprint.bin,
+            brand: fingerprint.brand,
+            accountTypeHint: fingerprint.accountTypeHint,
+            institutionHint: fingerprint.institutionHint,
+            isComplete: fingerprint.isComplete,
+            accountId: resolved.targetKind === "ACCOUNT" ? resolved.targetId : null,
+            cardId: resolved.targetKind === "CARD" ? resolved.targetId : null,
+            resolution: resolved.resolution,
+            occurrences: 1,
+            ...stamps(),
+        });
+    }
+
+    /**
+     * Vuelve a resolver una observación ya registrada contra las identidades
+     * que existen ahora. Lo que el usuario decidió a mano se respeta.
+     */
+    async reobserve(userId: UUID, raw: string): Promise<BankNumberObservation> {
+        const observation = await this.observations.findByRaw(userId, raw);
+        if (!observation) return this.observe(userId, raw);
+        if ((USER_DECIDED as readonly string[]).includes(observation.resolution)) {
+            return observation;
+        }
+
+        return this.applyResolution(observation, await this.identityCandidates(userId));
+    }
+
+    /**
+     * Re-parsea y re-resuelve todo el historial del usuario. La usa el backfill,
+     * que deja las observaciones con solo `raw` y `occurrences`.
+     *
+     * Idempotente: correrla dos veces da el mismo resultado, y no toca las que
+     * el usuario ya decidió.
+     */
+    async reparseAll(userId: UUID): Promise<number> {
+        const all = await this.observations.findByOwnerId(userId);
+        const candidates = await this.identityCandidates(userId);
+        let touched = 0;
+
+        for (const observation of all) {
+            if ((USER_DECIDED as readonly string[]).includes(observation.resolution)) continue;
+            await this.applyResolution(observation, candidates);
+            touched++;
+        }
+
+        return touched;
+    }
+
+    /**
+     * Las identidades del usuario con su huella acumulada: lo que cada cuenta o
+     * tarjeta declara de sí misma en su alta, más todo lo que aportaron sus
+     * observaciones ya resueltas.
+     */
+    async identityCandidates(userId: UUID): Promise<IdentityCandidate[]> {
+        const [accounts, cards, resolved] = await Promise.all([
+            this.accounts.findByOwnerId(userId),
+            this.cards.findByOwnerId(userId),
+            this.observations.findResolved(userId),
+        ]);
+
+        const build = (
+            id: UUID, kind: "ACCOUNT" | "CARD", declared: NumberFingerprint,
+        ): IdentityCandidate => {
+            const own = resolved
+                .filter(o => (kind === "ACCOUNT" ? o.accountId : o.cardId) === id)
+                .map(o => parseBankNumber(o.raw));
+            return { id, kind, fingerprint: mergeFingerprints([declared, ...own]) };
+        };
+
+        return [
+            ...accounts.map(a => build(a.id, "ACCOUNT", declaredFingerprint(a))),
+            ...cards.map(c => build(c.id, "CARD", declaredFingerprint(c))),
+        ];
+    }
+
+    /** Los grupos sin resolver, de más a menos frecuentes. */
+    async pendingGroups(userId: UUID): Promise<PendingGroup[]> {
+        const [pending, candidates] = await Promise.all([
+            this.observations.findByResolution(userId, "PENDING"),
+            this.identityCandidates(userId),
+        ]);
+
+        const byKey = new Map<string, PendingGroup>();
+
+        for (const observation of pending) {
+            // Prefijo y sufijo juntos: es lo que el usuario reconoce de un vistazo.
+            const key = `${observation.prefixDigits}|${observation.suffixDigits}`;
+            const group = byKey.get(key) ?? {
+                suffixDigits: observation.suffixDigits,
+                prefixDigits: observation.prefixDigits,
+                occurrences: 0, samples: [], observationIds: [], candidateIds: [],
+                institutionHint: null, brand: null, accountTypeHint: null,
+            };
+
+            group.occurrences += observation.occurrences;
+            group.samples.push(observation.raw);
+            group.observationIds.push(observation.id);
+            group.institutionHint ??= observation.institutionHint ?? null;
+            group.brand ??= observation.brand ?? null;
+            group.accountTypeHint ??= observation.accountTypeHint ?? null;
+
+            const compatible = resolveFingerprint(parseBankNumber(observation.raw), candidates);
+            for (const id of compatible.candidateIds) {
+                if (!group.candidateIds.includes(id)) group.candidateIds.push(id);
+            }
+
+            byKey.set(key, group);
+        }
+
+        return [...byKey.values()].sort((a, b) => b.occurrences - a.occurrences);
+    }
+
+    /** El usuario dice a qué identidad pertenece. Gana sobre cualquier inferencia. */
+    async assignObservation(
+        userId: UUID, observationId: UUID,
+        target: { kind: "ACCOUNT" | "CARD"; targetId: UUID },
+    ): Promise<BankNumberObservation> {
+        const observation = await this.requireObservation(userId, observationId);
+        return this.observations.update({
+            ...observation,
+            accountId: target.kind === "ACCOUNT" ? target.targetId : null,
+            cardId: target.kind === "CARD" ? target.targetId : null,
+            resolution: "MANUAL",
+            updatedAt: new Date().toISOString(),
+        });
+    }
+
+    /**
+     * La cuenta es de un tercero. Se conserva la observación —el detalle de la
+     * transacción muestra a dónde fue el dinero— pero no le corresponde una
+     * identidad, así que no suma a ningún saldo.
+     */
+    async markExternal(userId: UUID, observationId: UUID): Promise<BankNumberObservation> {
+        const observation = await this.requireObservation(userId, observationId);
+        return this.observations.update({
+            ...observation,
+            accountId: null, cardId: null,
+            resolution: "EXTERNAL",
+            updatedAt: new Date().toISOString(),
+        });
+    }
+
+    // ─── Privados ────────────────────────────────────────────
+
+    /** Re-parsea la cadena cruda y persiste el resultado de resolverla. */
+    private async applyResolution(
+        observation: BankNumberObservation, candidates: readonly IdentityCandidate[],
+    ): Promise<BankNumberObservation> {
+        const fingerprint = parseBankNumber(observation.raw);
+        const resolved = resolveFingerprint(fingerprint, candidates);
+
+        return this.observations.update({
+            ...observation,
+            prefixDigits: fingerprint.prefixDigits,
+            suffixDigits: fingerprint.suffixDigits,
+            totalLength: fingerprint.totalLength,
+            bin: fingerprint.bin,
+            brand: fingerprint.brand,
+            accountTypeHint: fingerprint.accountTypeHint,
+            institutionHint: fingerprint.institutionHint,
+            isComplete: fingerprint.isComplete,
+            accountId: resolved.targetKind === "ACCOUNT" ? resolved.targetId : null,
+            cardId: resolved.targetKind === "CARD" ? resolved.targetId : null,
+            resolution: resolved.resolution,
+            updatedAt: new Date().toISOString(),
+        });
+    }
+
+    private async requireObservation(userId: UUID, id: UUID): Promise<BankNumberObservation> {
+        const found = await this.observations.findById(id);
+        if (!found || found.ownerUserId !== userId) throw new Error("Observación no encontrada");
+        return found;
+    }
+}
+
+/** Lo que la identidad declara de sí misma en su alta. */
+function declaredFingerprint(entity: BankAccount | BankCard): NumberFingerprint {
+    const bin = "bin" in entity ? entity.bin ?? null : null;
+    const brand = "brand" in entity ? entity.brand ?? null : null;
+    return {
+        raw: "",
+        prefixDigits: entity.prefixDigits ?? bin ?? "",
+        suffixDigits: entity.lastFour ?? "",
+        totalLength: 0,
+        bin,
+        brand,
+        accountTypeHint: null,
+        institutionHint: null,
+        isComplete: false,
+    };
+}
