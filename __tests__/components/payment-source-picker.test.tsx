@@ -145,6 +145,30 @@ describe("PaymentSourcePicker — alta desde el paso", () => {
         expect(screen.queryByText(/crearlas en Bancos y/i)).not.toBeInTheDocument();
     });
 
+    it("el botón abre de verdad el formulario de cuenta", () => {
+        render(
+            <PaymentSourcePicker accounts={[]} cards={[]} value={{}} onChange={jest.fn()} {...creation} />,
+        );
+
+        fireEvent.click(nuevaCuenta()!);
+
+        expect(screen.getByText("Nueva cuenta", { selector: "h2, [data-slot='dialog-title']" }))
+            .toBeInTheDocument();
+        // Sin emisores registrados, el formulario tiene que dejar escribir uno:
+        // si aquí hubiera un desplegable vacío, el alta seguiría sin salida.
+        expect(screen.getByLabelText("Institución")).toBeInTheDocument();
+    });
+
+    it("el botón abre de verdad el formulario de tarjeta", () => {
+        render(
+            <PaymentSourcePicker accounts={[]} cards={[]} value={{}} onChange={jest.fn()} {...creation} />,
+        );
+
+        fireEvent.click(nuevaTarjeta()!);
+
+        expect(screen.getByLabelText("Tipo de tarjeta")).toBeInTheDocument();
+    });
+
     it("no ofrece crear nada a quien no sabe qué hacer con lo creado", () => {
         render(<PaymentSourcePicker accounts={accounts} cards={cards} value={{}} onChange={jest.fn()} />);
 

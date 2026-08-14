@@ -169,12 +169,24 @@ export function PaymentSourcePicker({
     );
 }
 
-/** Disparador de los formularios de alta, al pie de las opciones. */
-function CreateButton({ label, icon }: { label: string; icon: React.ReactNode }) {
+/**
+ * Disparador de los formularios de alta, al pie de las opciones.
+ *
+ * Reenvía todo lo que reciba: `FormSheet` monta su trigger con `asChild`, así
+ * que el `onClick` que abre la hoja —y el `ref`— llegan aquí como props. Un
+ * componente que las descarte se renderiza igual pero no abre nada.
+ */
+function CreateButton({
+    label, icon, className, ...props
+}: { label: string; icon: React.ReactNode } & React.ComponentProps<"button">) {
     return (
         <button
             type="button"
-            className="flex items-center justify-center gap-1.5 rounded-xl border border-dashed border-border/60 p-2.5 text-xs font-medium text-text-tertiary transition-colors hover:border-accent-primary hover:text-text-primary"
+            {...props}
+            className={cn(
+                "flex items-center justify-center gap-1.5 rounded-xl border border-dashed border-border/60 p-2.5 text-xs font-medium text-text-tertiary transition-colors hover:border-accent-primary hover:text-text-primary",
+                className,
+            )}
         >
             <span className="relative flex h-4 w-4 shrink-0 items-center justify-center">
                 {icon}
