@@ -40,6 +40,9 @@ export function TransactionEditWizard({
         // already shows for them so the required field starts answered.
         description: transaction.description?.trim() || getTransactionDisplayTitle(transaction),
         institutionName: displayNames.institution,
+        // Se declara al editar, no se arrastra: la transacción guarda el vínculo
+        // con el emisor, no la clasificación del emisor.
+        bankInstitutionKind: null,
         categoryName: displayNames.category,
         paidWithCredit: transaction.paidWithCredit ?? false,
         bankSourceAccountId: transaction.bankSourceAccountId ?? null,
@@ -57,6 +60,7 @@ export function TransactionEditWizard({
                 merchant: values.institutionName || transaction.merchant,
                 institutionId: null, // Force the backend to resolve by name
                 institutionName: values.institutionName || undefined,
+                bankInstitutionKind: values.bankInstitutionKind ?? undefined,
                 accountId: null,
                 categoryId: null,
                 categoryName: values.categoryName || undefined,

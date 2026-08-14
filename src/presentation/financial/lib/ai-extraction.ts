@@ -98,6 +98,8 @@ export function toWizardValues(extraction: AiExtraction, { fallbackDate }: ToWiz
             amount: toAmountValue(extraction.amount),
             description: toText(extraction.title),
             institutionName,
+            // El extractor no clasifica emisores: lo declara el usuario en el paso.
+            bankInstitutionKind: null,
             categoryName,
             // An id without a name is unusable: the row would render blank while
             // silently pointing at a record. Keep them together or not at all.

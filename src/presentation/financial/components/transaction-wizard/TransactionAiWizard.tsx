@@ -60,6 +60,7 @@ export function TransactionAiWizard({ extraction, method, sourceText, onDiscard 
                 date: wallClockInputToISO(values.date)!,
                 notes: values.notes || undefined,
                 institutionName: values.institutionName || undefined,
+                bankInstitutionKind: values.bankInstitutionKind ?? undefined,
                 categoryName: values.categoryName || undefined,
                 // Sent only when the extractor resolved them and the user kept
                 // that choice; the service falls back to matching by name.

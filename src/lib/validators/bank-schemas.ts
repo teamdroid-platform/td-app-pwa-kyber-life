@@ -6,7 +6,8 @@ const digits = z.string().regex(/^[0-9]{1,6}$/, "Solo dígitos");
 export const createInstitutionSchema = z.object({
     name: z.string().min(1, "El nombre es requerido").max(120),
     shortName: z.string().max(40).optional().nullable(),
-    kind: z.enum(["BANK", "COOPERATIVE", "WALLET", "OTHER"]).default("BANK"),
+    // Genérico por defecto: el tipo lo declara el usuario, no lo adivina la app.
+    kind: z.enum(["BANK", "COOPERATIVE", "WALLET", "OTHER"]).default("OTHER"),
     logoUrl: z.string().url().optional().nullable(),
     color: z.string().max(32).optional().nullable(),
     country: z.string().length(2).optional().nullable(),

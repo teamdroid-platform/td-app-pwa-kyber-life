@@ -10,19 +10,13 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { createBankInstitutionAction } from "@/app/actions/bank";
 import type { BankInstitutionKind } from "@/domain/entities/bank";
-
-const KINDS: { value: BankInstitutionKind; label: string }[] = [
-    { value: "BANK", label: "Banco" },
-    { value: "COOPERATIVE", label: "Cooperativa" },
-    { value: "WALLET", label: "Billetera digital" },
-    { value: "OTHER", label: "Otro" },
-];
+import { INSTITUTION_KINDS } from "@/lib/bank-institution-kind";
 
 export function InstitutionFormSheet({ trigger }: { trigger: React.ReactNode }) {
     const router = useRouter();
     const [open, setOpen] = useState(false);
     const [name, setName] = useState("");
-    const [kind, setKind] = useState<BankInstitutionKind>("BANK");
+    const [kind, setKind] = useState<BankInstitutionKind>("OTHER");
     const [saving, setSaving] = useState(false);
 
     async function handleSave() {
@@ -78,7 +72,7 @@ export function InstitutionFormSheet({ trigger }: { trigger: React.ReactNode }) 
                 <Select value={kind} onValueChange={v => setKind(v as BankInstitutionKind)}>
                     <SelectTrigger aria-label="Tipo"><SelectValue /></SelectTrigger>
                     <SelectContent>
-                        {KINDS.map(k => (
+                        {INSTITUTION_KINDS.map(k => (
                             <SelectItem key={k.value} value={k.value}>{k.label}</SelectItem>
                         ))}
                     </SelectContent>

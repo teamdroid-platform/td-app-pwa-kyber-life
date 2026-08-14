@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
+import type { BankInstitutionKind } from "@/domain/entities/bank";
 import type { FinancialTransactionType } from "@/domain/entities/financial";
 
 /** Types for which "paid with credit card" is a meaningful, editable flag. */
@@ -16,6 +17,14 @@ export interface WizardValues {
     amount: string;
     description: string;
     institutionName: string;
+    /**
+     * Qué clase de emisor es la institución, cuando el usuario lo declara.
+     *
+     * Solo pesa si la institución bancaria aún no existe: al fundarla, esto gana
+     * sobre lo que el nombre sugiera. Si ya existe, se ignora — el módulo Bancos
+     * es el sitio para reclasificarla, no una transacción de paso.
+     */
+    bankInstitutionKind?: BankInstitutionKind | null;
     categoryName: string;
     paidWithCredit: boolean;
     /** Cuenta de la que sale el dinero, cuando el usuario la eligió. */
@@ -73,6 +82,7 @@ export const FIELD_STEP: Record<keyof WizardValues, WizardScreen> = {
     description: "amount",
     institutionName: "institution",
     institutionId: "institution",
+    bankInstitutionKind: "institution",
     categoryName: "category",
     categoryId: "category",
     paidWithCredit: "payment",

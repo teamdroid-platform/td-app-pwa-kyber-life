@@ -20,6 +20,7 @@ import {
     computeAccountBalance, computeCardDebt, computeAvailableCredit,
     computeStatementDue, runningBalances, statementPeriodFor,
 } from "@/domain/services/bank-balance";
+import { ISSUER_NAME, inferInstitutionKind } from "@/lib/bank-institution-kind";
 import { BankIdentificationService } from "./bank-identification-service";
 
 function round2(value: number): number {
@@ -104,6 +105,27 @@ export interface ScannedTransactionInput {
     currency?: string | null;
     /** Única señal fiable de que el número con BIN es una tarjeta de crédito. */
     paidWithCredit?: boolean | null;
+    /**
+     * Tipo declarado por el usuario para el emisor, cuando lo dijo. Gana sobre
+     * cualquier inferencia desde el nombre.
+     */
+    institutionKind?: BankInstitution["kind"] | null;
+}
+
+/** Lo que una escritura de transacción le da al módulo Bancos. */
+export interface TransactionBankSyncInput {
+    merchant?: string | null;
+    currency?: string | null;
+    paidWithCredit?: boolean | null;
+    /** Tipo de emisor declarado por el usuario. Gana sobre la inferencia. */
+    institutionKind?: BankInstitution["kind"] | null;
+    /** Lo que el usuario eligió a mano. Nunca se pisa. */
+    bankSourceAccountId?: UUID | null;
+    bankDestinationAccountId?: UUID | null;
+    bankCardId?: UUID | null;
+    bankInstitutionId?: UUID | null;
+    /** Números enmascarados. Solo llegan desde un escaneo. */
+    scannedAccounts?: ScannedAccountEntry[] | null;
 }
 
 export interface ResolvedBankLinks {
@@ -117,9 +139,6 @@ export interface ResolvedBankLinks {
 
 /** Sufijo mínimo para fundar una identidad sin preguntar. */
 const AUTOCREATE_MIN_SUFFIX = 4;
-
-/** Nombres que sí son de un emisor y no de un comercio cualquiera. */
-const ISSUER_NAME = /banco|coop|coac|cooperativa|mutualista|billetera|pacificard/i;
 
 export interface CreateCardInput {
     institutionId: UUID;
@@ -149,6 +168,66 @@ export class BankService {
         /** Opcional: sin él, `relinkHistory` no tiene de dónde leer los escaneos. */
         private readonly scannerTransactions?: IFinancialScannerTransactionRepository,
     ) {}
+
+    // ─── Sincronización desde la transacción ─────────────────
+
+    /**
+     * El punto único por el que pasa toda escritura de transacción — captura
+     * manual, confirmación de escaneo y edición — para mantener el módulo
+     * Bancos al día.
+     *
+     * Solo sincroniza **identidades y vínculos**. Los saldos y los movimientos
+     * no se tocan nunca porque no se guardan: la vista `bank_movements` se
+     * deriva de las transacciones y el saldo se calcula al leer, así que editar
+     * o borrar una transacción los corrige sola.
+     *
+     * Dos reglas gobiernan el resultado:
+     *
+     *  - **Lo que el usuario eligió gana.** Si vino con cuenta o tarjeta, esta
+     *    función no la pisa: él vio el movimiento, la heurística solo vio una
+     *    cadena enmascarada.
+     *  - **Solo un escaneo funda cuentas.** Sin números enmascarados no hay de
+     *    dónde deducir una cuenta, así que una edición a lo sumo crea el emisor.
+     *    Fundar cuentas al editar es la vía rápida a llenar el módulo de basura.
+     */
+    async syncTransactionBankLinks(
+        userId: UUID, input: TransactionBankSyncInput,
+    ): Promise<ResolvedBankLinks> {
+        const chosen: ResolvedBankLinks = {
+            bankSourceAccountId: input.bankSourceAccountId ?? null,
+            bankDestinationAccountId: input.bankDestinationAccountId ?? null,
+            bankCardId: input.bankCardId ?? null,
+            bankInstitutionId: input.bankInstitutionId ?? null,
+            bankCounterpartyObservationId: null,
+        };
+
+        const scan: ScannedTransactionInput = {
+            accounts: input.scannedAccounts ?? [],
+            merchant: input.merchant ?? null,
+            currency: input.currency ?? "USD",
+            paidWithCredit: input.paidWithCredit ?? false,
+            institutionKind: input.institutionKind ?? null,
+        };
+
+        // Sin números que identificar, lo único que puede nacer es el emisor.
+        if (scan.accounts.length === 0) {
+            return {
+                ...chosen,
+                bankInstitutionId: chosen.bankInstitutionId
+                    ?? await this.resolveInstitution(userId, scan),
+            };
+        }
+
+        const resolved = await this.resolveScannedAccounts(userId, scan);
+
+        return {
+            bankSourceAccountId: chosen.bankSourceAccountId ?? resolved.bankSourceAccountId,
+            bankDestinationAccountId: chosen.bankDestinationAccountId ?? resolved.bankDestinationAccountId,
+            bankCardId: chosen.bankCardId ?? resolved.bankCardId,
+            bankInstitutionId: chosen.bankInstitutionId ?? resolved.bankInstitutionId,
+            bankCounterpartyObservationId: resolved.bankCounterpartyObservationId,
+        };
+    }
 
     // ─── Identificación desde un escaneo ─────────────────────
 
@@ -350,7 +429,7 @@ export class BankService {
 
         const created = await this.createInstitution(userId, {
             name,
-            kind: /coop|coac|cooperativa/i.test(name) ? "COOPERATIVE" : "BANK",
+            kind: scan.institutionKind ?? inferInstitutionKind(name),
         });
         await this.institutions.update({ ...created, isUnconfirmed: true });
         return created.id;
@@ -602,7 +681,7 @@ export class BankService {
             ownerUserId: userId,
             name: input.name,
             shortName: input.shortName ?? null,
-            kind: input.kind ?? "BANK",
+            kind: input.kind ?? "OTHER",
             logoUrl: input.logoUrl ?? null,
             color: input.color ?? null,
             country: input.country ?? "EC",

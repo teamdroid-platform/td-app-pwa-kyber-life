@@ -30,6 +30,8 @@ export interface MapScannerTransactionDTO {
     date?: string;
     tags?: string[];
     paidWithCredit?: boolean;
+    /** Tipo declarado por el usuario para el emisor, si la confirmación lo funda. */
+    bankInstitutionKind?: 'BANK' | 'COOPERATIVE' | 'WALLET' | 'OTHER' | null;
 }
 
 export class FinancialInboxService {
@@ -126,15 +128,21 @@ export class FinancialInboxService {
             throw new Error("La descripción es requerida para confirmar la transacción");
         }
 
-        // Identifica las cuentas del escaneo, creando las que falten. Lo que el
-        // usuario eligió a mano en el wizard gana sobre lo resuelto solo: él vio
-        // el movimiento, la heurística solo vio una cadena enmascarada.
+        // El mismo punto único por el que pasan la creación y la edición:
+        // identifica las cuentas del escaneo, crea las que falten y respeta lo
+        // que el usuario eligió a mano — él vio el movimiento, la heurística
+        // solo vio una cadena enmascarada.
         const resolvedBank = this.bankService
-            ? await this.bankService.resolveScannedAccounts(dto.userId, {
-                accounts: scannerTx.accounts ?? [],
+            ? await this.bankService.syncTransactionBankLinks(dto.userId, {
+                scannedAccounts: scannerTx.accounts ?? [],
                 merchant: dto.merchant ?? scannerTx.merchant ?? null,
                 currency: scannerTx.currency ?? 'USD',
                 paidWithCredit: dto.paidWithCredit ?? false,
+                institutionKind: dto.bankInstitutionKind ?? null,
+                bankSourceAccountId: dto.bankSourceAccountId ?? null,
+                bankDestinationAccountId: dto.bankDestinationAccountId ?? null,
+                bankCardId: dto.bankCardId ?? null,
+                bankInstitutionId: dto.bankInstitutionId ?? null,
             })
             : null;
 

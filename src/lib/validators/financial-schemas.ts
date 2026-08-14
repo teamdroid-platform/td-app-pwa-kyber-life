@@ -39,6 +39,8 @@ export const createTransactionSchema = z.object({
     bankDestinationAccountId: z.string().uuid("Invalid bank account ID").optional().nullable(),
     bankCardId: z.string().uuid("Invalid bank card ID").optional().nullable(),
     bankInstitutionId: z.string().uuid("Invalid bank institution ID").optional().nullable(),
+    // Tipo declarado por el usuario para el emisor, cuando la transacción lo funda.
+    bankInstitutionKind: z.enum(["BANK", "COOPERATIVE", "WALLET", "OTHER"]).optional().nullable(),
     bankCardStatementId: z.string().uuid("Invalid statement ID").optional().nullable(),
     tags: z.array(z.string().max(50)).max(20).optional().nullable(),
     notes: z.string().max(2000).optional().nullable(),
@@ -136,6 +138,8 @@ export const mapInboxTransactionSchema = z.object({
     bankDestinationAccountId: z.string().uuid("Invalid bank account ID").optional().nullable(),
     bankCardId: z.string().uuid("Invalid bank card ID").optional().nullable(),
     bankInstitutionId: z.string().uuid("Invalid bank institution ID").optional().nullable(),
+    // Tipo declarado por el usuario para el emisor, cuando la confirmación lo funda.
+    bankInstitutionKind: z.enum(["BANK", "COOPERATIVE", "WALLET", "OTHER"]).optional().nullable(),
     bankCardStatementId: z.string().uuid("Invalid statement ID").optional().nullable(),
     type: transactionTypeSchema.optional(),
     notes: z.string().max(2000).optional().nullable(),

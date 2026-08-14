@@ -155,12 +155,7 @@ import { PushSubscriptionService } from "@/application/services/push-subscriptio
 
 export const authService = new AuthService(userRepository, passwordResetTokenRepository);
 export const userService = new UserService(userRepository);
-export const financialTransactionService = new FinancialTransactionService(
-    financialTransactionRepository, 
-    financialTransactionAuditLogRepository,
-    financialInstitutionRepository,
-    financialCategoryRepository
-);
+// Bancos va primero: transacciones e inbox sincronizan contra el.
 export const bankIdentificationService = new BankIdentificationService(
     bankObservationRepository,
     bankAccountRepository,
@@ -177,6 +172,13 @@ export const bankService = new BankService(
     financialTransactionRepository,
     bankIdentificationService,
     financialScannerTransactionRepository,
+);
+export const financialTransactionService = new FinancialTransactionService(
+    financialTransactionRepository, 
+    financialTransactionAuditLogRepository,
+    financialInstitutionRepository,
+    financialCategoryRepository,
+    bankService,
 );
 export const financialInboxService = new FinancialInboxService(
     financialScannerTransactionRepository,

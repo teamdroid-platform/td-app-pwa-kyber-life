@@ -237,8 +237,9 @@ export function TransactionWizard({
     // Choosing from the picker makes the name authoritative again: any id a
     // pre-filled flow had resolved refers to a different record than the one
     // just selected, and keeping it would silently override the choice.
+    // El tipo declarado pertenece al emisor anterior, no al recién elegido.
     const handleSelectInstitution = (name: string) => {
-        wizard.patch({ institutionName: name, institutionId: null });
+        wizard.patch({ institutionName: name, institutionId: null, bankInstitutionKind: null });
         setInstitutionQuery("");
     };
 
@@ -302,6 +303,8 @@ export function TransactionWizard({
                         pendingEdit={pendingInstitutionEdit}
                         onPendingEditChange={setPendingInstitutionEdit}
                         hint={institutionHint}
+                        bankInstitutionKind={values.bankInstitutionKind}
+                        onBankInstitutionKindChange={(kind) => setValue("bankInstitutionKind", kind)}
                     />
                 );
             case "category":
