@@ -1,5 +1,5 @@
 import { parseBankNumber } from "@/lib/bank-number-fingerprint";
-import { areCompatible, mergeFingerprints, resolveFingerprint } from "@/lib/bank-number-match";
+import { areCompatible, mergeFingerprints, resolveFingerprint, type IdentityFingerprint } from "@/lib/bank-number-match";
 
 const fp = parseBankNumber;
 
@@ -34,8 +34,25 @@ describe("areCompatible — guard de prefijo", () => {
 });
 
 describe("areCompatible — BIN y marca", () => {
-    it("dos BIN distintos nunca son la misma tarjeta", () => {
-        expect(areCompatible(fp("493176XXXXXX2780"), fp("548244XXXXXX8001"))).toBe(false);
+    it("un bin en conflicto rechaza aunque sufijo y prefijo sean compatibles", () => {
+        // Con parseBankNumber, bin es siempre prefixDigits.slice(0,6): dos
+        // huellas frescas con bin distinto ya difieren en prefixDigits, y el
+        // guard de prefijo las rechaza solo — ese caso no ejercita este
+        // chequeo. La única forma de que el bin sea la razón decisiva es una
+        // IdentityFingerprint ya fusionada cuyo bin quedó desincronizado de su
+        // prefixDigits: el escenario que mergeFingerprints deja marcado en
+        // `conflicts` (ver el describe de mergeFingerprints, más abajo).
+        const a: IdentityFingerprint = {
+            prefixDigits: "493176", suffixDigits: "2780", bin: "493176",
+            brand: null, totalLength: 16, accountTypeHint: null, institutionHint: null,
+            conflicts: [],
+        };
+        const b: IdentityFingerprint = {
+            prefixDigits: "493176", suffixDigits: "2780", bin: "548244",
+            brand: null, totalLength: 16, accountTypeHint: null, institutionHint: null,
+            conflicts: ["bin"],
+        };
+        expect(areCompatible(a, b)).toBe(false);
     });
 
     it("dos marcas distintas tampoco", () => {
@@ -64,6 +81,13 @@ describe("mergeFingerprints", () => {
     it("se queda con el sufijo más largo conocido", () => {
         const merged = mergeFingerprints([fp("****361"), fp("Mastercard 8361")]);
         expect(merged.suffixDigits).toBe("8361");
+    });
+
+    it("registra en conflicts el bin cuando dos observaciones lo contradicen", () => {
+        const merged = mergeFingerprints([fp("493176XXXXXX2780"), fp("548244XXXXXX8001")]);
+        expect(merged.conflicts).toContain("bin");
+        // Primero-gana: el valor sigue siendo el de la primera observación.
+        expect(merged.bin).toBe("493176");
     });
 });
 
