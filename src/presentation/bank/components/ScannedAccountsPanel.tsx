@@ -1,11 +1,6 @@
-import { ArrowDownLeft, ArrowUpRight, CreditCard, Landmark } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, Landmark } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ScannedAccountView } from "@/application/services/bank-service";
-
-const ROLE_LABEL: Record<ScannedAccountView["role"], string> = {
-    SOURCE: "Origen",
-    DESTINATION: "Destino",
-};
 
 interface ScannedAccountsPanelProps {
     accounts: ScannedAccountView[];
@@ -18,12 +13,16 @@ interface ScannedAccountsPanelProps {
 }
 
 /**
- * Las cuentas que trajo el escaneo, de solo lectura.
+ * Las cuentas del movimiento, de solo lectura y en una línea por lado.
  *
  * Responde a «qué dijo el banco», no a «con qué pagué» — eso se elige en el
- * paso de pago, que gana sobre cualquier lectura automática. Por eso aquí no
- * hay ningún control: enseña el número al estándar de la app, a qué cuenta
- * tuya corresponde, y deja a la vista la cadena original como evidencia.
+ * paso de pago, que gana sobre cualquier lectura automática. Por eso no hay
+ * ningún control aquí.
+ *
+ * Es deliberadamente compacto: vive pegado a la fila de forma de pago, donde
+ * compite por espacio con el resto del resumen. La cadena original del banco y
+ * el nivel de la coincidencia viajan en el `title` en vez de ocupar línea
+ * propia; la pantalla de conciliación es donde esa evidencia se examina.
  */
 export function ScannedAccountsPanel({
     accounts, title = "Cuentas del escaneo", className,
@@ -31,16 +30,14 @@ export function ScannedAccountsPanel({
     if (accounts.length === 0) return null;
 
     return (
-        <div className={cn("rounded-2xl border border-border/40 bg-bg-secondary/30 p-3", className)}>
-            <p className="mb-2 flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.1em] text-text-tertiary">
-                <Landmark className="h-3.5 w-3.5" /> {title}
+        <div className={cn("rounded-2xl border border-border/40 bg-bg-secondary/30 px-3 py-2.5", className)}>
+            <p className="mb-1.5 flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.1em] text-text-tertiary">
+                <Landmark className="h-3 w-3" /> {title}
             </p>
 
-            <ul className="flex flex-col gap-1.5">
+            <ul className="flex flex-col gap-1">
                 {accounts.map((account, index) => (
-                    <li key={`${account.role}-${account.raw}-${index}`}>
-                        <ScannedAccountRow account={account} />
-                    </li>
+                    <ScannedAccountRow key={`${account.role}-${account.raw}-${index}`} account={account} />
                 ))}
             </ul>
         </div>
@@ -50,68 +47,43 @@ export function ScannedAccountsPanel({
 function ScannedAccountRow({ account }: { account: ScannedAccountView }) {
     const isSource = account.role === "SOURCE";
     const RoleIcon = isSource ? ArrowUpRight : ArrowDownLeft;
-    const KindIcon = account.kind === "CARD" ? CreditCard : Landmark;
 
     return (
-        <div className="flex items-start gap-3 rounded-xl border border-border/40 bg-bg-primary/40 p-2.5">
-            <span
-                className={cn(
-                    "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg",
-                    isSource ? "bg-rose-500/15 text-rose-500" : "bg-emerald-500/15 text-emerald-500",
-                )}
-                aria-hidden
-            >
-                <RoleIcon className="h-4 w-4" />
-            </span>
-
-            <div className="min-w-0 flex-1">
-                <p className="text-[10px] font-medium uppercase tracking-[0.1em] text-text-tertiary">
-                    {ROLE_LABEL[account.role]}
-                </p>
-
-                <p className="flex items-center gap-1.5 font-mono text-sm text-text-primary">
-                    <KindIcon className="h-3.5 w-3.5 shrink-0 text-text-tertiary" aria-hidden />
-                    <span className="truncate">{account.display}</span>
-                </p>
-
-                <Attribution account={account} />
-
-                {/* La cadena original queda a la vista: es lo que permite juzgar
-                    si la atribución automática acertó. Una cuenta ya elegida no
-                    tiene lectura que juzgar, y entonces no hay nada que mostrar. */}
-                {account.raw && (
-                    <p className="truncate font-mono text-[10px] text-text-tertiary" title={account.raw}>
-                        {account.raw}
-                    </p>
-                )}
-            </div>
-        </div>
+        <li
+            className="flex items-center gap-1.5 text-xs"
+            title={evidence(account)}
+        >
+            <RoleIcon
+                className={cn("h-3.5 w-3.5 shrink-0", isSource ? "text-rose-500" : "text-emerald-500")}
+                aria-label={isSource ? "Origen" : "Destino"}
+            />
+            <span className="shrink-0 font-mono text-text-primary">{account.display}</span>
+            <span className="truncate text-text-tertiary">{attribution(account)}</span>
+        </li>
     );
 }
 
 /** A quién pertenece el número, en las palabras que el sistema puede sostener. */
-function Attribution({ account }: { account: ScannedAccountView }) {
+function attribution(account: ScannedAccountView): string {
     if (account.match) {
-        return (
-            <p className="truncate text-xs text-text-secondary">
-                {account.match.name}
-                {account.match.institutionName && (
-                    <span className="text-text-tertiary"> · {account.match.institutionName}</span>
-                )}
-                {account.resolution === "INFERRED" && (
-                    <span className="text-text-tertiary"> · por los últimos dígitos</span>
-                )}
-            </p>
-        );
+        return account.match.institutionName
+            ? `${account.match.name} · ${account.match.institutionName}`
+            : account.match.name;
     }
 
     // Sin identidad, lo que se puede decir depende del lado: el origen suele ser
     // del usuario y solo falta registrarlo; el destino, en cambio, es de un
     // tercero. Decir «no es tuya» de un origen sería afirmar de más.
-    return (
-        <p className="truncate text-xs text-text-tertiary">
-            {account.role === "SOURCE" ? "Aún sin registrar en Bancos" : "No es una cuenta tuya"}
-            {account.institutionHint && <span> · {account.institutionHint}</span>}
-        </p>
-    );
+    const fallback = account.role === "SOURCE" ? "Sin registrar" : "De un tercero";
+    return account.institutionHint ? `${fallback} · ${account.institutionHint}` : fallback;
+}
+
+/** Lo que sostiene la lectura, para quien quiera comprobarla. */
+function evidence(account: ScannedAccountView): string | undefined {
+    const parts = [
+        account.raw,
+        account.resolution === "INFERRED" ? "Coincide por los últimos dígitos" : null,
+    ].filter(Boolean);
+
+    return parts.length > 0 ? parts.join(" · ") : undefined;
 }
