@@ -9,7 +9,9 @@ import { cn } from "@/lib/utils";
 import { Textarea } from "@/components/ui/textarea";
 import { TagInput } from "@/components/ui/tag-input";
 import { resolveTransactionTypeOption } from "../../TransactionTypeChips";
+import { describePaymentSource, isGenericPaymentLabel } from "../../../lib/payment-summary";
 import type { MissingField, WizardMode, WizardScreen, WizardValues } from "../../../hooks/useTransactionWizard";
+import type { BankAccount, BankCard } from "@/domain/entities/bank";
 
 const MAX_NOTES = 200;
 
@@ -145,6 +147,11 @@ interface SummaryStepProps {
     notesOrigin: "auto" | "scan" | "manual";
     /** Read-only content appended after the rows (e.g. the scan's original data). */
     extra?: ReactNode;
+    /** Cuentas y tarjetas del usuario, para nombrar con qué se pagó. */
+    accounts?: readonly BankAccount[];
+    cards?: readonly BankCard[];
+    /** Contexto que acompaña a la forma de pago, p. ej. las cuentas del escaneo. */
+    paymentExtra?: ReactNode;
     /**
      * Markers shown beside a value — a scan's match confidence, or whether
      * confirming will reuse a record or create one.
@@ -180,6 +187,9 @@ export function SummaryStep({
     notesOrigin,
     extra,
     fieldMarkers,
+    accounts = [],
+    cards = [],
+    paymentExtra,
 }: SummaryStepProps) {
     const [openEditor, setOpenEditor] = useState<"notes" | "tags" | null>(null);
 
@@ -194,6 +204,16 @@ export function SummaryStep({
         const text = Array.isArray(value) ? value.join(", ") : String(value ?? "");
         return text.trim() || "Sin valor";
     };
+
+    const paymentLabel = describePaymentSource(
+        {
+            accountId: values.bankSourceAccountId,
+            cardId: values.bankCardId,
+            paidWithCredit: values.paidWithCredit,
+        },
+        accounts,
+        cards,
+    );
 
     return (
         <>
@@ -263,10 +283,14 @@ export function SummaryStep({
                     onEdit={() => onEdit("payment")}
                     changed={didChange("paidWithCredit")}
                 >
-                    {values.paidWithCredit
-                        ? "Tarjeta de crédito"
-                        : <span className="text-text-tertiary">Efectivo o débito</span>}
+                    {/* Una cuenta concreta se enseña como valor; el texto genérico
+                        se atenúa, porque significa que no hay nada atado. */}
+                    {isGenericPaymentLabel(paymentLabel)
+                        ? <span className="text-text-tertiary">{paymentLabel}</span>
+                        : paymentLabel}
                 </SummaryRow>
+
+                {paymentExtra}
 
                 <SummaryRow
                     icon={Calendar}

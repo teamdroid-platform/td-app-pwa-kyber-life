@@ -283,10 +283,13 @@ setDisplayNames({ institution: instName, category: catName });
 
     // Collapsed accordion previews (edit mode only)
     const paidWithCreditActive = editState.paidWithCredit && creditEligible;
-    // El selector de cuenta o tarjeta llega con el módulo Bancos; por ahora
-    // este campo solo declara si el gasto se difirió a una tarjeta de crédito.
-    const accountPreview = paidWithCreditActive ? "Tarjeta de crédito" : "Efectivo o débito";
-    const accountHasValue = paidWithCreditActive;
+    // La cuenta con la que se pagó, cuando el movimiento está atado a una del
+    // módulo Bancos. Sin vínculo queda el genérico, que es todo lo que se sabe.
+    const paymentSource = bankAccounts.find(a => a.role === "SOURCE");
+    const accountPreview = paymentSource?.match
+        ? [paymentSource.match.name, paymentSource.display].filter(Boolean).join(" · ")
+        : paidWithCreditActive ? "Tarjeta de crédito" : "Efectivo o débito";
+    const accountHasValue = paidWithCreditActive || !!paymentSource?.match;
     const datePreview = formatDateTimeLocalPreview(editState.date) || "Selecciona fecha y hora";
 
     // Behind the flag, editing is the stepped wizard: it opens on the summary
@@ -301,6 +304,7 @@ setDisplayNames({ institution: instName, category: catName });
                 // Set when the user tapped a specific field on the detail
                 // screen: the editor opens there instead of on the summary.
                 initialFocus={editFocus ?? undefined}
+                bankAccounts={bankAccounts}
                 onSaved={(updated) => {
                     setTransaction(updated);
                     setIsEditing(false);
@@ -527,7 +531,7 @@ setDisplayNames({ institution: instName, category: catName });
                             <FieldCard icon={<Landmark className="h-4 w-4" />} iconClass="bg-emerald-500/15 text-emerald-500" label="Forma de pago">
                                 <div className="flex flex-wrap items-center gap-2">
                                     <p className="text-base font-bold text-text-primary">
-                                        {transaction.paidWithCredit ? "Tarjeta de crédito" : "Efectivo o débito"}
+                                        {accountPreview}
                                     </p>
                                     {transaction.type === "EXPENSE" && transaction.paidWithCredit && (
                                         <Badge variant="outline" className="gap-1.5 rounded-full px-2.5 text-xs">

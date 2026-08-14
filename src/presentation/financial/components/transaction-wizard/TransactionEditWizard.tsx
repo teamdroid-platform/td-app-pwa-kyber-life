@@ -7,6 +7,8 @@ import { getTransactionDisplayTitle } from "@/lib/financial-utils";
 import { updateTransactionAction } from "@/app/actions/financial-transactions";
 import type { FinancialTransaction, FinancialTransactionType } from "@/domain/entities/financial";
 import type { WizardScreen, WizardValues } from "../../hooks/useTransactionWizard";
+import type { ScannedAccountView } from "@/application/services/bank-service";
+import { ScannedAccountsPanel } from "@/presentation/bank/components/ScannedAccountsPanel";
 import { TransactionWizard } from "./TransactionWizard";
 
 export interface TransactionEditWizardProps {
@@ -19,6 +21,8 @@ export interface TransactionEditWizardProps {
     onCancel: () => void;
     /** Open straight on the field the user tapped on the detail screen. */
     initialFocus?: WizardScreen;
+    /** Origen y destino según el módulo Bancos, resueltos por la pantalla. */
+    bankAccounts?: ScannedAccountView[];
 }
 
 /**
@@ -32,6 +36,7 @@ export function TransactionEditWizard({
     onSaved,
     onCancel,
     initialFocus,
+    bankAccounts = [],
 }: TransactionEditWizardProps) {
     const initialValues = useMemo<WizardValues>(() => ({
         type: (transaction.type || "EXPENSE") as FinancialTransactionType,
@@ -96,6 +101,8 @@ export function TransactionEditWizard({
             onSubmit={handleSubmit}
             onClose={onCancel}
             initialFocus={initialFocus}
+            // Editar no debe perder de vista de dónde salió el dinero.
+            paymentHint={<ScannedAccountsPanel accounts={bankAccounts} title="Cuentas del movimiento" />}
         />
     );
 }

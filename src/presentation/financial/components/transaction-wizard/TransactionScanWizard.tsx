@@ -163,12 +163,7 @@ export function TransactionScanWizard({
             paymentHint={<ScannedAccountsPanel accounts={scannedAccounts} />}
             decorateSummary={() => ({
                 fieldMarkers: institutionMatch ? { institutionName: <InstitutionMatchIcon info={institutionMatch} /> } : undefined,
-                extra: (
-                    <>
-                        <ScannedAccountsPanel accounts={scannedAccounts} />
-                        <ScanOriginalData transaction={initialData} />
-                    </>
-                ),
+                extra: <ScanOriginalData transaction={initialData} />,
             })}
             secondaryAction={
                 <Button

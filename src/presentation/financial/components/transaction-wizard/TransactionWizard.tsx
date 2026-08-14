@@ -387,6 +387,11 @@ export function TransactionWizard({
                         notesOrigin={notesOrigin}
                         extra={decoration.extra}
                         fieldMarkers={decoration.fieldMarkers}
+                        accounts={bankAccounts}
+                        cards={bankCards}
+                        // Las cuentas del movimiento pertenecen junto a la forma
+                        // de pago, no al final: es la fila que responden.
+                        paymentExtra={paymentHint}
                     />
                 );
             }
