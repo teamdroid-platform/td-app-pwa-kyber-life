@@ -165,7 +165,11 @@ export class InMemoryBankNumberObservationRepository
     implements IBankNumberObservationRepository {
 
     async findByOwnerId(userId: UUID): Promise<BankNumberObservation[]> {
-        return (await this.findAll()).filter(o => o.ownerUserId === userId);
+        // Mismo orden que su gemelo de Supabase: si divergieran, el modo MEMORY
+        // le mentiría al de SUPABASE sobre en qué orden llegan las observaciones.
+        return (await this.findAll())
+            .filter(o => o.ownerUserId === userId)
+            .sort((a, b) => b.occurrences - a.occurrences);
     }
 
     async findByRaw(userId: UUID, raw: string): Promise<BankNumberObservation | null> {
