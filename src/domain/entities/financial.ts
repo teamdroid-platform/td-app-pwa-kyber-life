@@ -94,6 +94,12 @@ export interface FinancialScannerTransaction extends BaseEntity {
     relatedTransactionHint?: string | null;
     originId?: string | null;
     originStats?: Record<string, any> | null;
+    /**
+     * Cuentas origen y destino que el escáner extrajo del correo, enmascaradas
+     * tal como las escribió el banco. La identificación del módulo Bancos las
+     * parsea; aquí se conservan crudas como evidencia del origen.
+     */
+    accounts?: { type: string; account: string }[] | null;
     status: string;
 }
 

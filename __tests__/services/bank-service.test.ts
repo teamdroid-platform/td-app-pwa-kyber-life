@@ -3,8 +3,10 @@ import {
     InMemoryBankInstitutionRepository, InMemoryBankAccountRepository,
     InMemoryBankCardRepository, InMemoryBankAccountBalanceSnapshotRepository,
     InMemoryBankCardStatementRepository, InMemoryBankMovementRepository,
+    InMemoryBankNumberObservationRepository,
 } from "@/infrastructure/repositories/bank-in-memory";
 import { InMemoryFinancialTransactionRepository } from "@/infrastructure/repositories/implementations";
+import { BankIdentificationService } from "@/application/services/bank-identification-service";
 import type { FinancialTransaction } from "@/domain/entities/financial";
 
 const USER = "11111111-1111-1111-1111-111111111111";
@@ -18,8 +20,10 @@ function buildService() {
     const statements = new InMemoryBankCardStatementRepository();
     const transactions = new InMemoryFinancialTransactionRepository();
     const movements = new InMemoryBankMovementRepository(transactions, cards, statements);
+    const observations = new InMemoryBankNumberObservationRepository();
+    const identification = new BankIdentificationService(observations, accounts, cards, institutions);
     const service = new BankService(
-        institutions, accounts, cards, snapshots, statements, movements, transactions,
+        institutions, accounts, cards, snapshots, statements, movements, transactions, identification,
     );
     return { service, institutions, accounts, cards, snapshots, statements, transactions };
 }

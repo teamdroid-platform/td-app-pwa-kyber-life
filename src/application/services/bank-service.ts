@@ -3,6 +3,7 @@ import type { UUID } from "@/domain/core";
 import type {
     BankInstitution, BankAccount, BankCard,
     BankAccountBalanceSnapshot, BankCardStatement, BankMovement,
+    BankNumberObservation,
 } from "@/domain/entities/bank";
 import type { FinancialTransaction } from "@/domain/entities/financial";
 import type {
@@ -15,6 +16,7 @@ import {
     computeAccountBalance, computeCardDebt, computeAvailableCredit,
     computeStatementDue, runningBalances, statementPeriodFor,
 } from "@/domain/services/bank-balance";
+import { BankIdentificationService } from "./bank-identification-service";
 
 function round2(value: number): number {
     return Math.round(value * 100) / 100;
@@ -85,6 +87,36 @@ export interface CreateAccountInput {
     currency?: string;
 }
 
+/** Una entrada del jsonb `accounts` que produce el escáner. */
+export interface ScannedAccountEntry {
+    /** "origen" | "destino", tal cual lo escribe el escáner. */
+    type: string;
+    account: string;
+}
+
+export interface ScannedTransactionInput {
+    accounts: ScannedAccountEntry[];
+    merchant?: string | null;
+    currency?: string | null;
+    /** Única señal fiable de que el número con BIN es una tarjeta de crédito. */
+    paidWithCredit?: boolean | null;
+}
+
+export interface ResolvedBankLinks {
+    bankSourceAccountId: UUID | null;
+    bankDestinationAccountId: UUID | null;
+    bankCardId: UUID | null;
+    bankInstitutionId: UUID | null;
+    /** La cuenta del otro lado cuando no es del usuario. */
+    bankCounterpartyObservationId: UUID | null;
+}
+
+/** Sufijo mínimo para fundar una identidad sin preguntar. */
+const AUTOCREATE_MIN_SUFFIX = 4;
+
+/** Nombres que sí son de un emisor y no de un comercio cualquiera. */
+const ISSUER_NAME = /banco|coop|coac|cooperativa|mutualista|billetera|pacificard/i;
+
 export interface CreateCardInput {
     institutionId: UUID;
     accountId?: UUID | null;
@@ -109,7 +141,153 @@ export class BankService {
         private readonly statements: IBankCardStatementRepository,
         private readonly movements: IBankMovementRepository,
         private readonly transactions: IFinancialTransactionRepository,
+        private readonly identification: BankIdentificationService,
     ) {}
+
+    // ─── Identificación desde un escaneo ─────────────────────
+
+    /**
+     * Resuelve a qué cuenta o tarjeta pertenece cada número de un escaneo,
+     * creando las identidades que falten.
+     *
+     * La regla de propiedad manda: una cuenta se vuelve identidad propia solo
+     * si aparece como **origen**, porque solo se puede enviar dinero desde una
+     * cuenta propia. Las que solo salen como destino son de un tercero y quedan
+     * como observación `EXTERNAL`, referenciada desde la transacción para que
+     * el detalle pueda mostrar a dónde fue el dinero.
+     */
+    async resolveScannedAccounts(
+        userId: UUID, scan: ScannedTransactionInput,
+    ): Promise<ResolvedBankLinks> {
+        const links: ResolvedBankLinks = {
+            bankSourceAccountId: null, bankDestinationAccountId: null,
+            bankCardId: null, bankInstitutionId: null,
+            bankCounterpartyObservationId: null,
+        };
+
+        const institutionId = await this.resolveInstitution(userId, scan);
+        links.bankInstitutionId = institutionId;
+
+        for (const entry of scan.accounts ?? []) {
+            const raw = entry.account?.trim();
+            if (!raw) continue;
+
+            let observation = await this.identification.observe(userId, raw);
+            const isOrigin = entry.type?.toLowerCase().startsWith("orig") ?? false;
+
+            if (isOrigin && this.canAutoCreate(observation, scan, institutionId)) {
+                await this.createIdentityFrom(userId, observation, institutionId!, scan);
+                // Re-observar para que quede ligada a lo recién creado.
+                observation = await this.identification.reobserve(userId, raw);
+            }
+
+            if (observation.cardId) {
+                links.bankCardId = observation.cardId;
+                // Una tarjeta de débito gasta de su cuenta; el crédito, de ninguna.
+                const card = await this.cards.findById(observation.cardId);
+                if (card?.cardType === "DEBIT" && card.accountId) {
+                    links.bankSourceAccountId = card.accountId;
+                }
+                continue;
+            }
+
+            if (observation.accountId) {
+                if (isOrigin) links.bankSourceAccountId = observation.accountId;
+                else links.bankDestinationAccountId = observation.accountId;
+                continue;
+            }
+
+            // Sin identidad y no es origen: la cuenta es de un tercero.
+            if (!isOrigin) {
+                if (observation.resolution === "PENDING") {
+                    observation = await this.identification.markExternal(userId, observation.id);
+                }
+                links.bankCounterpartyObservationId = observation.id;
+            }
+        }
+
+        return links;
+    }
+
+    /**
+     * Si se puede fundar una identidad a partir de esta observación.
+     *
+     * Con BIN pero sin `paidWithCredit` no se crea nada: `493176XXXXXX2780` es
+     * una Visa de **débito**, y crearla como crédito mostraría una deuda que no
+     * existe — mientras que crearla como débito exige una cuenta que aquí no
+     * se conoce. Sin señal, el tipo lo elige el usuario en conciliación.
+     */
+    private canAutoCreate(
+        observation: BankNumberObservation,
+        scan: ScannedTransactionInput,
+        institutionId: UUID | null,
+    ): boolean {
+        if (observation.resolution !== "PENDING") return false;
+        if (!institutionId) return false;
+        if (observation.suffixDigits.length < AUTOCREATE_MIN_SUFFIX) return false;
+        if (observation.bin && !scan.paidWithCredit) return false;
+        return true;
+    }
+
+    /** Crea la cuenta o la tarjeta que la observación describe, sin confirmar. */
+    private async createIdentityFrom(
+        userId: UUID, observation: BankNumberObservation,
+        institutionId: UUID, scan: ScannedTransactionInput,
+    ): Promise<void> {
+        const currency = scan.currency ?? "USD";
+        const common = {
+            lastFour: observation.suffixDigits,
+            prefixDigits: observation.prefixDigits || null,
+            currency,
+        };
+
+        if (observation.bin) {
+            const card = await this.createCard(userId, {
+                institutionId,
+                name: [observation.brand, `••••${observation.suffixDigits}`]
+                    .filter(Boolean).join(" "),
+                cardType: "CREDIT",
+                brand: observation.brand ?? null,
+                bin: observation.bin,
+                ...common,
+            });
+            await this.cards.update({ ...card, isUnconfirmed: true });
+            return;
+        }
+
+        const account = await this.createAccount(userId, {
+            institutionId,
+            name: `Cuenta ••••${observation.suffixDigits}`,
+            accountType: (observation.accountTypeHint as BankAccount["accountType"]) ?? "SAVINGS",
+            ...common,
+        });
+        await this.accounts.update({ ...account, isUnconfirmed: true });
+    }
+
+    /**
+     * El emisor del movimiento. Sale del merchant del escaneo; si no existe
+     * todavía, se crea sin confirmar.
+     */
+    private async resolveInstitution(
+        userId: UUID, scan: ScannedTransactionInput,
+    ): Promise<UUID | null> {
+        const name = scan.merchant?.trim();
+        if (!name) return null;
+
+        const existing = await this.institutions.findByName(userId, name);
+        if (existing) return existing.id;
+
+        // Solo se crea cuando el nombre suena a emisor: un escaneo de FARMASHOP
+        // no debe fundar un banco llamado FARMASHOP.
+        if (!ISSUER_NAME.test(name)) return null;
+
+        const created = await this.createInstitution(userId, {
+            name,
+            kind: /coop|coac|cooperativa/i.test(name) ? "COOPERATIVE" : "BANK",
+        });
+        await this.institutions.update({ ...created, isUnconfirmed: true });
+        return created.id;
+    }
 
     // ─── Efectivo ────────────────────────────────────────────
 

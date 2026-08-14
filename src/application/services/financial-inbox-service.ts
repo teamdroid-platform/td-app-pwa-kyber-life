@@ -38,7 +38,9 @@ export class FinancialInboxService {
         private transactionRepo: IFinancialTransactionRepository,
         private auditLogRepo: IFinancialTransactionAuditLogRepository,
         private institutionRepo: IFinancialInstitutionRepository,
-        private categoryRepo?: import("../../domain/repositories/financial").IFinancialCategoryRepository
+        private categoryRepo?: import("../../domain/repositories/financial").IFinancialCategoryRepository,
+        /** Opcional: sin él, confirmar un escaneo no identifica cuentas. */
+        private bankService?: import("./bank-service").BankService
     ) {}
 
     async getUnprocessedTransactions(userId: UUID): Promise<FinancialScannerTransaction[]> {
@@ -124,6 +126,18 @@ export class FinancialInboxService {
             throw new Error("La descripción es requerida para confirmar la transacción");
         }
 
+        // Identifica las cuentas del escaneo, creando las que falten. Lo que el
+        // usuario eligió a mano en el wizard gana sobre lo resuelto solo: él vio
+        // el movimiento, la heurística solo vio una cadena enmascarada.
+        const resolvedBank = this.bankService
+            ? await this.bankService.resolveScannedAccounts(dto.userId, {
+                accounts: scannerTx.accounts ?? [],
+                merchant: dto.merchant ?? scannerTx.merchant ?? null,
+                currency: scannerTx.currency ?? 'USD',
+                paidWithCredit: dto.paidWithCredit ?? false,
+            })
+            : null;
+
         const transaction: FinancialTransaction = {
             id: crypto.randomUUID(),
             ownerUserId: dto.userId,
@@ -135,10 +149,11 @@ export class FinancialInboxService {
             merchant: dto.merchant ?? scannerTx.merchant ?? null,
             categoryId: finalCategoryId,
             institutionId: finalInstitutionId,
-            bankSourceAccountId: dto.bankSourceAccountId ?? null,
-            bankDestinationAccountId: dto.bankDestinationAccountId ?? null,
-            bankCardId: dto.bankCardId ?? null,
-            bankInstitutionId: dto.bankInstitutionId ?? null,
+            bankSourceAccountId: dto.bankSourceAccountId ?? resolvedBank?.bankSourceAccountId ?? null,
+            bankDestinationAccountId: dto.bankDestinationAccountId ?? resolvedBank?.bankDestinationAccountId ?? null,
+            bankCardId: dto.bankCardId ?? resolvedBank?.bankCardId ?? null,
+            bankInstitutionId: dto.bankInstitutionId ?? resolvedBank?.bankInstitutionId ?? null,
+            bankCounterpartyObservationId: resolvedBank?.bankCounterpartyObservationId ?? null,
             tags: dto.tags ?? [],
             description: resolvedDescription,
             notes: dto.notes ?? (scannerTx.originStats as Record<string, string>)?.emailBody ?? (scannerTx.originStats as Record<string, string>)?.snippet ?? null,

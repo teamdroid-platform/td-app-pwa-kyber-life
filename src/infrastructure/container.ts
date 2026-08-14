@@ -161,15 +161,6 @@ export const financialTransactionService = new FinancialTransactionService(
     financialInstitutionRepository,
     financialCategoryRepository
 );
-export const financialInboxService = new FinancialInboxService(
-    financialScannerTransactionRepository,
-    financialTransactionRepository,
-    financialTransactionAuditLogRepository,
-    financialInstitutionRepository,
-    financialCategoryRepository
-);
-export const financialDashboardService = new FinancialDashboardService(financialTransactionRepository, financialCategoryRepository, financialInstitutionRepository, financialScannerTransactionRepository);
-export const financialSettingsService = new FinancialSettingsService(financialInstitutionTypeRepository, financialInstitutionRepository, financialCategoryRepository, financialTransactionRepository);
 export const bankIdentificationService = new BankIdentificationService(
     bankObservationRepository,
     bankAccountRepository,
@@ -184,7 +175,18 @@ export const bankService = new BankService(
     bankStatementRepository,
     bankMovementRepository,
     financialTransactionRepository,
+    bankIdentificationService,
 );
+export const financialInboxService = new FinancialInboxService(
+    financialScannerTransactionRepository,
+    financialTransactionRepository,
+    financialTransactionAuditLogRepository,
+    financialInstitutionRepository,
+    financialCategoryRepository,
+    bankService,
+);
+export const financialDashboardService = new FinancialDashboardService(financialTransactionRepository, financialCategoryRepository, financialInstitutionRepository, financialScannerTransactionRepository);
+export const financialSettingsService = new FinancialSettingsService(financialInstitutionTypeRepository, financialInstitutionRepository, financialCategoryRepository, financialTransactionRepository);
 export const notificationService = new NotificationService(notificationRepository);
 export const pushSubscriptionService = new PushSubscriptionService(pushSubscriptionRepository);
 export const masterDataService = new MasterDataService(supermarketRepository, categoryRepository, unitRepository);

@@ -23,6 +23,7 @@ export class SupabaseFinancialScannerTransactionRepository implements IFinancial
             relatedTransactionHint: row.related_transaction_hint,
             originId: row.origin_id,
             originStats: row.origin_stats,
+            accounts: row.accounts ?? null,
             status: row.status,
             createdAt: row.created_at,
             updatedAt: row.updated_at,
@@ -47,6 +48,7 @@ export class SupabaseFinancialScannerTransactionRepository implements IFinancial
             related_transaction_hint: entity.relatedTransactionHint,
             origin_id: entity.originId,
             origin_stats: entity.originStats,
+            accounts: entity.accounts ?? null,
             status: entity.status,
         };
     }
@@ -106,6 +108,7 @@ export class SupabaseFinancialScannerTransactionRepository implements IFinancial
         if (entity.relatedTransactionHint !== undefined) rowData.related_transaction_hint = entity.relatedTransactionHint;
         if (entity.originId !== undefined) rowData.origin_id = entity.originId;
         if (entity.originStats !== undefined) rowData.origin_stats = entity.originStats;
+        if (entity.accounts !== undefined) rowData.accounts = entity.accounts;
         if (entity.status !== undefined) rowData.status = entity.status;
 
         const { data, error } = await supabase
