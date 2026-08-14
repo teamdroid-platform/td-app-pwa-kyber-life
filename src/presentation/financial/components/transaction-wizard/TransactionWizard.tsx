@@ -22,6 +22,7 @@ import { WizardShell } from "./WizardShell";
 import { AmountStep } from "./steps/AmountStep";
 import { CategoryStep, InstitutionStep } from "./steps/PickerSteps";
 import { PaymentStep } from "./steps/PaymentStep";
+import { paymentSourceForCard } from "@/presentation/bank/components/PaymentSourcePicker";
 import { DateStep } from "./steps/DateStep";
 import { SummaryStep, type FieldMarkers } from "./steps/SummaryStep";
 
@@ -114,11 +115,13 @@ export function TransactionWizard({
         institutionTypes,
         bankAccounts,
         bankCards,
+        bankInstitutions,
         categories,
         loading: optionsLoading,
         error: optionsError,
         setInstitutions,
         setCategories,
+        addBankEntities,
     } = useTransactionFormOptions();
 
     useEffect(() => {
@@ -237,6 +240,23 @@ export function TransactionWizard({
     // Choosing from the picker makes the name authoritative again: any id a
     // pre-filled flow had resolved refers to a different record than the one
     // just selected, and keeping it would silently override the choice.
+    // Lo que se crea en el paso de pago se elige solo: nadie abre ese formulario
+    // para después no usar lo que acaba de registrar.
+    const handleAccountCreated: React.ComponentProps<typeof PaymentStep>["onAccountCreated"] = ({ account, institution }) => {
+        addBankEntities({ account, institution });
+        wizard.patch({ bankSourceAccountId: account.id, bankCardId: null, paidWithCredit: false });
+    };
+
+    const handleCardCreated: React.ComponentProps<typeof PaymentStep>["onCardCreated"] = ({ card, institution }) => {
+        addBankEntities({ card, institution });
+        const source = paymentSourceForCard(card);
+        wizard.patch({
+            bankCardId: source.cardId ?? null,
+            bankSourceAccountId: source.accountId ?? null,
+            paidWithCredit: source.paidWithCredit,
+        });
+    };
+
     // El tipo declarado pertenece al emisor anterior, no al recién elegido.
     const handleSelectInstitution = (name: string) => {
         wizard.patch({ institutionName: name, institutionId: null, bankInstitutionKind: null });
@@ -335,12 +355,15 @@ export function TransactionWizard({
                             bankCardId: source.cardId ?? null,
                             paidWithCredit: source.paidWithCredit,
                         })}
+                        institutions={bankInstitutions}
+                        onAccountCreated={handleAccountCreated}
+                        onCardCreated={handleCardCreated}
                     />
                 );
             case "date":
                 return <DateStep value={values.date} onChange={(v) => setValue("date", v)} />;
             case "summary": {
-                const decoration = decorateSummary?.({ values, institutions, institutionTypes, categories, bankAccounts, bankCards }) ?? {};
+                const decoration = decorateSummary?.({ values, institutions, institutionTypes, categories, bankAccounts, bankCards, bankInstitutions }) ?? {};
                 return (
                     <SummaryStep
                         values={values}

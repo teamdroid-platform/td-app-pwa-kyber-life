@@ -1,9 +1,11 @@
 "use client";
 
-import { CreditCard, Landmark, Wallet, PiggyBank, TrendingUp } from "lucide-react";
+import { CreditCard, Landmark, Wallet, PiggyBank, TrendingUp, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatBankNumber } from "@/lib/format-bank-number";
-import type { BankAccount, BankCard, BankAccountType } from "@/domain/entities/bank";
+import { AccountFormSheet } from "./AccountFormSheet";
+import { CardFormSheet } from "./CardFormSheet";
+import type { BankAccount, BankCard, BankAccountType, BankInstitution } from "@/domain/entities/bank";
 import type { UUID } from "@/domain/core";
 
 const ACCOUNT_ICON: Record<BankAccountType, typeof Landmark> = {
@@ -19,11 +21,33 @@ export interface PaymentSource {
     paidWithCredit: boolean;
 }
 
+/**
+ * Lo que significa pagar con una tarjeta.
+ *
+ * El crédito difiere el gasto: no sale de ninguna cuenta hoy, sale cuando se
+ * pague la tarjeta. El débito sí gasta, y de la cuenta a la que está atado —
+ * la tarjeta es solo el instrumento.
+ */
+export function paymentSourceForCard(card: BankCard): PaymentSource {
+    if (card.cardType === "CREDIT") {
+        return { cardId: card.id, paidWithCredit: true };
+    }
+    return { cardId: card.id, accountId: card.accountId ?? undefined, paidWithCredit: false };
+}
+
 interface PaymentSourcePickerProps {
     accounts: BankAccount[];
     cards: BankCard[];
     value: Partial<PaymentSource>;
     onChange: (value: PaymentSource) => void;
+    /**
+     * Emisores disponibles para dar de alta aquí mismo. Junto con los dos
+     * callbacks de abajo habilitan la creación en el paso; sin ellos el picker
+     * solo elige entre lo que ya existe, como hacía antes.
+     */
+    institutions?: BankInstitution[];
+    onAccountCreated?: (created: { account: BankAccount; institution: BankInstitution | null }) => void;
+    onCardCreated?: (created: { card: BankCard; institution: BankInstitution | null }) => void;
 }
 
 /**
@@ -38,8 +62,10 @@ interface PaymentSourcePickerProps {
  */
 export function PaymentSourcePicker({
     accounts, cards, value, onChange,
+    institutions, onAccountCreated, onCardCreated,
 }: PaymentSourcePickerProps) {
     const isEmpty = accounts.length === 0 && cards.length === 0;
+    const canCreate = !!institutions && !!onAccountCreated && !!onCardCreated;
 
     function selectAccount(account: BankAccount) {
         if (value.accountId === account.id && !value.cardId) {
@@ -54,23 +80,35 @@ export function PaymentSourcePicker({
             onChange({ paidWithCredit: false });
             return;
         }
-        if (card.cardType === "CREDIT") {
-            onChange({ cardId: card.id, paidWithCredit: true });
-            return;
-        }
-        onChange({
-            cardId: card.id,
-            accountId: card.accountId ?? undefined,
-            paidWithCredit: false,
-        });
+        onChange(paymentSourceForCard(card));
     }
+
+    const createButtons = canCreate && (
+        <div className="grid grid-cols-2 gap-2">
+            <AccountFormSheet
+                institutions={institutions}
+                onCreated={onAccountCreated}
+                trigger={<CreateButton label="Nueva cuenta" icon={<Landmark className="h-4 w-4" />} />}
+            />
+            <CardFormSheet
+                institutions={institutions}
+                accounts={accounts}
+                onCreated={onCardCreated}
+                trigger={<CreateButton label="Nueva tarjeta" icon={<CreditCard className="h-4 w-4" />} />}
+            />
+        </div>
+    );
 
     if (isEmpty) {
         return (
-            <p className="text-xs leading-relaxed text-text-tertiary">
-                Todavía no registras cuentas ni tarjetas. Puedes crearlas en Bancos y
-                volver aquí, o dejar este paso vacío.
-            </p>
+            <div className="flex flex-col gap-3">
+                <p className="text-xs leading-relaxed text-text-tertiary">
+                    {canCreate
+                        ? "Todavía no registras cuentas ni tarjetas. Créala aquí mismo, o deja este paso vacío."
+                        : "Todavía no registras cuentas ni tarjetas. Puedes crearlas en Bancos y volver aquí, o dejar este paso vacío."}
+                </p>
+                {createButtons}
+            </div>
         );
     }
 
@@ -121,11 +159,29 @@ export function PaymentSourcePicker({
                 </div>
             )}
 
+            {createButtons}
+
             <p className="rounded-xl border border-border/40 bg-bg-secondary/40 p-3 text-[11px] leading-relaxed text-text-tertiary">
                 Si eliges una tarjeta de crédito, el gasto <b>no baja tu saldo hoy</b>.
                 Baja cuando registres el pago de la tarjeta.
             </p>
         </div>
+    );
+}
+
+/** Disparador de los formularios de alta, al pie de las opciones. */
+function CreateButton({ label, icon }: { label: string; icon: React.ReactNode }) {
+    return (
+        <button
+            type="button"
+            className="flex items-center justify-center gap-1.5 rounded-xl border border-dashed border-border/60 p-2.5 text-xs font-medium text-text-tertiary transition-colors hover:border-accent-primary hover:text-text-primary"
+        >
+            <span className="relative flex h-4 w-4 shrink-0 items-center justify-center">
+                {icon}
+                <Plus className="absolute -bottom-0.5 -right-1 h-2.5 w-2.5 rounded-full bg-bg-primary" />
+            </span>
+            {label}
+        </button>
     );
 }
 

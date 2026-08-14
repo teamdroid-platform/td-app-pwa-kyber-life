@@ -2,7 +2,7 @@
 
 import { StepHeading } from "../WizardShell";
 import { PaymentSourcePicker, type PaymentSource } from "@/presentation/bank/components/PaymentSourcePicker";
-import type { BankAccount, BankCard } from "@/domain/entities/bank";
+import type { BankAccount, BankCard, BankInstitution } from "@/domain/entities/bank";
 
 interface PaymentStepProps {
     accounts: BankAccount[];
@@ -11,6 +11,10 @@ interface PaymentStepProps {
     onChange: (value: PaymentSource) => void;
     /** El crédito solo aplica a tipos de gasto; con otros se ocultan las tarjetas. */
     creditEligible: boolean;
+    /** Emisores para dar de alta una cuenta o tarjeta sin salir del paso. */
+    institutions?: BankInstitution[];
+    onAccountCreated?: (created: { account: BankAccount; institution: BankInstitution | null }) => void;
+    onCardCreated?: (created: { card: BankCard; institution: BankInstitution | null }) => void;
 }
 
 /**
@@ -19,7 +23,10 @@ interface PaymentStepProps {
  * `paidWithCredit` ya no es una pregunta suelta: se deriva de lo que se elige.
  * Elegir una tarjeta de crédito difiere el gasto; cualquier otra cosa no.
  */
-export function PaymentStep({ accounts, cards, value, onChange, creditEligible }: PaymentStepProps) {
+export function PaymentStep({
+    accounts, cards, value, onChange, creditEligible,
+    institutions, onAccountCreated, onCardCreated,
+}: PaymentStepProps) {
     // Un ingreso o una transferencia no se pagan con crédito, así que esas
     // tarjetas no deben ni aparecer como opción.
     const selectableCards = creditEligible ? cards : cards.filter(c => c.cardType === "DEBIT");
@@ -35,6 +42,9 @@ export function PaymentStep({ accounts, cards, value, onChange, creditEligible }
                 cards={selectableCards}
                 value={value}
                 onChange={onChange}
+                institutions={institutions}
+                onAccountCreated={onAccountCreated}
+                onCardCreated={onCardCreated}
             />
         </>
     );

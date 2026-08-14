@@ -10,7 +10,11 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SegmentedChoice } from "./SegmentedChoice";
 import { createBankCardAction } from "@/app/actions/bank";
-import type { BankInstitution, BankAccount, BankCardType } from "@/domain/entities/bank";
+import {
+    InstitutionCombo, EMPTY_INSTITUTION_CHOICE, ensureInstitution,
+    type InstitutionChoice,
+} from "./InstitutionCombo";
+import type { BankInstitution, BankAccount, BankCard, BankCardType } from "@/domain/entities/bank";
 
 const CARD_TYPES = [
     { value: "CREDIT" as const, label: "Crédito" },
@@ -25,6 +29,11 @@ interface CardFormSheetProps {
     trigger: React.ReactNode;
     open?: boolean;
     onOpenChange?: (open: boolean) => void;
+    /**
+     * Qué hacer con lo recién creado, en vez de recargar la página. Ver la nota
+     * en `AccountFormSheet`: dentro del wizard un refresh tiraría lo escrito.
+     */
+    onCreated?: (created: { card: BankCard; institution: BankInstitution | null }) => void;
 }
 
 /**
@@ -34,7 +43,7 @@ interface CardFormSheetProps {
  * otra rama para que no viajen valores que el esquema va a rechazar.
  */
 export function CardFormSheet({
-    institutions, accounts, trigger, open: controlledOpen, onOpenChange,
+    institutions, accounts, trigger, open: controlledOpen, onOpenChange, onCreated,
 }: CardFormSheetProps) {
     const router = useRouter();
     const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
@@ -42,7 +51,11 @@ export function CardFormSheet({
     const setOpen = onOpenChange ?? setUncontrolledOpen;
 
     const [cardType, setCardType] = useState<BankCardType>("CREDIT");
-    const [institutionId, setInstitutionId] = useState(institutions[0]?.id ?? "");
+    const [institution, setInstitution] = useState<InstitutionChoice>(() =>
+        institutions[0]
+            ? { id: institutions[0].id, name: institutions[0].name, kind: institutions[0].kind }
+            : EMPTY_INSTITUTION_CHOICE,
+    );
     const [accountId, setAccountId] = useState(accounts[0]?.id ?? "");
     const [name, setName] = useState("");
     const [brand, setBrand] = useState("");
@@ -69,14 +82,17 @@ export function CardFormSheet({
             toast.error("El nombre es requerido");
             return;
         }
-        if (!institutionId) {
-            toast.error("Elige la institución que emite la tarjeta");
+
+        setSaving(true);
+        const emisor = await ensureInstitution(institution, institutions);
+        if (!emisor.ok) {
+            setSaving(false);
+            toast.error(emisor.error);
             return;
         }
 
-        setSaving(true);
         const result = await createBankCardAction({
-            institutionId,
+            institutionId: emisor.id,
             accountId: isCredit ? null : (accountId || null),
             name: name.trim(),
             cardType,
@@ -98,7 +114,9 @@ export function CardFormSheet({
         setName(""); setBrand(""); setLastFour("");
         setCreditLimit(""); setStatementDay(""); setDueDay("");
         setOpen(false);
-        router.refresh();
+
+        if (onCreated) onCreated({ card: result.data, institution: emisor.created });
+        else router.refresh();
     }
 
     return (
@@ -121,20 +139,12 @@ export function CardFormSheet({
                 onChange={switchType}
             />
 
-            <Field label="Institución">
-                <Select value={institutionId} onValueChange={setInstitutionId}>
-                    {/* El trigger de Radix no es un control asociable a <label>,
-                        así que lleva su propio nombre accesible. */}
-                    <SelectTrigger aria-label="Institución">
-                        <SelectValue placeholder="Elige el emisor" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {institutions.map(i => (
-                            <SelectItem key={i.id} value={i.id}>{i.name}</SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-            </Field>
+            <InstitutionCombo
+                id="card-institution"
+                institutions={institutions}
+                value={institution}
+                onChange={setInstitution}
+            />
 
             <Field label="Nombre" htmlFor="card-name">
                 <Input

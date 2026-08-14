@@ -7,7 +7,7 @@ import type {
     FinancialInstitutionType,
     FinancialCategory,
 } from "@/domain/entities/financial";
-import type { BankAccount, BankCard } from "@/domain/entities/bank";
+import type { BankAccount, BankCard, BankInstitution } from "@/domain/entities/bank";
 
 export interface TransactionFormOptions {
     institutions: FinancialInstitution[];
@@ -16,11 +16,13 @@ export interface TransactionFormOptions {
     /** Cuentas y tarjetas confirmadas, para el paso de pago. */
     bankAccounts: BankAccount[];
     bankCards: BankCard[];
+    /** Emisores, para dar de alta una cuenta o tarjeta desde ese mismo paso. */
+    bankInstitutions: BankInstitution[];
 }
 
 const EMPTY: TransactionFormOptions = {
     institutions: [], categories: [], institutionTypes: [],
-    bankAccounts: [], bankCards: [],
+    bankAccounts: [], bankCards: [], bankInstitutions: [],
 };
 
 /** One retry covers the common transient case (a token refresh racing the request). */
@@ -112,6 +114,28 @@ export function useTransactionFormOptions(onLoaded?: (options: TransactionFormOp
         setOptions((prev) => ({ ...prev, categories }));
     }, []);
 
+    /**
+     * Suma lo que el paso de pago acaba de crear, sin recargar.
+     *
+     * Recargar la ruta aquí tiraría lo que el usuario lleva escrito en el
+     * wizard, así que la lista se actualiza en memoria y el servidor ya quedó
+     * al día por su cuenta.
+     */
+    const addBankEntities = useCallback((added: {
+        account?: BankAccount;
+        card?: BankCard;
+        institution?: BankInstitution | null;
+    }) => {
+        setOptions((prev) => ({
+            ...prev,
+            bankAccounts: added.account ? [...prev.bankAccounts, added.account] : prev.bankAccounts,
+            bankCards: added.card ? [...prev.bankCards, added.card] : prev.bankCards,
+            bankInstitutions: added.institution
+                ? [...prev.bankInstitutions, added.institution]
+                : prev.bankInstitutions,
+        }));
+    }, []);
+
     return {
         ...options,
         loading,
@@ -119,5 +143,6 @@ export function useTransactionFormOptions(onLoaded?: (options: TransactionFormOp
         reload,
         setInstitutions,
         setCategories,
+        addBankEntities,
     };
 }

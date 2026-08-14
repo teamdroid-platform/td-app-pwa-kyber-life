@@ -9,7 +9,11 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { createBankAccountAction } from "@/app/actions/bank";
-import type { BankInstitution, BankAccountType } from "@/domain/entities/bank";
+import {
+    InstitutionCombo, EMPTY_INSTITUTION_CHOICE, ensureInstitution,
+    type InstitutionChoice,
+} from "./InstitutionCombo";
+import type { BankInstitution, BankAccount, BankAccountType } from "@/domain/entities/bank";
 
 const TYPES: { value: BankAccountType; label: string }[] = [
     { value: "SAVINGS", label: "Ahorros" },
@@ -20,16 +24,32 @@ const TYPES: { value: BankAccountType; label: string }[] = [
 interface AccountFormSheetProps {
     institutions: BankInstitution[];
     trigger: React.ReactNode;
+    /**
+     * Qué hacer con lo recién creado, en vez de recargar la página.
+     *
+     * Sin esto el formulario refresca la ruta, que es lo correcto en Bancos.
+     * Dentro del wizard de transacciones un refresh tiraría lo que el usuario
+     * lleva escrito, así que quien lo abre desde ahí recibe las entidades y
+     * actualiza sus propias listas.
+     */
+    onCreated?: (created: { account: BankAccount; institution: BankInstitution | null }) => void;
 }
 
 /**
  * Alta de cuenta. No ofrece el tipo `CASH`: la cuenta de efectivo la crea el
  * servicio sola y hay a lo sumo una por usuario.
+ *
+ * El emisor se elige o se escribe: si no existe todavía, nace junto con la
+ * cuenta en un solo guardado.
  */
-export function AccountFormSheet({ institutions, trigger }: AccountFormSheetProps) {
+export function AccountFormSheet({ institutions, trigger, onCreated }: AccountFormSheetProps) {
     const router = useRouter();
     const [open, setOpen] = useState(false);
-    const [institutionId, setInstitutionId] = useState(institutions[0]?.id ?? "");
+    const [institution, setInstitution] = useState<InstitutionChoice>(() =>
+        institutions[0]
+            ? { id: institutions[0].id, name: institutions[0].name, kind: institutions[0].kind }
+            : EMPTY_INSTITUTION_CHOICE,
+    );
     const [name, setName] = useState("");
     const [accountType, setAccountType] = useState<BankAccountType>("SAVINGS");
     const [lastFour, setLastFour] = useState("");
@@ -40,14 +60,17 @@ export function AccountFormSheet({ institutions, trigger }: AccountFormSheetProp
             toast.error("El nombre es requerido");
             return;
         }
-        if (!institutionId) {
-            toast.error("Crea primero la institución que emite la cuenta");
+
+        setSaving(true);
+        const emisor = await ensureInstitution(institution, institutions);
+        if (!emisor.ok) {
+            setSaving(false);
+            toast.error(emisor.error);
             return;
         }
 
-        setSaving(true);
         const result = await createBankAccountAction({
-            institutionId,
+            institutionId: emisor.id,
             name: name.trim(),
             accountType,
             lastFour: lastFour || null,
@@ -63,7 +86,9 @@ export function AccountFormSheet({ institutions, trigger }: AccountFormSheetProp
         toast.success("Cuenta creada");
         setName(""); setLastFour("");
         setOpen(false);
-        router.refresh();
+
+        if (onCreated) onCreated({ account: result.data, institution: emisor.created });
+        else router.refresh();
     }
 
     return (
@@ -79,18 +104,12 @@ export function AccountFormSheet({ institutions, trigger }: AccountFormSheetProp
                 </Button>
             }
         >
-            <Field label="Institución">
-                <Select value={institutionId} onValueChange={setInstitutionId}>
-                    <SelectTrigger aria-label="Institución">
-                        <SelectValue placeholder="Elige el emisor" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {institutions.map(i => (
-                            <SelectItem key={i.id} value={i.id}>{i.name}</SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-            </Field>
+            <InstitutionCombo
+                id="account-institution"
+                institutions={institutions}
+                value={institution}
+                onChange={setInstitution}
+            />
 
             <Field label="Nombre" htmlFor="account-name">
                 <Input

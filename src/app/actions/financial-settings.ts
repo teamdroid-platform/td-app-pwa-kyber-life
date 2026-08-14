@@ -113,6 +113,10 @@ export async function getTransactionFormOptionsAction() {
                 institutionTypes,
                 bankAccounts: bankOverview.accounts.filter(a => !a.isUnconfirmed),
                 bankCards: bankOverview.cards.filter(c => !c.isUnconfirmed),
+                // Sin filtrar: el alta desde el paso de pago necesita ofrecer
+                // todos los emisores, incluidos los que nacieron de un escaneo
+                // y aún no se confirman.
+                bankInstitutions: bankOverview.institutions,
             },
         };
     } catch (error) {
