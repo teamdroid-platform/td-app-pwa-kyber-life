@@ -27,7 +27,8 @@ import {
     InMemoryBankCardRepository,
     InMemoryBankAccountBalanceSnapshotRepository,
     InMemoryBankCardStatementRepository,
-    InMemoryBankMovementRepository
+    InMemoryBankMovementRepository,
+    InMemoryBankNumberObservationRepository
 } from "./repositories/bank-in-memory";
 import { seedRepositories } from "./seed/seed-data";
 import { randomUUID } from "crypto";
@@ -59,7 +60,8 @@ import {
     SupabaseBankCardRepository,
     SupabaseBankAccountBalanceSnapshotRepository,
     SupabaseBankCardStatementRepository,
-    SupabaseBankMovementRepository
+    SupabaseBankMovementRepository,
+    SupabaseBankNumberObservationRepository
 } from "./repositories/supabase"; // Need to create this index or import individually
 
 // ... Previous imports ...
@@ -127,6 +129,9 @@ export const bankMovementRepository = singleton("bankMovementRepo", () => isSupa
     // La versión in-memory deriva los movimientos de las transacciones, así que
     // necesita los tres repos de los que la vista SQL hace JOIN.
     : new InMemoryBankMovementRepository(financialTransactionRepository, bankCardRepository, bankStatementRepository));
+export const bankObservationRepository = singleton("bankObservationRepo", () => isSupabase
+    ? new SupabaseBankNumberObservationRepository()
+    : new InMemoryBankNumberObservationRepository());
 
 export const notificationRepository = singleton("notificationRepo", () => isSupabase ? new SupabaseNotificationRepository() : new InMemoryNotificationRepository());
 export const pushSubscriptionRepository = singleton("pushSubscriptionRepo", () => isSupabase ? new SupabasePushSubscriptionRepository() : new InMemoryPushSubscriptionRepository());

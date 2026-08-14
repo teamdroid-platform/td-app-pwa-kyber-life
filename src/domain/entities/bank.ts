@@ -115,3 +115,27 @@ export interface BankMovement {
     merchant?: string | null;
     categoryId?: UUID | null;
 }
+
+export type BankNumberResolution = 'EXACT' | 'INFERRED' | 'MANUAL' | 'EXTERNAL' | 'PENDING';
+
+/**
+ * Una forma concreta en que se vio escrito un número, con sus partes parseadas.
+ * La cadena cruda se conserva íntegra: si las reglas de emparejamiento mejoran,
+ * todo se puede recalcular sin haber perdido nada.
+ */
+export interface BankNumberObservation extends BaseEntity {
+    ownerUserId: UUID;
+    raw: string;
+    prefixDigits: string;
+    suffixDigits: string;
+    totalLength?: number | null;
+    bin?: string | null;
+    brand?: string | null;
+    accountTypeHint?: string | null;
+    institutionHint?: string | null;
+    isComplete: boolean;
+    accountId?: UUID | null;
+    cardId?: UUID | null;
+    resolution: BankNumberResolution;
+    occurrences: number;
+}

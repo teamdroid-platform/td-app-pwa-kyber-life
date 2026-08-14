@@ -3,11 +3,12 @@ import type { UUID, ISODate } from "@/domain/core";
 import type {
     BankInstitution, BankAccount, BankCard,
     BankAccountBalanceSnapshot, BankCardStatement, BankMovement,
+    BankNumberObservation, BankNumberResolution,
 } from "@/domain/entities/bank";
 import type {
     IBankInstitutionRepository, IBankAccountRepository, IBankCardRepository,
     IBankAccountBalanceSnapshotRepository, IBankCardStatementRepository,
-    IBankMovementRepository, BankMovementFilter,
+    IBankMovementRepository, BankMovementFilter, IBankNumberObservationRepository,
 } from "@/domain/repositories/bank";
 import type { IFinancialTransactionRepository } from "@/domain/repositories/financial";
 
@@ -156,5 +157,29 @@ export class InMemoryBankMovementRepository implements IBankMovementRepository {
         if (filter.until) movs = movs.filter(m => Date.parse(m.date) <= Date.parse(filter.until!));
 
         return filter.limit ? movs.slice(0, filter.limit) : movs;
+    }
+}
+
+export class InMemoryBankNumberObservationRepository
+    extends InMemoryRepository<BankNumberObservation>
+    implements IBankNumberObservationRepository {
+
+    async findByOwnerId(userId: UUID): Promise<BankNumberObservation[]> {
+        return (await this.findAll()).filter(o => o.ownerUserId === userId);
+    }
+
+    async findByRaw(userId: UUID, raw: string): Promise<BankNumberObservation | null> {
+        return (await this.findByOwnerId(userId)).find(o => o.raw === raw) ?? null;
+    }
+
+    async findByResolution(userId: UUID, resolution: BankNumberResolution): Promise<BankNumberObservation[]> {
+        return (await this.findByOwnerId(userId))
+            .filter(o => o.resolution === resolution)
+            .sort((a, b) => b.occurrences - a.occurrences);
+    }
+
+    async findResolved(userId: UUID): Promise<BankNumberObservation[]> {
+        return (await this.findByOwnerId(userId))
+            .filter(o => ["EXACT", "INFERRED", "MANUAL"].includes(o.resolution));
     }
 }

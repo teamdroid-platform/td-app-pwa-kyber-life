@@ -2,7 +2,8 @@ import { UUID, ISODate } from "../core";
 import { IRepository } from "./index";
 import {
     BankInstitution, BankAccount, BankCard,
-    BankAccountBalanceSnapshot, BankCardStatement, BankMovement
+    BankAccountBalanceSnapshot, BankCardStatement, BankMovement,
+    BankNumberObservation, BankNumberResolution
 } from "../entities/bank";
 
 export interface IBankInstitutionRepository extends IRepository<BankInstitution> {
@@ -47,4 +48,13 @@ export interface BankMovementFilter {
 export interface IBankMovementRepository {
     find(userId: UUID, filter: BankMovementFilter): Promise<BankMovement[]>;
     findAllForOwner(userId: UUID): Promise<BankMovement[]>;
+}
+
+export interface IBankNumberObservationRepository extends IRepository<BankNumberObservation> {
+    findByOwnerId(userId: UUID): Promise<BankNumberObservation[]>;
+    /** La observación de esta cadena exacta, si ya se vio. */
+    findByRaw(userId: UUID, raw: string): Promise<BankNumberObservation | null>;
+    findByResolution(userId: UUID, resolution: BankNumberResolution): Promise<BankNumberObservation[]>;
+    /** Las que ya apuntan a una identidad; alimentan el emparejamiento. */
+    findResolved(userId: UUID): Promise<BankNumberObservation[]>;
 }

@@ -26,3 +26,4 @@ export * from './supabase-bank-card-repository';
 export * from './supabase-bank-snapshot-repository';
 export * from './supabase-bank-statement-repository';
 export * from './supabase-bank-movement-repository';
+export * from './supabase-bank-observation-repository';
