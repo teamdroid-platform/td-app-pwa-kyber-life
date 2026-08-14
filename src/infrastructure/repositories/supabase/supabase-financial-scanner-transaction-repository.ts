@@ -148,4 +148,21 @@ export class SupabaseFinancialScannerTransactionRepository implements IFinancial
         if (!data) return [];
         return data.map(this.mapToEntity);
     }
+
+    /** Todos los escaneos del usuario. Lo usa el re-ligado del historial. */
+    async findByOwnerId(userId: UUID): Promise<FinancialScannerTransaction[]> {
+        const supabase = await createClient();
+        const { data, error } = await supabase
+            .from(this.tableName)
+            .select("*")
+            .eq("owner_user_id", userId)
+            .order("date", { ascending: false });
+
+        if (error) {
+            console.error("Error in findByOwnerId:", error);
+            throw error;
+        }
+        if (!data) return [];
+        return data.map(this.mapToEntity);
+    }
 }

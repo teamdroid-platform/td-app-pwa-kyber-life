@@ -5,13 +5,17 @@ import type {
     BankAccountBalanceSnapshot, BankCardStatement, BankMovement,
     BankNumberObservation,
 } from "@/domain/entities/bank";
-import type { FinancialTransaction } from "@/domain/entities/financial";
+import type {
+    FinancialTransaction, FinancialScannerTransaction,
+} from "@/domain/entities/financial";
 import type {
     IBankInstitutionRepository, IBankAccountRepository, IBankCardRepository,
     IBankAccountBalanceSnapshotRepository, IBankCardStatementRepository,
     IBankMovementRepository,
 } from "@/domain/repositories/bank";
-import type { IFinancialTransactionRepository } from "@/domain/repositories/financial";
+import type {
+    IFinancialTransactionRepository, IFinancialScannerTransactionRepository,
+} from "@/domain/repositories/financial";
 import {
     computeAccountBalance, computeCardDebt, computeAvailableCredit,
     computeStatementDue, runningBalances, statementPeriodFor,
@@ -142,6 +146,8 @@ export class BankService {
         private readonly movements: IBankMovementRepository,
         private readonly transactions: IFinancialTransactionRepository,
         private readonly identification: BankIdentificationService,
+        /** Opcional: sin él, `relinkHistory` no tiene de dónde leer los escaneos. */
+        private readonly scannerTransactions?: IFinancialScannerTransactionRepository,
     ) {}
 
     // ─── Identificación desde un escaneo ─────────────────────
@@ -207,6 +213,67 @@ export class BankService {
         }
 
         return links;
+    }
+
+    /**
+     * Re-apunta las transacciones del historial contra las identidades ya
+     * resueltas.
+     *
+     * El vínculo entre una transacción y su escaneo es
+     * `origin_stats.originalExecutionId` más el monto: la transacción no guarda
+     * el jsonb `accounts`, solo el escaneo lo tiene. Solo toca transacciones
+     * que aún no tengan ninguna columna `bank_*`, para no pisar lo que el
+     * usuario ya eligió a mano.
+     */
+    async relinkHistory(userId: UUID): Promise<number> {
+        if (!this.scannerTransactions) return 0;
+
+        const [transactions, scans] = await Promise.all([
+            this.transactions.findByOwnerId(userId),
+            this.scannerTransactions.findByOwnerId(userId),
+        ]);
+
+        const byExecution = new Map<string, FinancialScannerTransaction[]>();
+        for (const scan of scans) {
+            if (!scan.executionId) continue;
+            const list = byExecution.get(scan.executionId) ?? [];
+            list.push(scan);
+            byExecution.set(scan.executionId, list);
+        }
+
+        let relinked = 0;
+
+        for (const transaction of transactions) {
+            const alreadyLinked = transaction.bankSourceAccountId
+                || transaction.bankDestinationAccountId
+                || transaction.bankCardId;
+            if (alreadyLinked) continue;
+
+            const executionId = (transaction.originStats as Record<string, unknown> | null)
+                ?.originalExecutionId;
+            if (typeof executionId !== "string") continue;
+
+            const scan = (byExecution.get(executionId) ?? [])
+                .find(s => Number(s.amount) === Number(transaction.amount));
+            if (!scan?.accounts?.length) continue;
+
+            const links = await this.resolveScannedAccounts(userId, {
+                accounts: scan.accounts,
+                merchant: transaction.merchant ?? scan.merchant ?? null,
+                currency: transaction.currency,
+                paidWithCredit: transaction.paidWithCredit ?? false,
+            });
+
+            const gotSomething = links.bankSourceAccountId
+                || links.bankDestinationAccountId
+                || links.bankCardId;
+            if (!gotSomething) continue;
+
+            await this.transactions.update({ ...transaction, ...links });
+            relinked++;
+        }
+
+        return relinked;
     }
 
     /**

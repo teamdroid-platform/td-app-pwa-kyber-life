@@ -6,7 +6,11 @@ import {
     InMemoryBankCardStatementRepository, InMemoryBankMovementRepository,
     InMemoryBankNumberObservationRepository,
 } from "@/infrastructure/repositories/bank-in-memory";
-import { InMemoryFinancialTransactionRepository } from "@/infrastructure/repositories/implementations";
+import {
+    InMemoryFinancialTransactionRepository,
+    InMemoryFinancialScannerTransactionRepository,
+} from "@/infrastructure/repositories/implementations";
+import type { FinancialTransaction, FinancialScannerTransaction } from "@/domain/entities/financial";
 
 const USER = "11111111-1111-4111-8111-111111111111";
 
@@ -21,12 +25,14 @@ async function buildService() {
     const observations = new InMemoryBankNumberObservationRepository();
 
     const identification = new BankIdentificationService(observations, accounts, cards, institutions);
+    const scanner = new InMemoryFinancialScannerTransactionRepository();
     const service = new BankService(
-        institutions, accounts, cards, snapshots, statements, movements, transactions, identification,
+        institutions, accounts, cards, snapshots, statements, movements, transactions,
+        identification, scanner,
     );
 
     const inst = await service.createInstitution(USER, { name: "Banco del Austro", kind: "BANK" });
-    return { service, identification, observations, accounts, cards, institutions, inst };
+    return { service, identification, observations, accounts, cards, institutions, transactions, scanner, inst };
 }
 
 function scan(
@@ -232,5 +238,103 @@ describe("resolveScannedAccounts — ambigüedad", () => {
 
         expect(result.bankSourceAccountId).toBeNull();
         expect(result.bankCardId).toBeNull();
+    });
+});
+
+// ─── relinkHistory ───────────────────────────────────────────
+
+const NOW = "2026-08-12T00:00:00Z";
+const STAMPS = { createdAt: NOW, updatedAt: NOW, isDeleted: false };
+
+function scannerRow(partial: Partial<FinancialScannerTransaction>): FinancialScannerTransaction {
+    return {
+        id: crypto.randomUUID(), ownerUserId: USER, status: "PROCESSED",
+        currency: "USD", date: NOW, ...STAMPS, ...partial,
+    } as FinancialScannerTransaction;
+}
+
+function txRow(partial: Partial<FinancialTransaction>): FinancialTransaction {
+    return {
+        id: crypto.randomUUID(), ownerUserId: USER, type: "EXPENSE", status: "CONFIRMED",
+        amount: 0, currency: "USD", date: NOW, description: "test",
+        possibleDuplicate: false, ...STAMPS, ...partial,
+    } as FinancialTransaction;
+}
+
+describe("relinkHistory", () => {
+    it("re-apunta una transacción del historial contra su cuenta", async () => {
+        const { service, transactions, scanner, inst } = await buildService();
+        const cuenta = await service.createAccount(USER, {
+            institutionId: inst.id, name: "Ahorros", accountType: "SAVINGS", lastFour: "0814",
+        });
+        await scanner.create(scannerRow({
+            executionId: "prod_abc_1", amount: 74.19, merchant: "FARMASHOP",
+            accounts: [{ type: "origen", account: "XXXXXX0814" }],
+        }));
+        const tx = await transactions.create(txRow({
+            amount: 74.19, merchant: "FARMASHOP",
+            originStats: { originalExecutionId: "prod_abc_1" },
+        }));
+
+        const relinked = await service.relinkHistory(USER);
+
+        expect(relinked).toBe(1);
+        expect((await transactions.findById(tx.id))?.bankSourceAccountId).toBe(cuenta.id);
+    });
+
+    it("no pisa una transacción que ya tiene cuenta", async () => {
+        const { service, transactions, scanner, inst } = await buildService();
+        const elegida = await service.createAccount(USER, {
+            institutionId: inst.id, name: "Elegida a mano", accountType: "SAVINGS", lastFour: "9511",
+        });
+        await service.createAccount(USER, {
+            institutionId: inst.id, name: "Otra", accountType: "SAVINGS", lastFour: "0814",
+        });
+        await scanner.create(scannerRow({
+            executionId: "prod_abc_2", amount: 10,
+            accounts: [{ type: "origen", account: "XXXXXX0814" }],
+        }));
+        const tx = await transactions.create(txRow({
+            amount: 10, bankSourceAccountId: elegida.id,
+            originStats: { originalExecutionId: "prod_abc_2" },
+        }));
+
+        await service.relinkHistory(USER);
+
+        expect((await transactions.findById(tx.id))?.bankSourceAccountId).toBe(elegida.id);
+    });
+
+    it("el monto desempata cuando una ejecución trae varias transacciones", async () => {
+        const { service, transactions, scanner, inst } = await buildService();
+        const a = await service.createAccount(USER, {
+            institutionId: inst.id, name: "A", accountType: "SAVINGS", lastFour: "0814",
+        });
+        const b = await service.createAccount(USER, {
+            institutionId: inst.id, name: "B", accountType: "SAVINGS", lastFour: "9511",
+        });
+        await scanner.create(scannerRow({
+            executionId: "prod_abc_3", amount: 10,
+            accounts: [{ type: "origen", account: "XXXXXX0814" }],
+        }));
+        await scanner.create(scannerRow({
+            executionId: "prod_abc_3", amount: 20,
+            accounts: [{ type: "origen", account: "XXXXXX9511" }],
+        }));
+        const tx = await transactions.create(txRow({
+            amount: 20, originStats: { originalExecutionId: "prod_abc_3" },
+        }));
+
+        await service.relinkHistory(USER);
+
+        expect((await transactions.findById(tx.id))?.bankSourceAccountId).toBe(b.id);
+        expect(a.id).not.toBe(b.id);
+    });
+
+    it("una transacción sin originalExecutionId se queda como está", async () => {
+        const { service, transactions } = await buildService();
+        const tx = await transactions.create(txRow({ amount: 5, originStats: null }));
+
+        expect(await service.relinkHistory(USER)).toBe(0);
+        expect((await transactions.findById(tx.id))?.bankSourceAccountId).toBeUndefined();
     });
 });

@@ -176,6 +176,7 @@ export const bankService = new BankService(
     bankMovementRepository,
     financialTransactionRepository,
     bankIdentificationService,
+    financialScannerTransactionRepository,
 );
 export const financialInboxService = new FinancialInboxService(
     financialScannerTransactionRepository,

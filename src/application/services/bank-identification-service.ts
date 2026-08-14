@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import type { UUID } from "@/domain/core";
 import type {
-    BankNumberObservation, BankAccount, BankCard,
+    BankNumberObservation, BankNumberResolution, BankAccount, BankCard,
 } from "@/domain/entities/bank";
 import type {
     IBankNumberObservationRepository, IBankAccountRepository,
@@ -25,6 +25,9 @@ export interface PendingGroup {
     institutionHint: string | null;
     brand: string | null;
     accountTypeHint: string | null;
+    /** La identidad a la que ya apunta el grupo, si alguna. */
+    accountId: UUID | null;
+    cardId: UUID | null;
 }
 
 /** Las decisiones del usuario; nunca las pisa una re-resolución automática. */
@@ -154,14 +157,24 @@ export class BankIdentificationService {
 
     /** Los grupos sin resolver, de más a menos frecuentes. */
     async pendingGroups(userId: UUID): Promise<PendingGroup[]> {
-        const [pending, candidates] = await Promise.all([
-            this.observations.findByResolution(userId, "PENDING"),
+        return this.groupsByResolution(userId, "PENDING");
+    }
+
+    /**
+     * Los grupos de una resolución concreta. La conciliación los pide para las
+     * tres secciones: lo resuelto exacto, lo inferido y lo pendiente.
+     */
+    async groupsByResolution(
+        userId: UUID, resolution: BankNumberResolution,
+    ): Promise<PendingGroup[]> {
+        const [matching, candidates] = await Promise.all([
+            this.observations.findByResolution(userId, resolution),
             this.identityCandidates(userId),
         ]);
 
         const byKey = new Map<string, PendingGroup>();
 
-        for (const observation of pending) {
+        for (const observation of matching) {
             // Prefijo y sufijo juntos: es lo que el usuario reconoce de un vistazo.
             const key = `${observation.prefixDigits}|${observation.suffixDigits}`;
             const group = byKey.get(key) ?? {
@@ -169,6 +182,8 @@ export class BankIdentificationService {
                 prefixDigits: observation.prefixDigits,
                 occurrences: 0, samples: [], observationIds: [], candidateIds: [],
                 institutionHint: null, brand: null, accountTypeHint: null,
+                accountId: observation.accountId ?? null,
+                cardId: observation.cardId ?? null,
             };
 
             group.occurrences += observation.occurrences;
@@ -217,6 +232,49 @@ export class BankIdentificationService {
             resolution: "EXTERNAL",
             updatedAt: new Date().toISOString(),
         });
+    }
+
+    /**
+     * Liga todas las observaciones de un grupo a la misma identidad de una vez.
+     * Es lo que hace el botón de conciliación cuando el usuario nombra un grupo.
+     */
+    async assignGroup(
+        userId: UUID, observationIds: readonly UUID[],
+        target: { kind: "ACCOUNT" | "CARD"; targetId: UUID },
+    ): Promise<number> {
+        for (const id of observationIds) {
+            await this.assignObservation(userId, id, target);
+        }
+        return observationIds.length;
+    }
+
+    /**
+     * Quita `isUnconfirmed` de las identidades que ya tienen al menos una
+     * observación resuelta. Hasta ese momento no suman a ningún saldo; después
+     * de confirmarlas, sí.
+     */
+    async confirmResolvedIdentities(userId: UUID): Promise<number> {
+        const resolved = await this.observations.findResolved(userId);
+        const accountIds = new Set(resolved.map(o => o.accountId).filter(Boolean) as UUID[]);
+        const cardIds = new Set(resolved.map(o => o.cardId).filter(Boolean) as UUID[]);
+        let confirmed = 0;
+
+        for (const id of accountIds) {
+            const account = await this.accounts.findById(id);
+            if (account?.isUnconfirmed) {
+                await this.accounts.update({ ...account, isUnconfirmed: false });
+                confirmed++;
+            }
+        }
+        for (const id of cardIds) {
+            const card = await this.cards.findById(id);
+            if (card?.isUnconfirmed) {
+                await this.cards.update({ ...card, isUnconfirmed: false });
+                confirmed++;
+            }
+        }
+
+        return confirmed;
     }
 
     // ─── Privados ────────────────────────────────────────────

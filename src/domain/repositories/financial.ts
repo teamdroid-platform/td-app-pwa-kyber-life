@@ -68,6 +68,8 @@ export interface IFinancialScanExecutionRepository extends IRepository<Financial
 
 export interface IFinancialScannerTransactionRepository extends IRepository<FinancialScannerTransaction> {
     findUnprocessedByOwnerId(userId: UUID): Promise<FinancialScannerTransaction[]>;
+    /** Todos los escaneos del usuario, procesados o no. Lo usa el re-ligado del historial. */
+    findByOwnerId(userId: UUID): Promise<FinancialScannerTransaction[]>;
 }
 
 
