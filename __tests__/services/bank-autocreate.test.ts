@@ -167,19 +167,46 @@ describe("resolveScannedAccounts — tarjetas", () => {
         });
     });
 
-    it("SIN paidWithCredit no inventa una tarjeta", async () => {
-        const { service, cards, accounts, observations } = await buildService();
+    it("SIN paidWithCredit la crea como débito, que es lo que no inventa deuda", async () => {
+        const { service, cards } = await buildService();
 
-        // 493176XXXXXX2780 es una Visa de DÉBITO del Austro. Crearla como
-        // crédito mostraría una deuda que no existe.
+        // 493176XXXXXX2780 es una Visa de DÉBITO del Austro, y así llega en un
+        // retiro de cajero. Crearla como crédito mostraría una deuda que no
+        // existe; no crearla dejaba el número repitiéndose para siempre.
         const result = await service.resolveScannedAccounts(
             USER, scan([{ type: "origen", account: "493176XXXXXX2780" }]),
         );
 
-        expect(result.bankCardId).toBeNull();
-        expect(await cards.findByOwnerId(USER)).toHaveLength(0);
-        expect(await accounts.findByOwnerId(USER)).toHaveLength(0);
-        expect((await observations.findByRaw(USER, "493176XXXXXX2780"))?.resolution).toBe("PENDING");
+        expect(result.bankCardId).toBeTruthy();
+        const created = await cards.findById(result.bankCardId!);
+        expect(created).toMatchObject({
+            bin: "493176", lastFour: "2780", cardType: "DEBIT", isUnconfirmed: true,
+        });
+    });
+
+    it("la tarjeta detectada nace sin cuenta, para que el usuario la ate después", async () => {
+        const { service, cards } = await buildService();
+
+        const result = await service.resolveScannedAccounts(
+            USER, scan([{ type: "origen", account: "493176XXXXXX2780" }]),
+        );
+
+        const created = await cards.findById(result.bankCardId!);
+        expect(created?.accountId ?? null).toBeNull();
+        // Sin cuenta atada no hay de dónde descontar: no se afirma un origen.
+        expect(result.bankSourceAccountId).toBeNull();
+    });
+
+    it("una tarjeta de crédito detectada no arrastra cupo ni ciclo inventados", async () => {
+        const { service, cards } = await buildService();
+
+        const result = await service.resolveScannedAccounts(
+            USER,
+            scan([{ type: "origen", account: "493176XXXXXX2780" }], { paidWithCredit: true }),
+        );
+
+        const created = await cards.findById(result.bankCardId!);
+        expect(created).toMatchObject({ creditLimit: null, statementDay: null, dueDay: null });
     });
 
     it("una tarjeta de débito ya registrada gasta de su cuenta", async () => {

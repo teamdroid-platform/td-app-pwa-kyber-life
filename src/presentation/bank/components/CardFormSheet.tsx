@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SegmentedChoice } from "./SegmentedChoice";
-import { createBankCardAction } from "@/app/actions/bank";
+import { createBankCardAction, updateBankCardAction } from "@/app/actions/bank";
 import {
     InstitutionCombo, EMPTY_INSTITUTION_CHOICE, ensureInstitution,
     type InstitutionChoice,
@@ -34,35 +34,48 @@ interface CardFormSheetProps {
      * en `AccountFormSheet`: dentro del wizard un refresh tiraría lo escrito.
      */
     onCreated?: (created: { card: BankCard; institution: BankInstitution | null }) => void;
+    /**
+     * La tarjeta a corregir. Con ella el formulario edita en vez de dar de alta
+     * — es el mantenimiento de lo que detectó un escaneo: atarla a su cuenta,
+     * moverla al emisor correcto, ponerle nombre.
+     */
+    card?: BankCard;
 }
 
 /**
- * Alta de tarjeta. El formulario cambia de forma según el tipo, espejando los
- * CHECK de la tabla: el débito exige cuenta, el crédito la prohíbe y es el
- * único que tiene cupo y ciclo. Al cambiar de tipo se limpian los campos de la
- * otra rama para que no viajen valores que el esquema va a rechazar.
+ * Alta y mantenimiento de tarjeta. El formulario cambia de forma según el tipo,
+ * espejando los CHECK de la tabla: el débito exige cuenta, el crédito la
+ * prohíbe y es el único que tiene cupo y ciclo. Al cambiar de tipo se limpian
+ * los campos de la otra rama para que no viajen valores que el esquema va a
+ * rechazar.
+ *
+ * Guardar una tarjeta detectada por un escaneo la da por revisada: entra a los
+ * saldos, y por eso a partir de ahí un débito sí tiene que decir de qué cuenta
+ * gasta.
  */
 export function CardFormSheet({
-    institutions, accounts, trigger, open: controlledOpen, onOpenChange, onCreated,
+    institutions, accounts, trigger, open: controlledOpen, onOpenChange, onCreated, card,
 }: CardFormSheetProps) {
     const router = useRouter();
     const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
     const open = controlledOpen ?? uncontrolledOpen;
     const setOpen = onOpenChange ?? setUncontrolledOpen;
 
-    const [cardType, setCardType] = useState<BankCardType>("CREDIT");
-    const [institution, setInstitution] = useState<InstitutionChoice>(() =>
-        institutions[0]
-            ? { id: institutions[0].id, name: institutions[0].name, kind: institutions[0].kind }
-            : EMPTY_INSTITUTION_CHOICE,
-    );
-    const [accountId, setAccountId] = useState(accounts[0]?.id ?? "");
-    const [name, setName] = useState("");
-    const [brand, setBrand] = useState("");
-    const [lastFour, setLastFour] = useState("");
-    const [creditLimit, setCreditLimit] = useState("");
-    const [statementDay, setStatementDay] = useState("");
-    const [dueDay, setDueDay] = useState("");
+    const isEdit = !!card;
+    const [cardType, setCardType] = useState<BankCardType>(card?.cardType ?? "CREDIT");
+    const [institution, setInstitution] = useState<InstitutionChoice>(() => {
+        const current = institutions.find(i => i.id === card?.institutionId) ?? institutions[0];
+        return current
+            ? { id: current.id, name: current.name, kind: current.kind }
+            : EMPTY_INSTITUTION_CHOICE;
+    });
+    const [accountId, setAccountId] = useState(card?.accountId ?? accounts[0]?.id ?? "");
+    const [name, setName] = useState(card?.name ?? "");
+    const [brand, setBrand] = useState(card?.brand ?? "");
+    const [lastFour, setLastFour] = useState(card?.lastFour ?? "");
+    const [creditLimit, setCreditLimit] = useState(card?.creditLimit != null ? String(card.creditLimit) : "");
+    const [statementDay, setStatementDay] = useState(card?.statementDay != null ? String(card.statementDay) : "");
+    const [dueDay, setDueDay] = useState(card?.dueDay != null ? String(card.dueDay) : "");
     const [saving, setSaving] = useState(false);
 
     const isCredit = cardType === "CREDIT";
@@ -82,6 +95,12 @@ export function CardFormSheet({
             toast.error("El nombre es requerido");
             return;
         }
+        // Guardar da la tarjeta por revisada, y una de débito que entra a los
+        // saldos tiene que decir de dónde sale el dinero.
+        if (!isCredit && !accountId) {
+            toast.error("Elige la cuenta de la que gasta esta tarjeta");
+            return;
+        }
 
         setSaving(true);
         const emisor = await ensureInstitution(institution, institutions);
@@ -91,7 +110,7 @@ export function CardFormSheet({
             return;
         }
 
-        const result = await createBankCardAction({
+        const payload = {
             institutionId: emisor.id,
             accountId: isCredit ? null : (accountId || null),
             name: name.trim(),
@@ -102,7 +121,11 @@ export function CardFormSheet({
             creditLimit: isCredit && creditLimit ? Number(creditLimit) : null,
             statementDay: isCredit && statementDay ? Number(statementDay) : null,
             dueDay: isCredit && dueDay ? Number(dueDay) : null,
-        });
+        };
+
+        const result = card
+            ? await updateBankCardAction(card.id, { ...payload, isUnconfirmed: false })
+            : await createBankCardAction(payload);
         setSaving(false);
 
         if (!result.success) {
@@ -110,12 +133,14 @@ export function CardFormSheet({
             return;
         }
 
-        toast.success("Tarjeta creada");
-        setName(""); setBrand(""); setLastFour("");
-        setCreditLimit(""); setStatementDay(""); setDueDay("");
+        toast.success(isEdit ? "Tarjeta actualizada" : "Tarjeta creada");
+        if (!isEdit) {
+            setName(""); setBrand(""); setLastFour("");
+            setCreditLimit(""); setStatementDay(""); setDueDay("");
+        }
         setOpen(false);
 
-        if (onCreated) onCreated({ card: result.data, institution: emisor.created });
+        if (onCreated && !isEdit) onCreated({ card: result.data, institution: emisor.created });
         else router.refresh();
     }
 
@@ -124,11 +149,11 @@ export function CardFormSheet({
             open={open}
             onOpenChange={setOpen}
             trigger={trigger}
-            title="Nueva tarjeta"
+            title={isEdit ? "Editar tarjeta" : "Nueva tarjeta"}
             bodyClassName="space-y-4 py-4"
             footer={
                 <Button className="w-full" onClick={handleSave} disabled={saving}>
-                    {saving ? "Guardando…" : "Guardar tarjeta"}
+                    {saving ? "Guardando…" : isEdit ? "Guardar cambios" : "Guardar tarjeta"}
                 </Button>
             }
         >

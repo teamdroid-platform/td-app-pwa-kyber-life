@@ -93,6 +93,8 @@ export interface CreateAccountInput {
     lastFour?: string | null;
     prefixDigits?: string | null;
     currency?: string;
+    /** Detectada por un escaneo y aún sin revisar. */
+    isUnconfirmed?: boolean;
 }
 
 /** Una entrada del jsonb `accounts` que produce el escáner. */
@@ -150,6 +152,23 @@ function isOriginEntry(entry: ScannedAccountEntry): boolean {
     return entry.type?.toLowerCase().startsWith("orig") ?? false;
 }
 
+/**
+ * La red de la tarjeta según el primer dígito de su BIN.
+ *
+ * No es una adivinanza: el primer dígito es el «major industry identifier» y
+ * las redes tienen el suyo asignado. Solo se usa para ponerle nombre a una
+ * tarjeta recién detectada cuyo texto no nombró la marca — el emparejamiento
+ * sigue mirando únicamente lo que el banco escribió.
+ */
+function brandFromBin(bin: string | null): string | null {
+    if (!bin) return null;
+    if (bin.startsWith("4")) return "Visa";
+    if (/^5[1-5]/.test(bin)) return "Mastercard";
+    if (/^3[47]/.test(bin)) return "American Express";
+    if (/^3(0[0-5]|[68])/.test(bin)) return "Diners Club";
+    return null;
+}
+
 /** Un lado del movimiento, tal como se le muestra al usuario. */
 export interface ScannedAccountView {
     role: "SOURCE" | "DESTINATION";
@@ -186,6 +205,8 @@ export interface CreateCardInput {
     creditLimit?: number | null;
     statementDay?: number | null;
     dueDay?: number | null;
+    /** Detectada por un escaneo y aún sin revisar. */
+    isUnconfirmed?: boolean;
 }
 
 export class BankService {
@@ -551,7 +572,6 @@ export class BankService {
         if (observation.resolution !== "PENDING") return false;
         if (!institutionId) return false;
         if (observation.suffixDigits.length < AUTOCREATE_MIN_SUFFIX) return false;
-        if (observation.bin && !scan.paidWithCredit) return false;
         return true;
     }
 
@@ -568,26 +588,35 @@ export class BankService {
         };
 
         if (observation.bin) {
-            const card = await this.createCard(userId, {
+            // Solo un gasto a crédito prueba que la tarjeta lo sea. Sin esa
+            // señal nace como débito: es lo más frecuente y, sobre todo, es lo
+            // que no inventa deuda. Queda sin cuenta y sin confirmar, a la
+            // espera de que el usuario la ate desde Bancos.
+            const cardType = scan.paidWithCredit ? "CREDIT" : "DEBIT";
+            const brand = observation.brand ?? brandFromBin(observation.bin);
+            await this.createCard(userId, {
                 institutionId,
-                name: [observation.brand, `••••${observation.suffixDigits}`]
-                    .filter(Boolean).join(" "),
-                cardType: "CREDIT",
-                brand: observation.brand ?? null,
+                name: [brand, formatBankNumber(
+                    { prefixDigits: null, lastFour: observation.suffixDigits }, "CARD",
+                )].filter(Boolean).join(" "),
+                cardType,
+                brand,
                 bin: observation.bin,
+                isUnconfirmed: true,
                 ...common,
             });
-            await this.cards.update({ ...card, isUnconfirmed: true });
             return;
         }
 
-        const account = await this.createAccount(userId, {
+        await this.createAccount(userId, {
             institutionId,
-            name: `Cuenta ••••${observation.suffixDigits}`,
+            name: `Cuenta ${formatBankNumber(
+                { prefixDigits: null, lastFour: observation.suffixDigits }, "ACCOUNT",
+            )}`,
             accountType: (observation.accountTypeHint as BankAccount["accountType"]) ?? "SAVINGS",
+            isUnconfirmed: true,
             ...common,
         });
-        await this.accounts.update({ ...account, isUnconfirmed: true });
     }
 
     /**
@@ -892,7 +921,7 @@ export class BankService {
             prefixDigits: input.prefixDigits ?? null,
             currency: input.currency ?? "USD",
             status: "ACTIVE",
-            isUnconfirmed: false,
+            isUnconfirmed: input.isUnconfirmed ?? false,
             ...stamps(),
         });
     }
@@ -907,6 +936,12 @@ export class BankService {
         return this.accounts.delete(id);
     }
 
+    /**
+     * Alta de tarjeta. `isUnconfirmed` viaja en la creación y no en un update
+     * posterior: una tarjeta de débito sin cuenta solo es válida mientras está
+     * sin confirmar, así que nacer confirmada y corregirse después violaría el
+     * CHECK de la tabla a mitad de camino.
+     */
     async createCard(userId: UUID, input: CreateCardInput): Promise<BankCard> {
         const isCredit = input.cardType === "CREDIT";
         return this.cards.create({
@@ -927,7 +962,7 @@ export class BankService {
             statementDay: isCredit ? (input.statementDay ?? null) : null,
             dueDay: isCredit ? (input.dueDay ?? null) : null,
             status: "ACTIVE",
-            isUnconfirmed: false,
+            isUnconfirmed: input.isUnconfirmed ?? false,
             ...stamps(),
         });
     }

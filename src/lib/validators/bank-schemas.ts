@@ -82,6 +82,13 @@ export const payStatementSchema = z.object({
 
 // Las de update parten de la base sin refinar: un parcial no puede validar
 // invariantes entre campos que quizá no vengan en el payload.
+//
+// `isUnconfirmed` solo aparece aquí: se pone al detectar una identidad en un
+// escaneo y se quita al revisarla, nunca se declara en un alta manual.
 export const updateInstitutionSchema = createInstitutionSchema.partial();
-export const updateAccountSchema = accountBase.partial();
-export const updateCardSchema = cardBase.partial();
+export const updateAccountSchema = accountBase.partial().extend({
+    isUnconfirmed: z.boolean().optional(),
+});
+export const updateCardSchema = cardBase.partial().extend({
+    isUnconfirmed: z.boolean().optional(),
+});

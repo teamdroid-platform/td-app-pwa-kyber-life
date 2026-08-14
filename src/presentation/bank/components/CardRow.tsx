@@ -11,16 +11,21 @@ interface CardRowProps {
     card: BankCardWithDebt;
     /** Nombre de la cuenta atada, solo para tarjetas de débito. */
     accountName?: string;
+    /**
+     * Acción de mantenimiento a la derecha. Va fuera del enlace: anidar un
+     * botón dentro de un `<a>` deja la fila sin saber qué hacer al tocarla.
+     */
+    action?: React.ReactNode;
 }
 
-export function CardRow({ card, accountName }: CardRowProps) {
+export function CardRow({ card, accountName, action }: CardRowProps) {
     const isCredit = card.cardType === "CREDIT";
     const number = formatBankNumber(card, "CARD");
 
-    return (
+    const row = (
         <Link
             href={`/financial/banks/cards/${card.id}`}
-            className="flex items-center gap-3 rounded-2xl border bg-card p-3 transition-colors hover:border-primary/50"
+            className="flex flex-1 items-center gap-3 rounded-2xl border bg-card p-3 transition-colors hover:border-primary/50"
         >
             <span className={cn(
                 "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl",
@@ -36,6 +41,15 @@ export function CardRow({ card, accountName }: CardRowProps) {
                     {number && ` · ${number}`}
                     {isCredit && card.statementDay && ` · corte ${card.statementDay}`}
                     {!isCredit && accountName && ` → ${accountName}`}
+                    {/* Una detectada por un escaneo no entra a los saldos hasta
+                        que el usuario la revisa; decirlo aquí evita que parezca
+                        que las cuentas no cuadran. */}
+                    {card.isUnconfirmed && (
+                        <span className="text-amber-500"> · sin revisar</span>
+                    )}
+                    {!isCredit && !card.accountId && (
+                        <span className="text-amber-500"> · sin cuenta</span>
+                    )}
                 </span>
             </span>
 
@@ -60,4 +74,8 @@ export function CardRow({ card, accountName }: CardRowProps) {
             </span>
         </Link>
     );
+
+    if (!action) return row;
+
+    return <div className="flex items-center gap-2">{row}{action}</div>;
 }

@@ -8,7 +8,7 @@ import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { createBankAccountAction } from "@/app/actions/bank";
+import { createBankAccountAction, updateBankAccountAction } from "@/app/actions/bank";
 import {
     InstitutionCombo, EMPTY_INSTITUTION_CHOICE, ensureInstitution,
     type InstitutionChoice,
@@ -33,6 +33,12 @@ interface AccountFormSheetProps {
      * actualiza sus propias listas.
      */
     onCreated?: (created: { account: BankAccount; institution: BankInstitution | null }) => void;
+    /**
+     * La cuenta a corregir. Con ella el formulario edita en vez de dar de alta
+     * — es el mantenimiento de lo que detectó un escaneo: ponerle nombre,
+     * moverla al emisor correcto, ajustar su tipo.
+     */
+    account?: BankAccount;
 }
 
 /**
@@ -42,17 +48,21 @@ interface AccountFormSheetProps {
  * El emisor se elige o se escribe: si no existe todavía, nace junto con la
  * cuenta en un solo guardado.
  */
-export function AccountFormSheet({ institutions, trigger, onCreated }: AccountFormSheetProps) {
+export function AccountFormSheet({ institutions, trigger, onCreated, account }: AccountFormSheetProps) {
     const router = useRouter();
     const [open, setOpen] = useState(false);
-    const [institution, setInstitution] = useState<InstitutionChoice>(() =>
-        institutions[0]
-            ? { id: institutions[0].id, name: institutions[0].name, kind: institutions[0].kind }
-            : EMPTY_INSTITUTION_CHOICE,
+    const isEdit = !!account;
+    const [institution, setInstitution] = useState<InstitutionChoice>(() => {
+        const current = institutions.find(i => i.id === account?.institutionId) ?? institutions[0];
+        return current
+            ? { id: current.id, name: current.name, kind: current.kind }
+            : EMPTY_INSTITUTION_CHOICE;
+    });
+    const [name, setName] = useState(account?.name ?? "");
+    const [accountType, setAccountType] = useState<BankAccountType>(
+        account?.accountType === "CASH" ? "SAVINGS" : account?.accountType ?? "SAVINGS",
     );
-    const [name, setName] = useState("");
-    const [accountType, setAccountType] = useState<BankAccountType>("SAVINGS");
-    const [lastFour, setLastFour] = useState("");
+    const [lastFour, setLastFour] = useState(account?.lastFour ?? "");
     const [saving, setSaving] = useState(false);
 
     async function handleSave() {
@@ -69,13 +79,19 @@ export function AccountFormSheet({ institutions, trigger, onCreated }: AccountFo
             return;
         }
 
-        const result = await createBankAccountAction({
+        const payload = {
             institutionId: emisor.id,
             name: name.trim(),
             accountType,
             lastFour: lastFour || null,
             currency: "USD",
-        });
+        };
+
+        // Guardar da por revisada una cuenta que detectó un escaneo: a partir
+        // de ahí cuenta para los saldos.
+        const result = account
+            ? await updateBankAccountAction(account.id, { ...payload, isUnconfirmed: false })
+            : await createBankAccountAction(payload);
         setSaving(false);
 
         if (!result.success) {
@@ -83,11 +99,11 @@ export function AccountFormSheet({ institutions, trigger, onCreated }: AccountFo
             return;
         }
 
-        toast.success("Cuenta creada");
-        setName(""); setLastFour("");
+        toast.success(isEdit ? "Cuenta actualizada" : "Cuenta creada");
+        if (!isEdit) { setName(""); setLastFour(""); }
         setOpen(false);
 
-        if (onCreated) onCreated({ account: result.data, institution: emisor.created });
+        if (onCreated && !isEdit) onCreated({ account: result.data, institution: emisor.created });
         else router.refresh();
     }
 
@@ -96,11 +112,11 @@ export function AccountFormSheet({ institutions, trigger, onCreated }: AccountFo
             open={open}
             onOpenChange={setOpen}
             trigger={trigger}
-            title="Nueva cuenta"
+            title={isEdit ? "Editar cuenta" : "Nueva cuenta"}
             bodyClassName="space-y-4 py-4"
             footer={
                 <Button className="w-full" onClick={handleSave} disabled={saving}>
-                    {saving ? "Guardando…" : "Guardar"}
+                    {saving ? "Guardando…" : isEdit ? "Guardar cambios" : "Guardar"}
                 </Button>
             }
         >

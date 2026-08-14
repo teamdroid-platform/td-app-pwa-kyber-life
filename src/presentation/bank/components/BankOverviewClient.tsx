@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import Link from "next/link";
-import { AlertTriangle, Landmark } from "lucide-react";
+import { AlertTriangle, Landmark, Pencil } from "lucide-react";
 import { BankBalanceHero } from "./BankBalanceHero";
 import { AccountRow } from "./AccountRow";
 import { CardRow } from "./CardRow";
@@ -14,6 +14,24 @@ import { money, shortDate } from "../lib/format-money";
 import type {
     BankOverview, BankAccountWithBalance, BankCardWithDebt,
 } from "@/application/services/bank-service";
+
+/**
+ * Disparador del formulario de mantenimiento. Reenvía sus props: `FormSheet`
+ * monta el trigger con `asChild`, así que el `onClick` que abre la hoja llega
+ * aquí como prop y un componente que la descarte se pinta pero no abre nada.
+ */
+function EditButton({ label, ...props }: { label: string } & React.ComponentProps<"button">) {
+    return (
+        <button
+            type="button"
+            aria-label={label}
+            {...props}
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border bg-card text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground"
+        >
+            <Pencil className="h-3.5 w-3.5" />
+        </button>
+    );
+}
 
 interface Group {
     id: string | null;
@@ -47,7 +65,7 @@ export function BankOverviewClient({ initialData }: { initialData: BankOverview 
                 cards: ownCards,
                 total: ownAccounts.reduce((sum, a) => sum + a.balance, 0),
             };
-        }).filter(g => g.accounts.length > 0 || g.cards.length > 0);
+        });
 
         const loose = accounts.filter(a => !a.institutionId);
         if (loose.length > 0) {
@@ -63,7 +81,10 @@ export function BankOverviewClient({ initialData }: { initialData: BankOverview 
         return byInstitution;
     }, [institutions, accounts, cards]);
 
-    const isEmpty = accounts.length === 0 && cards.length === 0;
+    // Vacío es no tener nada, ni siquiera un emisor. Una institución sola ya es
+    // algo que el usuario registró —o que nació de un escaneo— y ocultarla hacía
+    // que la pantalla dijera «no registras nada» con cinco bancos guardados.
+    const isEmpty = institutions.length === 0 && accounts.length === 0 && cards.length === 0;
 
     return (
         <div className="flex flex-col gap-4">
@@ -150,15 +171,40 @@ export function BankOverviewClient({ initialData }: { initialData: BankOverview 
                         </header>
 
                         {group.accounts.map(account => (
-                            <AccountRow key={account.id} account={account} />
+                            <AccountRow
+                                key={account.id}
+                                account={account}
+                                // El efectivo lo gestiona el servicio, no el usuario.
+                                action={account.accountType === "CASH" ? undefined : (
+                                    <AccountFormSheet
+                                        institutions={institutions}
+                                        account={account}
+                                        trigger={<EditButton label={`Editar ${account.name}`} />}
+                                    />
+                                )}
+                            />
                         ))}
                         {group.cards.map(card => (
                             <CardRow
                                 key={card.id}
                                 card={card}
                                 accountName={card.accountId ? accountNameById.get(card.accountId) : undefined}
+                                action={
+                                    <CardFormSheet
+                                        institutions={institutions}
+                                        accounts={accounts}
+                                        card={card}
+                                        trigger={<EditButton label={`Editar ${card.name}`} />}
+                                    />
+                                }
                             />
                         ))}
+
+                        {group.accounts.length === 0 && group.cards.length === 0 && (
+                            <p className="rounded-2xl border border-dashed bg-muted/20 px-3 py-2.5 text-xs text-muted-foreground">
+                                Sin cuentas ni tarjetas todavía.
+                            </p>
+                        )}
                     </section>
                 ))
             )}
