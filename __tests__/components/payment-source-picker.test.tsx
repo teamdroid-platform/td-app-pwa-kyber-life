@@ -173,3 +173,45 @@ describe("PaymentSourcePicker — alta desde el paso", () => {
         expect(nuevaTarjeta()).not.toBeInTheDocument();
     });
 });
+
+describe("PaymentSourcePicker — lo detectado también se puede elegir", () => {
+    const detectada = {
+        id: "c9", ownerUserId: "u", institutionId: "i1",
+        cardType: "DEBIT" as const, brand: "Visa", lastFour: "2780", prefixDigits: "493176",
+        currency: "USD", status: "ACTIVE" as const, isUnconfirmed: true,
+        ...STAMPS,
+    };
+
+    it("una tarjeta que detectó un escaneo aparece entre las opciones", () => {
+        // Antes se filtraba por «revisada», y el paso decía «todavía no
+        // registras cuentas ni tarjetas» justo encima de la tarjeta que el
+        // propio movimiento acababa de identificar.
+        render(
+            <PaymentSourcePicker accounts={[]} cards={[detectada]} value={{}} onChange={jest.fn()} />,
+        );
+
+        expect(screen.getByText("Visa 493176XXXX2780")).toBeInTheDocument();
+        expect(screen.queryByText(/todavía no registras cuentas/i)).not.toBeInTheDocument();
+    });
+
+    it("y avisa de que aún no está revisada", () => {
+        render(
+            <PaymentSourcePicker accounts={[]} cards={[detectada]} value={{}} onChange={jest.fn()} />,
+        );
+
+        expect(screen.getByText(/sin revisar/)).toBeInTheDocument();
+    });
+
+    it("elegirla ata la transacción a ella como cualquier otra", () => {
+        const onChange = jest.fn();
+        render(
+            <PaymentSourcePicker accounts={[]} cards={[detectada]} value={{}} onChange={onChange} />,
+        );
+
+        fireEvent.click(screen.getByText("Visa 493176XXXX2780"));
+
+        expect(onChange).toHaveBeenCalledWith({
+            cardId: "c9", accountId: undefined, paidWithCredit: false,
+        });
+    });
+});

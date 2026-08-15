@@ -128,7 +128,13 @@ export function PaymentSourcePicker({
                                 icon={<Icon className="h-4 w-4" />}
                                 iconClass="bg-emerald-500/15 text-emerald-500"
                                 title={accountLabel(account)}
-                                subtitle={number || undefined}
+                                subtitle={[
+                                    number,
+                                    // Detectada por un escaneo y aún sin revisar:
+                                    // se puede usar, pero no cuenta para los
+                                    // totales hasta que se confirme en Bancos.
+                                    account.isUnconfirmed ? "sin revisar" : null,
+                                ].filter(Boolean).join(" · ") || undefined}
                             />
                         );
                     })}
@@ -153,6 +159,7 @@ export function PaymentSourcePicker({
                                 subtitle={[
                                     isCredit ? "Crédito" : "Débito",
                                     number,
+                                    card.isUnconfirmed ? "sin revisar" : null,
                                 ].filter(Boolean).join(" · ")}
                             />
                         );

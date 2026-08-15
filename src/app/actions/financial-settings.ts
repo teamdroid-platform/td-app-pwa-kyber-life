@@ -111,8 +111,13 @@ export async function getTransactionFormOptionsAction() {
                 institutions,
                 categories: categories.filter((c: FinancialCategory) => !c.isDeleted),
                 institutionTypes,
-                bankAccounts: bankOverview.accounts.filter(a => !a.isUnconfirmed),
-                bankCards: bankOverview.cards.filter(c => !c.isUnconfirmed),
+                // Sin filtrar por «revisada»: una cuenta que detectó un escaneo
+                // existe y es del usuario, y esconderla dejaba el paso diciendo
+                // «todavía no registras cuentas» justo encima de la tarjeta que
+                // el propio movimiento acababa de identificar. Elegirla es la
+                // forma más directa de darla por buena.
+                bankAccounts: bankOverview.accounts,
+                bankCards: bankOverview.cards,
                 // Sin filtrar: el alta desde el paso de pago necesita ofrecer
                 // todos los emisores, incluidos los que nacieron de un escaneo
                 // y aún no se confirman.
