@@ -159,17 +159,6 @@ describe("de quién es cada cuenta", () => {
         expect(vistas.map(v => v.role)).toEqual(["SOURCE", "DESTINATION"]);
     });
 
-    it("una cuenta detectada se nombra por su tipo y su número", async () => {
-        const { service, accounts } = build();
-
-        await service.syncTransactionBankLinks(USER, BASE);
-
-        const [cuenta] = await accounts.findByOwnerId(USER);
-        // Las cuentas no se nombran: se reconocen. El nombre se compone solo,
-        // igual que lo compondría el formulario.
-        expect(cuenta.name).toBe("Ahorros 25••••10");
-    });
-
     it("sin emisor conocido se registra igual, sin institución", async () => {
         const { service, accounts } = build();
 
@@ -180,7 +169,7 @@ describe("de quién es cada cuenta", () => {
         });
 
         const [cuenta] = await accounts.findByOwnerId(USER);
-        expect(cuenta.name).toBe("Ahorros ••••0814");
+        expect(cuenta.lastFour).toBe("0814");
         expect(cuenta.institutionId).toBeNull();
     });
 

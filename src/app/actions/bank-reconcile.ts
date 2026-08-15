@@ -7,7 +7,7 @@ import {
     bankAccountRepository, bankCardRepository,
 } from "@/infrastructure/container";
 import { requireUserId } from "@/infrastructure/supabase/auth-user";
-import { formatBankNumber } from "@/lib/format-bank-number";
+import { accountLabel, cardLabel } from "@/lib/bank-identity-label";
 import type { PendingGroup } from "@/application/services/bank-identification-service";
 
 const uuid = z.string().uuid();
@@ -108,11 +108,11 @@ export async function getReconcileStateAction() {
         const identities: ReconcileIdentity[] = [
             ...accounts.map(a => ({
                 id: a.id, kind: "ACCOUNT" as const,
-                label: `${a.name} ${formatBankNumber(a, "ACCOUNT")}`.trim(),
+                label: accountLabel(a),
             })),
             ...cards.map(c => ({
                 id: c.id, kind: "CARD" as const,
-                label: `${c.name} ${formatBankNumber(c, "CARD")}`.trim(),
+                label: cardLabel(c),
             })),
         ];
 
@@ -182,7 +182,6 @@ export async function createIdentityFromGroupAction(input: unknown) {
         const target = v.kind === "ACCOUNT"
             ? await bankService.createAccount(userId, {
                 institutionId: v.institutionId,
-                name: v.name,
                 accountType: v.accountType ?? "SAVINGS",
                 lastFour: v.lastFour ?? null,
                 prefixDigits: v.prefixDigits ?? null,
@@ -190,7 +189,6 @@ export async function createIdentityFromGroupAction(input: unknown) {
             : await bankService.createCard(userId, {
                 institutionId: v.institutionId,
                 accountId: v.cardType === "DEBIT" ? v.accountId ?? null : null,
-                name: v.name,
                 cardType: v.cardType ?? "CREDIT",
                 brand: v.brand ?? null,
                 bin: v.bin ?? null,

@@ -1,4 +1,4 @@
-import { formatBankNumber } from "@/lib/format-bank-number";
+import { accountLabel, cardLabel } from "@/lib/bank-identity-label";
 import type { BankAccount, BankCard } from "@/domain/entities/bank";
 
 export interface PaymentSourceRef {
@@ -24,10 +24,10 @@ export function describePaymentSource(
     cards: readonly BankCard[],
 ): string {
     const card = source.cardId ? cards.find(c => c.id === source.cardId) : undefined;
-    if (card) return join(card.name, formatBankNumber(card, "CARD"));
+    if (card) return cardLabel(card);
 
     const account = source.accountId ? accounts.find(a => a.id === source.accountId) : undefined;
-    if (account) return join(account.name, formatBankNumber(account, "ACCOUNT"));
+    if (account) return accountLabel(account);
 
     return source.paidWithCredit ? "Tarjeta de crédito" : "Efectivo o débito";
 }
@@ -37,6 +37,3 @@ export function isGenericPaymentLabel(label: string): boolean {
     return label === "Tarjeta de crédito" || label === "Efectivo o débito";
 }
 
-function join(name: string, number: string): string {
-    return number ? `${name} · ${number}` : name;
-}

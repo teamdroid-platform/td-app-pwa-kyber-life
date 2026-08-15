@@ -34,12 +34,10 @@ async function withIdentities() {
     const ctx = build();
     const banco = await ctx.service.createInstitution(USER, { name: "Banco del Austro", kind: "BANK" });
     const cuenta = await ctx.service.createAccount(USER, {
-        institutionId: banco.id, name: "Ahorros Principal",
-        accountType: "SAVINGS", lastFour: "0814",
+        institutionId: banco.id,         accountType: "SAVINGS", lastFour: "0814",
     });
     const tarjeta = await ctx.service.createCard(USER, {
-        institutionId: banco.id, name: "Pacificard Mastercard",
-        cardType: "CREDIT", lastFour: "8361", brand: "Mastercard",
+        institutionId: banco.id,         cardType: "CREDIT", lastFour: "8361", brand: "Mastercard",
     });
     return { ...ctx, banco, cuenta, tarjeta };
 }
@@ -149,7 +147,7 @@ describe("previewScannedAccounts — a qué cuenta corresponde", () => {
 
         expect(vista.match).toEqual({
             id: cuenta.id,
-            name: "Ahorros Principal",
+            typeLabel: "Ahorros",
             institutionName: "Banco del Austro",
         });
         expect(vista.resolution).toBe("EXACT");
@@ -202,7 +200,7 @@ describe("transactionAccounts — lo mismo, ya confirmado", () => {
             display: "••••0814",
             kind: "ACCOUNT",
             resolution: "EXACT",
-            match: { id: cuenta.id, name: "Ahorros Principal", institutionName: "Banco del Austro" },
+            match: { id: cuenta.id, typeLabel: "Ahorros", institutionName: "Banco del Austro" },
         });
     });
 
@@ -218,7 +216,7 @@ describe("transactionAccounts — lo mismo, ya confirmado", () => {
         const { service, banco, cuenta } = await withIdentities();
         const debito = await service.createCard(USER, {
             institutionId: banco.id, accountId: cuenta.id,
-            name: "Visa Débito", cardType: "DEBIT", lastFour: "2780",
+            cardType: "DEBIT", lastFour: "2780",
         });
 
         const vistas = await service.transactionAccounts(USER, {
@@ -234,7 +232,7 @@ describe("transactionAccounts — lo mismo, ya confirmado", () => {
     it("muestra el destino cuando es una cuenta del usuario", async () => {
         const { service, banco } = await withIdentities();
         const otra = await service.createAccount(USER, {
-            institutionId: banco.id, name: "Corriente", accountType: "CHECKING", lastFour: "9511",
+            institutionId: banco.id, accountType: "CHECKING", lastFour: "9511",
         });
 
         const vistas = await service.transactionAccounts(USER, {

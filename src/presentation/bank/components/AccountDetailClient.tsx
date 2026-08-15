@@ -1,5 +1,6 @@
 "use client";
 
+import { accountLabel } from "@/lib/bank-identity-label";
 import { useMemo } from "react";
 import Link from "next/link";
 import { ChevronLeft, Inbox } from "lucide-react";
@@ -57,7 +58,7 @@ export function AccountDetailClient({ initialData }: { initialData: BankAccountD
                     <ChevronLeft className="h-4 w-4" />
                 </Link>
                 <div className="min-w-0 flex-1">
-                    <h1 className="truncate text-xl font-bold tracking-tight">{account.name}</h1>
+                    <h1 className="truncate text-xl font-bold tracking-tight">{accountLabel(account)}</h1>
                     <p className="truncate text-xs text-muted-foreground">
                         {account.institutionName ?? TYPE_LABEL[account.accountType]}
                         {number && ` · ${number}`}

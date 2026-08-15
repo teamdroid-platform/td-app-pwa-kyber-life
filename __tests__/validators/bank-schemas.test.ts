@@ -4,7 +4,7 @@ const INSTITUTION = "11111111-1111-4111-8111-111111111111";
 const ACCOUNT = "22222222-2222-4222-8222-222222222222";
 
 describe("createCardSchema", () => {
-    const base = { institutionId: INSTITUTION, name: "Pacificard", currency: "USD" };
+    const base = { institutionId: INSTITUTION, currency: "USD" };
 
     it("acepta una tarjeta de crédito con ciclo y sin cuenta", () => {
         const result = createCardSchema.safeParse({
@@ -50,21 +50,21 @@ describe("createCardSchema", () => {
 describe("createAccountSchema", () => {
     it("rechaza una cuenta corriente sin institución", () => {
         const result = createAccountSchema.safeParse({
-            name: "Corriente", accountType: "CHECKING", currency: "USD",
+            accountType: "CHECKING", currency: "USD",
         });
         expect(result.success).toBe(false);
     });
 
     it("acepta efectivo sin institución", () => {
         const result = createAccountSchema.safeParse({
-            name: "Efectivo", accountType: "CASH", currency: "USD",
+            accountType: "CASH", currency: "USD",
         });
         expect(result.success).toBe(true);
     });
 
     it("rechaza efectivo con institución", () => {
         const result = createAccountSchema.safeParse({
-            name: "Efectivo", accountType: "CASH", institutionId: INSTITUTION, currency: "USD",
+            accountType: "CASH", institutionId: INSTITUTION, currency: "USD",
         });
         expect(result.success).toBe(false);
     });

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { computeStatementDue } from "@/domain/services/bank-balance";
 import { payStatementAction, setStatementTotalAction } from "@/app/actions/bank";
+import { accountLabel } from "@/lib/bank-identity-label";
 import { money, shortDate } from "../lib/format-money";
 import { cn } from "@/lib/utils";
 import type { BankCardStatement } from "@/domain/entities/bank";
@@ -122,7 +123,7 @@ export function StatementPanel({ statement, accounts }: StatementPanelProps) {
             {due > 0 && (
                 source ? (
                     <Button onClick={handlePay} disabled={paying} className="mt-1 w-full">
-                        {paying ? "Registrando…" : `Pagar ${money(due)} desde ${source.name}`}
+                        {paying ? "Registrando…" : `Pagar ${money(due)} desde ${accountLabel(source)}`}
                     </Button>
                 ) : (
                     <p className="mt-1 text-xs leading-relaxed text-amber-500">

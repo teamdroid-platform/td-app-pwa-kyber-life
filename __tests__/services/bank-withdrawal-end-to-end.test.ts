@@ -79,7 +79,7 @@ describe("retiro de cajero, de punta a punta", () => {
         expect(links.bankInstitutionId).toBeTruthy();
     });
 
-    it("el detalle de la transacción sabe nombrar esa tarjeta", async () => {
+    it("el detalle de la transacción sabe describir esa tarjeta", async () => {
         const { service } = build();
 
         const links = await service.syncTransactionBankLinks(USER, {
@@ -93,7 +93,7 @@ describe("retiro de cajero, de punta a punta", () => {
             role: "SOURCE",
             kind: "CARD",
             display: "493176XXXX2780",
-            match: { name: "Visa XXXX2780", institutionName: "Banco del Austro" },
+            match: { typeLabel: "Visa", institutionName: "Banco del Austro" },
         });
     });
 
@@ -137,7 +137,7 @@ describe("retiro de cajero, de punta a punta", () => {
 
         const cuenta = await service.createAccount(USER, {
             institutionId: links.bankInstitutionId!,
-            name: "Ahorros Principal", accountType: "SAVINGS", lastFour: "0814",
+            accountType: "SAVINGS", lastFour: "0814",
         });
         await service.updateCard(USER, links.bankCardId!, {
             accountId: cuenta.id, isUnconfirmed: false,
@@ -158,7 +158,7 @@ describe("retiro de cajero, de punta a punta", () => {
 
         const cuenta = await service.createAccount(USER, {
             institutionId: primero.bankInstitutionId!,
-            name: "Ahorros Principal", accountType: "SAVINGS", lastFour: "0814",
+            accountType: "SAVINGS", lastFour: "0814",
         });
         await service.updateCard(USER, primero.bankCardId!, {
             accountId: cuenta.id, isUnconfirmed: false,
@@ -208,7 +208,7 @@ describe("retiro de cajero, de punta a punta", () => {
 
         const emisor = await service.createInstitution(USER, { name: "Banco Pichincha", kind: "BANK" });
         const cuenta = await service.createAccount(USER, {
-            institutionId: emisor.id, name: "Ahorros", accountType: "SAVINGS",
+            institutionId: emisor.id, accountType: "SAVINGS",
         });
         await service.updateCard(USER, links.bankCardId!, {
             institutionId: emisor.id, accountId: cuenta.id, isUnconfirmed: false,

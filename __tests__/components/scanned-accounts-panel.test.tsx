@@ -10,7 +10,7 @@ function view(overrides: Partial<ScannedAccountView> = {}): ScannedAccountView {
         display: "••••0814",
         kind: "ACCOUNT",
         resolution: "EXACT",
-        match: { id: "acc-1", name: "Ahorros Principal", institutionName: "Banco del Austro" },
+        match: { id: "acc-1", typeLabel: "Ahorros", institutionName: "Banco del Austro" },
         institutionHint: null,
         ownership: null,
         ...overrides,
@@ -33,7 +33,7 @@ describe("ScannedAccountsPanel", () => {
 
         const filas = screen.getAllByRole("listitem");
         expect(filas).toHaveLength(2);
-        expect(filas[0]).toHaveTextContent("••••0814Ahorros Principal · Banco del Austro");
+        expect(filas[0]).toHaveTextContent("••••0814Ahorros · Banco del Austro");
         expect(filas[1]).toHaveTextContent("••••1582De un tercero");
     });
 
@@ -204,19 +204,18 @@ describe("AccountsTrail", () => {
 
     it("nombra la cuenta cuando se sabe cuál es", () => {
         render(<AccountsTrail accounts={[view()]} />);
-        expect(screen.getByText(/Ahorros Principal/)).toBeInTheDocument();
+        expect(screen.getByText(/Ahorros · Banco del Austro/)).toBeInTheDocument();
     });
 
-    it("no repite el número dentro del nombre de la cuenta", () => {
-        // Las cuentas detectadas se llamaban «Cuenta ••••10», y junto a
-        // «25••••10» era la misma información dos veces.
+    it("dice qué es la cuenta, sin repetir el número que ya se ve", () => {
+        // Las cuentas no tienen nombre: la fila muestra el número y, al lado,
+        // qué es y de quién.
         render(<AccountsTrail accounts={[view({
             display: "25••••10",
-            match: { id: "a1", name: "Cuenta ••••10", institutionName: "COAC Jardín Azuayo" },
+            match: { id: "a1", typeLabel: "Ahorros", institutionName: "COAC Jardín Azuayo" },
         })]} />);
 
-        expect(screen.getByText("COAC Jardín Azuayo")).toBeInTheDocument();
-        expect(screen.queryByText(/Cuenta ••••10/)).not.toBeInTheDocument();
+        expect(screen.getByText("Ahorros · COAC Jardín Azuayo")).toBeInTheDocument();
     });
 
     it("dice a quién pertenece lo que no es tuyo", () => {

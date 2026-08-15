@@ -11,6 +11,7 @@ import { AccountFormSheet } from "./AccountFormSheet";
 import { CardFormSheet } from "./CardFormSheet";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { accountLabel, cardLabel } from "@/lib/bank-identity-label";
 import { money, shortDate } from "../lib/format-money";
 import type {
     BankOverview, BankAccountWithBalance, BankCardWithDebt,
@@ -51,7 +52,7 @@ export function BankOverviewClient({ initialData }: { initialData: BankOverview 
     const { institutions, accounts, cards } = initialData;
 
     const accountNameById = useMemo(
-        () => new Map(accounts.map(a => [a.id, a.name])),
+        () => new Map(accounts.map(a => [a.id, accountLabel(a)])),
         [accounts],
     );
 
@@ -208,7 +209,7 @@ export function BankOverviewClient({ initialData }: { initialData: BankOverview 
                                     <AccountFormSheet
                                         institutions={institutions}
                                         account={account}
-                                        trigger={<EditButton label={`Editar ${account.name}`} />}
+                                        trigger={<EditButton label={`Editar ${accountLabel(account)}`} />}
                                     />
                                 )}
                             />
@@ -223,7 +224,7 @@ export function BankOverviewClient({ initialData }: { initialData: BankOverview 
                                         institutions={institutions}
                                         accounts={accounts}
                                         card={card}
-                                        trigger={<EditButton label={`Editar ${card.name}`} />}
+                                        trigger={<EditButton label={`Editar ${cardLabel(card)}`} />}
                                     />
                                 }
                             />

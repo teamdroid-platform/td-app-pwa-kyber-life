@@ -106,7 +106,7 @@ describe("syncTransactionBankLinks — sin números enmascarados", () => {
         const { service } = build();
         const inst = await service.createInstitution(USER, { name: "Banco del Austro", kind: "BANK" });
         const cuenta = await service.createAccount(USER, {
-            institutionId: inst.id, name: "Ahorros", accountType: "SAVINGS",
+            institutionId: inst.id, accountType: "SAVINGS",
         });
 
         const links = await service.syncTransactionBankLinks(USER, {
@@ -144,7 +144,7 @@ describe("syncTransactionBankLinks — con números enmascarados", () => {
         const { service } = build();
         const inst = await service.createInstitution(USER, { name: "Banco del Austro", kind: "BANK" });
         const elegida = await service.createAccount(USER, {
-            institutionId: inst.id, name: "La que yo dije", accountType: "SAVINGS", lastFour: "9511",
+            institutionId: inst.id, accountType: "SAVINGS", lastFour: "9511",
         });
 
         const links = await service.syncTransactionBankLinks(USER, {

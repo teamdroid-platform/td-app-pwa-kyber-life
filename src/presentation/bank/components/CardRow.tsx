@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { CreditCard } from "lucide-react";
 import { formatBankNumber } from "@/lib/format-bank-number";
+import { cardLabel } from "@/lib/bank-identity-label";
 import { money } from "../lib/format-money";
 import { cn } from "@/lib/utils";
 import type { BankCardWithDebt } from "@/application/services/bank-service";
@@ -35,7 +36,7 @@ export function CardRow({ card, accountName, action }: CardRowProps) {
             </span>
 
             <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-semibold">{card.name}</span>
+                <span className="block truncate text-sm font-semibold">{cardLabel(card)}</span>
                 <span className="block truncate text-xs text-muted-foreground">
                     {isCredit ? "Crédito" : "Débito"}
                     {number && ` · ${number}`}

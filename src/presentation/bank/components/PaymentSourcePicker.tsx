@@ -3,6 +3,7 @@
 import { CreditCard, Landmark, Wallet, PiggyBank, TrendingUp, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatBankNumber } from "@/lib/format-bank-number";
+import { accountLabel, cardLabel } from "@/lib/bank-identity-label";
 import { AccountFormSheet } from "./AccountFormSheet";
 import { CardFormSheet } from "./CardFormSheet";
 import type { BankAccount, BankCard, BankAccountType, BankInstitution } from "@/domain/entities/bank";
@@ -126,7 +127,7 @@ export function PaymentSourcePicker({
                                 onClick={() => selectAccount(account)}
                                 icon={<Icon className="h-4 w-4" />}
                                 iconClass="bg-emerald-500/15 text-emerald-500"
-                                title={account.name}
+                                title={accountLabel(account)}
                                 subtitle={number || undefined}
                             />
                         );
@@ -148,7 +149,7 @@ export function PaymentSourcePicker({
                                 iconClass={isCredit
                                     ? "bg-rose-500/15 text-rose-500"
                                     : "bg-slate-500/15 text-slate-500"}
-                                title={card.name}
+                                title={cardLabel(card)}
                                 subtitle={[
                                     isCredit ? "Crédito" : "Débito",
                                     number,

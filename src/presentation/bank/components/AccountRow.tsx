@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Landmark, Wallet, PiggyBank, TrendingUp } from "lucide-react";
 import { formatBankNumber } from "@/lib/format-bank-number";
+import { accountLabel } from "@/lib/bank-identity-label";
 import { money, shortDate } from "../lib/format-money";
 import { cn } from "@/lib/utils";
 import type { BankAccountWithBalance } from "@/application/services/bank-service";
@@ -46,7 +47,7 @@ export function AccountRow({ account, action }: AccountRowProps) {
             </span>
 
             <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-semibold">{account.name}</span>
+                <span className="block truncate text-sm font-semibold">{accountLabel(account)}</span>
                 <span className="block truncate text-xs text-muted-foreground">
                     {TYPE_LABEL[account.accountType]}
                     {number && ` · ${number}`}

@@ -83,10 +83,10 @@ describe("resolveScannedAccounts — cuentas propias", () => {
     it("una transferencia entre dos cuentas propias liga ambas", async () => {
         const { service, inst } = await buildService();
         const origen = await service.createAccount(USER, {
-            institutionId: inst.id, name: "Ahorros", accountType: "SAVINGS", lastFour: "0814",
+            institutionId: inst.id, accountType: "SAVINGS", lastFour: "0814",
         });
         const destino = await service.createAccount(USER, {
-            institutionId: inst.id, name: "Corriente", accountType: "CHECKING", lastFour: "9511",
+            institutionId: inst.id, accountType: "CHECKING", lastFour: "9511",
         });
 
         const result = await service.resolveScannedAccounts(USER, scan([
@@ -229,11 +229,10 @@ describe("resolveScannedAccounts — tarjetas", () => {
     it("una tarjeta de débito ya registrada gasta de su cuenta", async () => {
         const { service, inst } = await buildService();
         const cuenta = await service.createAccount(USER, {
-            institutionId: inst.id, name: "Ahorros", accountType: "SAVINGS", lastFour: "0814",
+            institutionId: inst.id, accountType: "SAVINGS", lastFour: "0814",
         });
         await service.createCard(USER, {
-            institutionId: inst.id, accountId: cuenta.id, name: "Visa Débito",
-            cardType: "DEBIT", bin: "493176", lastFour: "2780", prefixDigits: "493176",
+            institutionId: inst.id, accountId: cuenta.id,             cardType: "DEBIT", bin: "493176", lastFour: "2780", prefixDigits: "493176",
         });
 
         const result = await service.resolveScannedAccounts(
@@ -249,10 +248,10 @@ describe("resolveScannedAccounts — ambigüedad", () => {
     it("una cadena ambigua no crea nada y deja la transacción sin cuenta", async () => {
         const { service, inst, accounts, observations } = await buildService();
         await service.createAccount(USER, {
-            institutionId: inst.id, name: "A", accountType: "SAVINGS", lastFour: "4058",
+            institutionId: inst.id, accountType: "SAVINGS", lastFour: "4058",
         });
         await service.createAccount(USER, {
-            institutionId: inst.id, name: "B", accountType: "SAVINGS", lastFour: "9558",
+            institutionId: inst.id, accountType: "SAVINGS", lastFour: "9558",
         });
 
         const result = await service.resolveScannedAccounts(
@@ -309,7 +308,7 @@ describe("relinkHistory", () => {
     it("re-apunta una transacción del historial contra su cuenta", async () => {
         const { service, transactions, scanner, inst } = await buildService();
         const cuenta = await service.createAccount(USER, {
-            institutionId: inst.id, name: "Ahorros", accountType: "SAVINGS", lastFour: "0814",
+            institutionId: inst.id, accountType: "SAVINGS", lastFour: "0814",
         });
         await scanner.create(scannerRow({
             executionId: "prod_abc_1", amount: 74.19, merchant: "FARMASHOP",
@@ -329,10 +328,10 @@ describe("relinkHistory", () => {
     it("no pisa una transacción que ya tiene cuenta", async () => {
         const { service, transactions, scanner, inst } = await buildService();
         const elegida = await service.createAccount(USER, {
-            institutionId: inst.id, name: "Elegida a mano", accountType: "SAVINGS", lastFour: "9511",
+            institutionId: inst.id, accountType: "SAVINGS", lastFour: "9511",
         });
         await service.createAccount(USER, {
-            institutionId: inst.id, name: "Otra", accountType: "SAVINGS", lastFour: "0814",
+            institutionId: inst.id, accountType: "SAVINGS", lastFour: "0814",
         });
         await scanner.create(scannerRow({
             executionId: "prod_abc_2", amount: 10,
@@ -351,10 +350,10 @@ describe("relinkHistory", () => {
     it("el monto desempata cuando una ejecución trae varias transacciones", async () => {
         const { service, transactions, scanner, inst } = await buildService();
         const a = await service.createAccount(USER, {
-            institutionId: inst.id, name: "A", accountType: "SAVINGS", lastFour: "0814",
+            institutionId: inst.id, accountType: "SAVINGS", lastFour: "0814",
         });
         const b = await service.createAccount(USER, {
-            institutionId: inst.id, name: "B", accountType: "SAVINGS", lastFour: "9511",
+            institutionId: inst.id, accountType: "SAVINGS", lastFour: "9511",
         });
         await scanner.create(scannerRow({
             executionId: "prod_abc_3", amount: 10,

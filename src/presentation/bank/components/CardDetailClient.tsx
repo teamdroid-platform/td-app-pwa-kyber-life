@@ -1,5 +1,6 @@
 "use client";
 
+import { cardLabel } from "@/lib/bank-identity-label";
 import Link from "next/link";
 import { ChevronLeft, Inbox } from "lucide-react";
 import { formatBankNumber } from "@/lib/format-bank-number";
@@ -40,7 +41,7 @@ export function CardDetailClient({ initialData }: { initialData: BankCardDetail 
                     <ChevronLeft className="h-4 w-4" />
                 </Link>
                 <div className="min-w-0 flex-1">
-                    <h1 className="truncate text-xl font-bold tracking-tight">{card.name}</h1>
+                    <h1 className="truncate text-xl font-bold tracking-tight">{cardLabel(card)}</h1>
                     <p className="truncate text-xs text-muted-foreground">
                         {card.institutionName ?? (isCredit ? "Crédito" : "Débito")}
                         {number && ` · ${number}`}

@@ -10,8 +10,7 @@ const STAMPS = { createdAt: "", updatedAt: "", isDeleted: false };
 
 const detail: BankAccountDetail = {
     account: {
-        id: "a1", ownerUserId: "u", institutionId: "i1", name: "Ahorros Principal",
-        accountType: "SAVINGS", lastFour: "0814", currency: "USD", status: "ACTIVE",
+        id: "a1", ownerUserId: "u", institutionId: "i1",         accountType: "SAVINGS", lastFour: "0814", currency: "USD", status: "ACTIVE",
         isUnconfirmed: false, balance: 2104.18, lastSnapshotAt: "2026-08-01T00:00:00Z",
         institutionName: "Banco del Austro", ...STAMPS,
     },

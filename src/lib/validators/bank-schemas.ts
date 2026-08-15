@@ -16,7 +16,6 @@ export const createInstitutionSchema = z.object({
 
 const accountBase = z.object({
     institutionId: uuid.optional().nullable(),
-    name: z.string().min(1, "El nombre es requerido").max(120),
     accountType: z.enum(["CHECKING", "SAVINGS", "CASH", "INVESTMENT"]),
     lastFour: digits.optional().nullable(),
     prefixDigits: digits.optional().nullable(),
@@ -32,7 +31,6 @@ export const createAccountSchema = accountBase.refine(
 const cardBase = z.object({
     institutionId: uuid,
     accountId: uuid.optional().nullable(),
-    name: z.string().min(1, "El nombre es requerido").max(120),
     cardType: z.enum(["DEBIT", "CREDIT"]),
     brand: z.string().max(40).optional().nullable(),
     bin: digits.optional().nullable(),

@@ -25,8 +25,7 @@ const azuayo: BankInstitution = {
 const pichincha: BankInstitution = { ...azuayo, id: "i2", name: "Banco Pichincha", kind: "BANK" };
 
 const cuenta: BankAccount = {
-    id: "a1", ownerUserId: "u", institutionId: "i1", name: "Cuenta ••••11",
-    accountType: "SAVINGS", lastFour: "11", prefixDigits: "10", currency: "USD",
+    id: "a1", ownerUserId: "u", institutionId: "i1",     accountType: "SAVINGS", lastFour: "11", prefixDigits: "10", currency: "USD",
     status: "ACTIVE", isUnconfirmed: true, ...STAMPS,
 };
 
@@ -91,31 +90,20 @@ describe("AccountFormSheet — el número de la cuenta", () => {
         }));
     });
 
-    it("el formulario ya no pide un nombre: lo compone del tipo y el número", async () => {
+    it("el formulario no pide ningún nombre: la cuenta es su número", async () => {
         open();
-
-        fireEvent.change(screen.getByLabelText("Institución"), { target: { value: "COAC Jardín Azuayo" } });
-        fireEvent.change(screen.getByLabelText(/Número de cuenta/), { target: { value: "25XXX10" } });
 
         expect(screen.queryByLabelText("Nombre")).not.toBeInTheDocument();
 
-        fireEvent.click(screen.getByRole("button", { name: /Guardar/ }));
-        await waitFor(() => expect(createBankAccountAction).toHaveBeenCalled());
-        expect(createBankAccountAction).toHaveBeenCalledWith(expect.objectContaining({
-            name: "Ahorros 25••••10",
-        }));
-    });
-
-    it("sin número queda el tipo, que es todo lo que se sabe", async () => {
-        open();
-
         fireEvent.change(screen.getByLabelText("Institución"), { target: { value: "COAC Jardín Azuayo" } });
+        fireEvent.change(screen.getByLabelText(/Número de cuenta/), { target: { value: "25XXX10" } });
         fireEvent.click(screen.getByRole("button", { name: /Guardar/ }));
 
         await waitFor(() => expect(createBankAccountAction).toHaveBeenCalled());
-        expect(createBankAccountAction).toHaveBeenCalledWith(expect.objectContaining({
-            name: "Ahorros",
-        }));
+        // Lo que se guarda son los dígitos, y nada más.
+        expect(createBankAccountAction).toHaveBeenCalledWith(
+            expect.not.objectContaining({ name: expect.anything() }),
+        );
     });
 });
 

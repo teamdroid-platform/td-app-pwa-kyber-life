@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { SegmentedChoice } from "./SegmentedChoice";
 import { createBankCardAction, updateBankCardAction } from "@/app/actions/bank";
 import { parseBankNumber } from "@/lib/bank-number-fingerprint";
+import { accountLabel } from "@/lib/bank-identity-label";
 import { formatBankNumber } from "@/lib/format-bank-number";
 import {
     InstitutionCombo, EMPTY_INSTITUTION_CHOICE, ensureInstitution,
@@ -72,7 +73,6 @@ export function CardFormSheet({
             : EMPTY_INSTITUTION_CHOICE;
     });
     const [accountId, setAccountId] = useState(card?.accountId ?? accounts[0]?.id ?? "");
-    const [name, setName] = useState(card?.name ?? "");
     const [brand, setBrand] = useState(card?.brand ?? "");
     // Un solo campo para el número, como en el alta de cuenta: lo que el banco
     // muestra —`493176XXXXXX2780`— trae principio y final a la vez.
@@ -95,10 +95,6 @@ export function CardFormSheet({
     }
 
     async function handleSave() {
-        if (!name.trim()) {
-            toast.error("El nombre es requerido");
-            return;
-        }
         // Guardar da la tarjeta por revisada, y una de débito que entra a los
         // saldos tiene que decir de dónde sale el dinero.
         if (!isCredit && !accountId) {
@@ -118,7 +114,6 @@ export function CardFormSheet({
         const payload = {
             institutionId: emisor.id,
             accountId: isCredit ? null : (accountId || null),
-            name: name.trim(),
             cardType,
             brand: brand || null,
             lastFour: digits.suffixDigits || null,
@@ -142,7 +137,7 @@ export function CardFormSheet({
 
         toast.success(isEdit ? "Tarjeta actualizada" : "Tarjeta creada");
         if (!isEdit) {
-            setName(""); setBrand(""); setNumber("");
+            setBrand(""); setNumber("");
             setCreditLimit(""); setStatementDay(""); setDueDay("");
         }
         setOpen(false);
@@ -177,15 +172,6 @@ export function CardFormSheet({
                 value={institution}
                 onChange={setInstitution}
             />
-
-            <Field label="Nombre" htmlFor="card-name">
-                <Input
-                    id="card-name"
-                    value={name}
-                    onChange={e => setName(e.target.value)}
-                    placeholder="Ej. Pacificard Mastercard"
-                />
-            </Field>
 
             <div className="grid grid-cols-2 gap-3">
                 <Field label="Marca" optional>
@@ -255,7 +241,7 @@ export function CardFormSheet({
                         </SelectTrigger>
                         <SelectContent>
                             {accounts.map(a => (
-                                <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                                <SelectItem key={a.id} value={a.id}>{accountLabel(a)}</SelectItem>
                             ))}
                         </SelectContent>
                     </Select>

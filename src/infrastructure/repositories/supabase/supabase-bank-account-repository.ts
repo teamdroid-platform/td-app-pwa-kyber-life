@@ -10,7 +10,6 @@ function mapToEntity(row: Row): BankAccount {
         id: row.id as string,
         ownerUserId: row.owner_user_id as string,
         institutionId: (row.institution_id as string) ?? null,
-        name: row.name as string,
         accountType: row.account_type as BankAccount["accountType"],
         lastFour: (row.last_four as string) ?? null,
         prefixDigits: (row.prefix_digits as string) ?? null,
@@ -27,7 +26,6 @@ function toRow(entity: BankAccount): Row {
     return {
         owner_user_id: entity.ownerUserId,
         institution_id: entity.institutionId ?? null,
-        name: entity.name,
         account_type: entity.accountType,
         last_four: entity.lastFour ?? null,
         prefix_digits: entity.prefixDigits ?? null,

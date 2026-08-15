@@ -15,21 +15,19 @@ const overview: BankOverview = {
         isUnconfirmed: false, ...STAMPS,
     }],
     accounts: [{
-        id: "a1", ownerUserId: "u", institutionId: "i1", name: "Ahorros Principal",
-        accountType: "SAVINGS", lastFour: "0814", currency: "USD", status: "ACTIVE",
+        id: "a1", ownerUserId: "u", institutionId: "i1",         accountType: "SAVINGS", lastFour: "0814", currency: "USD", status: "ACTIVE",
         isUnconfirmed: false, balance: 2104.18, lastSnapshotAt: "2026-08-01T00:00:00Z",
         ...STAMPS,
     }],
     cards: [
         {
-            id: "c1", ownerUserId: "u", institutionId: "i1", name: "Pacificard Mastercard",
-            cardType: "CREDIT", lastFour: "8361", currency: "USD", creditLimit: 3000,
+            id: "c1", ownerUserId: "u", institutionId: "i1",             cardType: "CREDIT", lastFour: "8361", currency: "USD", creditLimit: 3000,
             statementDay: 20, dueDay: 28, status: "ACTIVE", isUnconfirmed: false,
             debt: 842.15, availableCredit: 2157.85, openStatement: null, ...STAMPS,
         },
         {
             id: "c2", ownerUserId: "u", institutionId: "i1", accountId: "a1",
-            name: "Visa Débito", cardType: "DEBIT", lastFour: "2780", currency: "USD",
+            cardType: "DEBIT", lastFour: "2780", currency: "USD",
             status: "ACTIVE", isUnconfirmed: false,
             debt: 0, availableCredit: null, openStatement: null, ...STAMPS,
         },
@@ -41,8 +39,8 @@ const overview: BankOverview = {
 describe("BankOverviewClient", () => {
     it("muestra la cuenta con puntos y la tarjeta con equis", () => {
         render(<BankOverviewClient initialData={overview} />);
-        expect(screen.getByText(/••••0814/)).toBeInTheDocument();
-        expect(screen.getByText(/XXXX8361/)).toBeInTheDocument();
+        expect(screen.getAllByText(/••••0814/).length).toBeGreaterThan(0);
+        expect(screen.getAllByText(/XXXX8361/).length).toBeGreaterThan(0);
     });
 
     it("muestra el disponible, la deuda y el efectivo", () => {
@@ -59,7 +57,8 @@ describe("BankOverviewClient", () => {
     it("la tarjeta de débito dice de qué cuenta come, no un saldo propio", () => {
         render(<BankOverviewClient initialData={overview} />);
         // Una vez como fila de cuenta, otra como destino de la tarjeta de débito.
-        expect(screen.getAllByText(/Ahorros Principal/)).toHaveLength(2);
+        // La cuenta se nombra sola: como fila propia y como destino del débito.
+        expect(screen.getAllByText(/Ahorros ••••0814/)).toHaveLength(2);
         expect(screen.getByText(/usa el saldo de la cuenta/i)).toBeInTheDocument();
         // La de débito no muestra deuda ni cupo.
         expect(screen.queryByText(/^−\$0,00$/)).not.toBeInTheDocument();

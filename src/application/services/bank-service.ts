@@ -24,7 +24,7 @@ import { ISSUER_NAME, inferInstitutionKind } from "@/lib/bank-institution-kind";
 import { parseBankNumber } from "@/lib/bank-number-fingerprint";
 import { resolveFingerprint, type Resolution } from "@/lib/bank-number-match";
 import { formatBankNumber } from "@/lib/format-bank-number";
-import { defaultAccountName } from "@/lib/bank-account-name";
+import { cardLabel, identityTypeLabel } from "@/lib/bank-identity-label";
 import { BankIdentificationService } from "./bank-identification-service";
 
 function round2(value: number): number {
@@ -89,7 +89,6 @@ export interface CreateInstitutionInput {
 
 export interface CreateAccountInput {
     institutionId?: UUID | null;
-    name: string;
     accountType: BankAccount["accountType"];
     lastFour?: string | null;
     prefixDigits?: string | null;
@@ -200,7 +199,11 @@ export interface ScannedAccountView {
     /** La cuenta o tarjeta del usuario, cuando el número corresponde a una. */
     match: {
         id: UUID;
-        name: string;
+        /**
+         * «Ahorros», «Visa»… Lo que la identidad es, sin repetir el número que
+         * la fila ya muestra al lado. No hay ningún nombre guardado.
+         */
+        typeLabel: string;
         institutionName: string | null;
     } | null;
     /** El emisor que el propio texto nombra, cuando no hay identidad que consultar. */
@@ -215,7 +218,6 @@ const AUTOCREATE_MIN_SUFFIX = 4;
 export interface CreateCardInput {
     institutionId?: UUID | null;
     accountId?: UUID | null;
-    name: string;
     cardType: BankCard["cardType"];
     brand?: string | null;
     bin?: string | null;
@@ -376,7 +378,7 @@ export class BankService {
                 match: matched
                     ? {
                         id: matched.id,
-                        name: matched.name,
+                        typeLabel: identityTypeLabel(matched, kind),
                         institutionName: institutionName(matched.institutionId),
                     }
                     : null,
@@ -420,7 +422,7 @@ export class BankService {
                 resolution: "EXACT",
                 match: {
                     id: entity.id,
-                    name: entity.name,
+                    typeLabel: identityTypeLabel(entity, kind),
                     institutionName: institutionName(entity.institutionId),
                 },
                 institutionHint: null,
@@ -657,9 +659,6 @@ export class BankService {
             const brand = observation.brand ?? brandFromBin(observation.bin ?? null);
             await this.createCard(userId, {
                 institutionId,
-                name: [brand, formatBankNumber(
-                    { prefixDigits: null, lastFour: observation.suffixDigits }, "CARD",
-                )].filter(Boolean).join(" "),
                 cardType,
                 brand,
                 bin: observation.bin,
@@ -669,15 +668,9 @@ export class BankService {
             return;
         }
 
-        // El mismo nombre que compondría el formulario: una cuenta se reconoce
-        // por su número, no por un nombre que nadie escribió.
         const accountType = (observation.accountTypeHint as BankAccount["accountType"]) ?? "SAVINGS";
         await this.createAccount(userId, {
             institutionId,
-            name: defaultAccountName(accountType, {
-                prefixDigits: observation.prefixDigits,
-                lastFour: observation.suffixDigits,
-            }),
             accountType,
             isUnconfirmed: true,
             ...common,
@@ -724,7 +717,6 @@ export class BankService {
             id: randomUUID(),
             ownerUserId: userId,
             institutionId: null,
-            name: "Efectivo",
             accountType: "CASH",
             lastFour: null,
             prefixDigits: null,
@@ -918,8 +910,8 @@ export class BankService {
             status: "MANUAL",
             amount,
             currency: card.currency,
-            description: `Pago ${card.name}`,
-            merchant: card.institutionName ?? card.name,
+            description: `Pago ${cardLabel(card)}`,
+            merchant: card.institutionName ?? cardLabel(card),
             date,
             paidWithCredit: false,
             possibleDuplicate: false,
@@ -980,7 +972,6 @@ export class BankService {
             id: randomUUID(),
             ownerUserId: userId,
             institutionId: input.institutionId ?? null,
-            name: input.name,
             accountType: input.accountType,
             lastFour: input.lastFour ?? null,
             prefixDigits: input.prefixDigits ?? null,
@@ -1016,7 +1007,6 @@ export class BankService {
             // Los mismos invariantes que los CHECK de la tabla, para fallar
             // antes de llegar a Postgres con un estado imposible.
             accountId: isCredit ? null : (input.accountId ?? null),
-            name: input.name,
             cardType: input.cardType,
             brand: input.brand ?? null,
             bin: input.bin ?? null,

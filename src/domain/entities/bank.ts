@@ -34,7 +34,6 @@ export interface BankAccount extends BaseEntity {
     ownerUserId: UUID;
     /** Null solo para la cuenta de efectivo. */
     institutionId?: UUID | null;
-    name: string;
     accountType: BankAccountType;
     lastFour?: string | null;
     prefixDigits?: string | null;
@@ -62,7 +61,6 @@ export interface BankCard extends BaseEntity {
     institutionId?: UUID | null;
     /** Obligatorio en DEBIT, siempre null en CREDIT. */
     accountId?: UUID | null;
-    name: string;
     cardType: BankCardType;
     brand?: string | null;
     bin?: string | null;

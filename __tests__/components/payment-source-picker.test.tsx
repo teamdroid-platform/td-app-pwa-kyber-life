@@ -17,26 +17,23 @@ const STAMPS = { createdAt: "", updatedAt: "", isDeleted: false };
 
 const accounts = [
     {
-        id: "a1", ownerUserId: "u", institutionId: "i1", name: "Ahorros Principal",
-        accountType: "SAVINGS" as const, lastFour: "0814", currency: "USD",
+        id: "a1", ownerUserId: "u", institutionId: "i1",         accountType: "SAVINGS" as const, lastFour: "0814", currency: "USD",
         status: "ACTIVE" as const, isUnconfirmed: false, ...STAMPS,
     },
     {
-        id: "cash", ownerUserId: "u", institutionId: null, name: "Efectivo",
-        accountType: "CASH" as const, currency: "USD",
+        id: "cash", ownerUserId: "u", institutionId: null,         accountType: "CASH" as const, currency: "USD",
         status: "ACTIVE" as const, isUnconfirmed: false, ...STAMPS,
     },
 ];
 
 const cards = [
     {
-        id: "c1", ownerUserId: "u", institutionId: "i1", name: "Pacificard Mastercard",
-        cardType: "CREDIT" as const, lastFour: "8361", currency: "USD",
+        id: "c1", ownerUserId: "u", institutionId: "i1",         cardType: "CREDIT" as const, lastFour: "8361", currency: "USD",
         status: "ACTIVE" as const, isUnconfirmed: false, ...STAMPS,
     },
     {
         id: "c2", ownerUserId: "u", institutionId: "i1", accountId: "a1",
-        name: "Visa Débito", cardType: "DEBIT" as const, lastFour: "2780",
+        cardType: "DEBIT" as const, lastFour: "2780",
         currency: "USD", status: "ACTIVE" as const, isUnconfirmed: false, ...STAMPS,
     },
 ];
@@ -45,7 +42,7 @@ describe("PaymentSourcePicker", () => {
     it("elegir una cuenta no marca pago con crédito", () => {
         const onChange = jest.fn();
         render(<PaymentSourcePicker accounts={accounts} cards={cards} value={{}} onChange={onChange} />);
-        fireEvent.click(screen.getByText("Ahorros Principal"));
+        fireEvent.click(screen.getByText("Ahorros ••••0814"));
 
         expect(onChange).toHaveBeenCalledWith({ accountId: "a1", paidWithCredit: false });
     });
@@ -53,7 +50,7 @@ describe("PaymentSourcePicker", () => {
     it("elegir una tarjeta de crédito difiere el gasto", () => {
         const onChange = jest.fn();
         render(<PaymentSourcePicker accounts={accounts} cards={cards} value={{}} onChange={onChange} />);
-        fireEvent.click(screen.getByText("Pacificard Mastercard"));
+        fireEvent.click(screen.getByText("Crédito XXXX8361"));
 
         expect(onChange).toHaveBeenCalledWith({ cardId: "c1", paidWithCredit: true });
     });
@@ -61,7 +58,7 @@ describe("PaymentSourcePicker", () => {
     it("una tarjeta de débito gasta de su cuenta, no difiere nada", () => {
         const onChange = jest.fn();
         render(<PaymentSourcePicker accounts={accounts} cards={cards} value={{}} onChange={onChange} />);
-        fireEvent.click(screen.getByText("Visa Débito"));
+        fireEvent.click(screen.getByText("Débito XXXX2780"));
 
         expect(onChange).toHaveBeenCalledWith({
             cardId: "c2", accountId: "a1", paidWithCredit: false,
@@ -77,7 +74,7 @@ describe("PaymentSourcePicker", () => {
                 onChange={onChange}
             />,
         );
-        fireEvent.click(screen.getByText("Ahorros Principal"));
+        fireEvent.click(screen.getByText("Ahorros ••••0814"));
 
         expect(onChange).toHaveBeenCalledWith({ paidWithCredit: false });
     });

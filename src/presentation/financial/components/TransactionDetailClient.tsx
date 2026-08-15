@@ -287,7 +287,7 @@ setDisplayNames({ institution: instName, category: catName });
     // módulo Bancos. Sin vínculo queda el genérico, que es todo lo que se sabe.
     const paymentSource = bankAccounts.find(a => a.role === "SOURCE");
     const accountPreview = paymentSource?.match
-        ? [paymentSource.match.name, paymentSource.display].filter(Boolean).join(" · ")
+        ? [paymentSource.match.typeLabel, paymentSource.display].filter(Boolean).join(" · ")
         : paidWithCreditActive ? "Tarjeta de crédito" : "Efectivo o débito";
     const accountHasValue = paidWithCreditActive || !!paymentSource?.match;
     const datePreview = formatDateTimeLocalPreview(editState.date) || "Selecciona fecha y hora";

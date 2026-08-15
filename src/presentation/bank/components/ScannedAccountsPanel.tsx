@@ -3,7 +3,7 @@
 import { ArrowDownLeft, ArrowUpRight, Landmark } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { AccountOwnership, ScannedAccountView } from "@/application/services/bank-service";
-import { GENERIC_NAME_WORDS } from "@/lib/bank-account-name";
+
 
 interface ScannedAccountsPanelProps {
     accounts: ScannedAccountView[];
@@ -167,37 +167,13 @@ export function AccountsTrail({ accounts }: { accounts: ScannedAccountView[] }) 
     );
 }
 
-/**
- * Cómo llamar a una cuenta identificada sin repetir lo que el número ya dijo.
- *
- * Las cuentas que nacen de un escaneo se llaman «Cuenta ••••10», así que
- * ponerlas junto a «25••••10» enseña dos veces lo mismo. Cuando el nombre no
- * aporta nada nuevo, manda el emisor, que sí distingue.
- */
-function identityLabel(match: NonNullable<ScannedAccountView["match"]>): string {
-    if (!match.institutionName) return match.name;
-    // El emisor se muestra siempre; el nombre solo si añade algo. Repetirlo
-    // daba «10••••11 Cuenta COAC Jardín Azuayo · COAC Jardín Azuayo».
-    if (addsNothing(match.name, match.institutionName)) return match.institutionName;
-    return `${match.name} · ${match.institutionName}`;
-}
-
-/**
- * Si el nombre no dice nada que la fila no muestre ya: «Ahorros ••••10» junto
- * al número, o el emisor repetido a su lado. Las cuentas no se nombran —su
- * nombre se compone del tipo y el número—, así que casi siempre es el caso.
- */
-function addsNothing(name: string, institutionName: string): boolean {
-    const rest = name
-        .replace(institutionName, "")
-        .replace(GENERIC_NAME_WORDS, "")
-        .replace(/[\s•X*·\-–0-9]/g, "");
-    return rest.length === 0;
-}
 
 /** A quién pertenece el número, en las palabras que el sistema puede sostener. */
 function attribution(account: ScannedAccountView): string {
-    if (account.match) return identityLabel(account.match);
+    if (account.match) {
+        return [account.match.typeLabel, account.match.institutionName]
+            .filter(Boolean).join(" · ");
+    }
 
     // Lo que el usuario declaró manda sobre cualquier suposición: decir «de un
     // tercero» de una cuenta que acaba de marcar como suya le contradice a la

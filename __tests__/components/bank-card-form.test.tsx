@@ -14,8 +14,7 @@ const institutions = [{
 
 const accounts = [{
     id: "22222222-2222-4222-8222-222222222222", ownerUserId: "u",
-    institutionId: institutions[0].id, name: "Ahorros Principal",
-    accountType: "SAVINGS" as const, currency: "USD", status: "ACTIVE" as const,
+    institutionId: institutions[0].id,     accountType: "SAVINGS" as const, currency: "USD", status: "ACTIVE" as const,
     isUnconfirmed: false, ...STAMPS,
 }];
 

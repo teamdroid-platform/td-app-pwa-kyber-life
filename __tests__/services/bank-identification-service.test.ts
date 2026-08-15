@@ -25,7 +25,7 @@ async function buildService() {
     });
     const cuenta = await accounts.create({
         id: randomUUID(), ownerUserId: USER, institutionId: inst.id,
-        name: "Ahorros Principal", accountType: "SAVINGS", lastFour: "0814",
+        accountType: "SAVINGS", lastFour: "0814",
         currency: "USD", status: "ACTIVE", isUnconfirmed: false, ...stamps(),
     });
 
@@ -82,7 +82,7 @@ describe("observe", () => {
         const { service, cards, inst } = await buildService();
         await cards.create({
             id: randomUUID(), ownerUserId: USER, institutionId: inst.id,
-            name: "Pacificard", cardType: "CREDIT", bin: "542258", lastFour: "8361",
+            cardType: "CREDIT", bin: "542258", lastFour: "8361",
             prefixDigits: "542258", currency: "USD", status: "ACTIVE",
             isUnconfirmed: false, ...stamps(),
         });
@@ -96,7 +96,7 @@ describe("observe", () => {
         const { service, cards, inst } = await buildService();
         const card = await cards.create({
             id: randomUUID(), ownerUserId: USER, institutionId: inst.id,
-            name: "Pacificard", cardType: "CREDIT", lastFour: "8361",
+            cardType: "CREDIT", lastFour: "8361",
             currency: "USD", status: "ACTIVE", isUnconfirmed: false, ...stamps(),
         });
         // La tarjeta declara solo los 4 últimos; esta observación aporta el BIN.
@@ -136,12 +136,12 @@ describe("pendingGroups", () => {
         const { service, accounts, inst } = await buildService();
         await accounts.create({
             id: randomUUID(), ownerUserId: USER, institutionId: inst.id,
-            name: "B", accountType: "SAVINGS", lastFour: "9558",
+            accountType: "SAVINGS", lastFour: "9558",
             currency: "USD", status: "ACTIVE", isUnconfirmed: false, ...stamps(),
         });
         await accounts.create({
             id: randomUUID(), ownerUserId: USER, institutionId: inst.id,
-            name: "C", accountType: "SAVINGS", lastFour: "4058",
+            accountType: "SAVINGS", lastFour: "4058",
             currency: "USD", status: "ACTIVE", isUnconfirmed: false, ...stamps(),
         });
 
@@ -198,7 +198,7 @@ describe("reobserve", () => {
 
         const nueva = await accounts.create({
             id: randomUUID(), ownerUserId: USER, institutionId: inst.id,
-            name: "Corriente", accountType: "CHECKING", lastFour: "9511",
+            accountType: "CHECKING", lastFour: "9511",
             currency: "USD", status: "ACTIVE", isUnconfirmed: false, ...stamps(),
         });
 

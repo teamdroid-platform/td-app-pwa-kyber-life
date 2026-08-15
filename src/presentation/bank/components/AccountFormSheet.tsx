@@ -11,7 +11,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { createBankAccountAction, updateBankAccountAction } from "@/app/actions/bank";
 import { parseBankNumber } from "@/lib/bank-number-fingerprint";
 import { formatBankNumber } from "@/lib/format-bank-number";
-import { defaultAccountName } from "@/lib/bank-account-name";
 import {
     InstitutionCombo, EMPTY_INSTITUTION_CHOICE, ensureInstitution,
     type InstitutionChoice,
@@ -86,11 +85,6 @@ export function AccountFormSheet({ institutions, trigger, onCreated, account }: 
         const digits = parseBankNumber(number);
         const payload = {
             institutionId: emisor.id,
-            // Una cuenta se reconoce por su número, no por un nombre inventado.
-            name: defaultAccountName(accountType, {
-                prefixDigits: digits.prefixDigits,
-                lastFour: digits.suffixDigits,
-            }),
             accountType,
             lastFour: digits.suffixDigits || null,
             prefixDigits: digits.prefixDigits || null,

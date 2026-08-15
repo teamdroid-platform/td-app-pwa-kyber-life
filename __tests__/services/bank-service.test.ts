@@ -64,10 +64,10 @@ describe("getOverview", () => {
         const inst = await service.createInstitution(USER, { name: "Banco del Austro", kind: "BANK" });
 
         const ok = await service.createAccount(USER, {
-            institutionId: inst.id, name: "Ahorros", accountType: "SAVINGS",
+            institutionId: inst.id, accountType: "SAVINGS",
         });
         const pending = await service.createAccount(USER, {
-            institutionId: inst.id, name: "Sin confirmar", accountType: "SAVINGS",
+            institutionId: inst.id, accountType: "SAVINGS",
         });
         await service.markUnconfirmed(pending.id);
 
@@ -94,7 +94,7 @@ describe("retiro en cajero", () => {
         const { service, transactions } = buildService();
         const inst = await service.createInstitution(USER, { name: "Banco del Austro", kind: "BANK" });
         const banco = await service.createAccount(USER, {
-            institutionId: inst.id, name: "Ahorros", accountType: "SAVINGS",
+            institutionId: inst.id, accountType: "SAVINGS",
         });
         const cash = await service.ensureCashAccount(USER);
 
@@ -115,10 +115,10 @@ describe("consumo con tarjeta de crédito", () => {
         const { service, transactions } = buildService();
         const inst = await service.createInstitution(USER, { name: "Banco del Austro", kind: "BANK" });
         const cuenta = await service.createAccount(USER, {
-            institutionId: inst.id, name: "Ahorros", accountType: "SAVINGS",
+            institutionId: inst.id, accountType: "SAVINGS",
         });
         const card = await service.createCard(USER, {
-            institutionId: inst.id, name: "Pacificard", cardType: "CREDIT",
+            institutionId: inst.id, cardType: "CREDIT",
             creditLimit: 3000, statementDay: 20, dueDay: 28,
         });
 
@@ -140,7 +140,7 @@ describe("closeDueStatements", () => {
         const ctx = buildService();
         const inst = await ctx.service.createInstitution(USER, { name: "Banco del Austro", kind: "BANK" });
         const card = await ctx.service.createCard(USER, {
-            institutionId: inst.id, name: "Pacificard", cardType: "CREDIT",
+            institutionId: inst.id, cardType: "CREDIT",
             creditLimit: 3000, statementDay: 20, dueDay: 28,
         });
         return { ...ctx, card };
@@ -172,10 +172,10 @@ describe("closeDueStatements", () => {
         const { service, statements } = buildService();
         const inst = await service.createInstitution(USER, { name: "B", kind: "BANK" });
         const cuenta = await service.createAccount(USER, {
-            institutionId: inst.id, name: "Ahorros", accountType: "SAVINGS",
+            institutionId: inst.id, accountType: "SAVINGS",
         });
         const debito = await service.createCard(USER, {
-            institutionId: inst.id, accountId: cuenta.id, name: "Visa Débito", cardType: "DEBIT",
+            institutionId: inst.id, accountId: cuenta.id, cardType: "DEBIT",
         });
 
         await service.closeDueStatements(USER, new Date("2026-08-25T00:00:00Z"));
@@ -188,10 +188,10 @@ describe("payStatement", () => {
         const ctx = buildService();
         const inst = await ctx.service.createInstitution(USER, { name: "Banco del Austro", kind: "BANK" });
         const cuenta = await ctx.service.createAccount(USER, {
-            institutionId: inst.id, name: "Ahorros", accountType: "SAVINGS",
+            institutionId: inst.id, accountType: "SAVINGS",
         });
         const card = await ctx.service.createCard(USER, {
-            institutionId: inst.id, name: "Pacificard", cardType: "CREDIT",
+            institutionId: inst.id, cardType: "CREDIT",
             creditLimit: 3000, statementDay: 20, dueDay: 28,
         });
         await ctx.service.closeDueStatements(USER, new Date("2026-08-25T00:00:00Z"));
