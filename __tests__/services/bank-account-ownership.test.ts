@@ -159,17 +159,19 @@ describe("de quién es cada cuenta", () => {
         expect(vistas.map(v => v.role)).toEqual(["SOURCE", "DESTINATION"]);
     });
 
-    it("una cuenta detectada se nombra por su emisor, no repitiendo el número", async () => {
+    it("una cuenta detectada nace con un nombre corto y provisional", async () => {
         const { service, accounts } = build();
 
         await service.syncTransactionBankLinks(USER, BASE);
 
         const [cuenta] = await accounts.findByOwnerId(USER);
-        // «Cuenta ••••10» junto a «25••••10» decía lo mismo dos veces.
-        expect(cuenta.name).toBe("Cuenta COAC Jardín Azuayo");
+        // Nombrarla por su emisor daba «Cuenta COAC Jardín Azuayo», que en la
+        // fila quedaba junto al emisor otra vez. Evitar la repetición es
+        // trabajo de la vista, no del nombre.
+        expect(cuenta.name).toBe("Cuenta ••••10");
     });
 
-    it("sin emisor conocido cae al número, que es lo único que hay", async () => {
+    it("sin emisor conocido se registra igual, sin institución", async () => {
         const { service, accounts } = build();
 
         await service.syncTransactionBankLinks(USER, {

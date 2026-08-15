@@ -10,6 +10,8 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SegmentedChoice } from "./SegmentedChoice";
 import { createBankCardAction, updateBankCardAction } from "@/app/actions/bank";
+import { parseBankNumber } from "@/lib/bank-number-fingerprint";
+import { formatBankNumber } from "@/lib/format-bank-number";
 import {
     InstitutionCombo, EMPTY_INSTITUTION_CHOICE, ensureInstitution,
     type InstitutionChoice,
@@ -72,7 +74,9 @@ export function CardFormSheet({
     const [accountId, setAccountId] = useState(card?.accountId ?? accounts[0]?.id ?? "");
     const [name, setName] = useState(card?.name ?? "");
     const [brand, setBrand] = useState(card?.brand ?? "");
-    const [lastFour, setLastFour] = useState(card?.lastFour ?? "");
+    // Un solo campo para el número, como en el alta de cuenta: lo que el banco
+    // muestra —`493176XXXXXX2780`— trae principio y final a la vez.
+    const [number, setNumber] = useState(card ? formatBankNumber(card, "CARD") : "");
     const [creditLimit, setCreditLimit] = useState(card?.creditLimit != null ? String(card.creditLimit) : "");
     const [statementDay, setStatementDay] = useState(card?.statementDay != null ? String(card.statementDay) : "");
     const [dueDay, setDueDay] = useState(card?.dueDay != null ? String(card.dueDay) : "");
@@ -110,13 +114,16 @@ export function CardFormSheet({
             return;
         }
 
+        const digits = parseBankNumber(number);
         const payload = {
             institutionId: emisor.id,
             accountId: isCredit ? null : (accountId || null),
             name: name.trim(),
             cardType,
             brand: brand || null,
-            lastFour: lastFour || null,
+            lastFour: digits.suffixDigits || null,
+            prefixDigits: digits.prefixDigits || null,
+            bin: digits.bin ?? card?.bin ?? null,
             currency: "USD",
             creditLimit: isCredit && creditLimit ? Number(creditLimit) : null,
             statementDay: isCredit && statementDay ? Number(statementDay) : null,
@@ -135,7 +142,7 @@ export function CardFormSheet({
 
         toast.success(isEdit ? "Tarjeta actualizada" : "Tarjeta creada");
         if (!isEdit) {
-            setName(""); setBrand(""); setLastFour("");
+            setName(""); setBrand(""); setNumber("");
             setCreditLimit(""); setStatementDay(""); setDueDay("");
         }
         setOpen(false);
@@ -190,14 +197,13 @@ export function CardFormSheet({
                     </Select>
                 </Field>
 
-                <Field label="Últimos 4" htmlFor="card-last-four" optional>
+                <Field label="Número" htmlFor="card-number" optional>
                     <Input
-                        id="card-last-four"
-                        inputMode="numeric"
-                        maxLength={4}
-                        value={lastFour}
-                        onChange={e => setLastFour(e.target.value.replace(/\D/g, ""))}
-                        placeholder="8361"
+                        id="card-number"
+                        value={number}
+                        onChange={e => setNumber(e.target.value)}
+                        placeholder="Ej. 493176XXXXXX2780"
+                        autoComplete="off"
                     />
                 </Field>
             </div>

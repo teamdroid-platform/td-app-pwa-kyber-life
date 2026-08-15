@@ -174,17 +174,24 @@ export function AccountsTrail({ accounts }: { accounts: ScannedAccountView[] }) 
  * aporta nada nuevo, manda el emisor, que sí distingue.
  */
 function identityLabel(match: NonNullable<ScannedAccountView["match"]>): string {
-    if (isJustANumber(match.name) && match.institutionName) return match.institutionName;
-    return match.institutionName ? `${match.name} · ${match.institutionName}` : match.name;
+    if (!match.institutionName) return match.name;
+    // El emisor se muestra siempre; el nombre solo si añade algo. Repetirlo
+    // daba «10••••11 Cuenta COAC Jardín Azuayo · COAC Jardín Azuayo».
+    if (addsNothing(match.name, match.institutionName)) return match.institutionName;
+    return `${match.name} · ${match.institutionName}`;
 }
 
 /**
- * Si el nombre no dice nada que el número no diga ya: «Cuenta ••••10»,
- * «Tarjeta XXXX8361». Es la forma de los que se generan solos al detectar una
- * identidad, y el usuario puede reemplazarlos por uno de verdad en Bancos.
+ * Si el nombre no dice nada que la fila no muestre ya: «Cuenta ••••10» junto al
+ * número, o «Cuenta COAC Jardín Azuayo» junto a su emisor. Son las dos formas
+ * que toman los nombres generados al detectar una identidad, y el usuario los
+ * reemplaza por uno de verdad desde Bancos.
  */
-function isJustANumber(name: string): boolean {
-    return name.replace(/cuenta|tarjeta|[\s•X*·\-–0-9]/gi, "").length === 0;
+function addsNothing(name: string, institutionName: string): boolean {
+    const rest = name
+        .replace(institutionName, "")
+        .replace(/cuenta|tarjeta|[\s•X*·\-–0-9]/gi, "");
+    return rest.length === 0;
 }
 
 /** A quién pertenece el número, en las palabras que el sistema puede sostener. */

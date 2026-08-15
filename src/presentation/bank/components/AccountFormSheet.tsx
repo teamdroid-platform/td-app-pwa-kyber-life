@@ -9,6 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { createBankAccountAction, updateBankAccountAction } from "@/app/actions/bank";
+import { parseBankNumber } from "@/lib/bank-number-fingerprint";
+import { formatBankNumber } from "@/lib/format-bank-number";
 import {
     InstitutionCombo, EMPTY_INSTITUTION_CHOICE, ensureInstitution,
     type InstitutionChoice,
@@ -62,7 +64,14 @@ export function AccountFormSheet({ institutions, trigger, onCreated, account }: 
     const [accountType, setAccountType] = useState<BankAccountType>(
         account?.accountType === "CASH" ? "SAVINGS" : account?.accountType ?? "SAVINGS",
     );
-    const [lastFour, setLastFour] = useState(account?.lastFour ?? "");
+    // Un solo campo para el número: el usuario escribe lo que el banco le
+    // muestra —`25XXX11`, `••••0814`— o el número entero, y de ahí salen el
+    // principio y el final. Pedir «últimos 4» por separado obligaba a
+    // descomponerlo a mano y perdía los dígitos del principio, que son los que
+    // distinguen una cuenta de cooperativa de otra.
+    const [number, setNumber] = useState(
+        account ? formatBankNumber(account, "ACCOUNT") : "",
+    );
     const [saving, setSaving] = useState(false);
 
     async function handleSave() {
@@ -79,11 +88,13 @@ export function AccountFormSheet({ institutions, trigger, onCreated, account }: 
             return;
         }
 
+        const digits = parseBankNumber(number);
         const payload = {
             institutionId: emisor.id,
             name: name.trim(),
             accountType,
-            lastFour: lastFour || null,
+            lastFour: digits.suffixDigits || null,
+            prefixDigits: digits.prefixDigits || null,
             currency: "USD",
         };
 
@@ -100,7 +111,7 @@ export function AccountFormSheet({ institutions, trigger, onCreated, account }: 
         }
 
         toast.success(isEdit ? "Cuenta actualizada" : "Cuenta creada");
-        if (!isEdit) { setName(""); setLastFour(""); }
+        if (!isEdit) { setName(""); setNumber(""); }
         setOpen(false);
 
         if (onCreated && !isEdit) onCreated({ account: result.data, institution: emisor.created });
@@ -136,29 +147,30 @@ export function AccountFormSheet({ institutions, trigger, onCreated, account }: 
                 />
             </Field>
 
-            <div className="grid grid-cols-2 gap-3">
-                <Field label="Tipo">
-                    <Select value={accountType} onValueChange={v => setAccountType(v as BankAccountType)}>
-                        <SelectTrigger aria-label="Tipo"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                            {TYPES.map(t => (
-                                <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                </Field>
+            <Field label="Tipo">
+                <Select value={accountType} onValueChange={v => setAccountType(v as BankAccountType)}>
+                    <SelectTrigger aria-label="Tipo"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                        {TYPES.map(t => (
+                            <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </Field>
 
-                <Field label="Últimos 4" htmlFor="account-last-four" optional>
-                    <Input
-                        id="account-last-four"
-                        inputMode="numeric"
-                        maxLength={4}
-                        value={lastFour}
-                        onChange={e => setLastFour(e.target.value.replace(/\D/g, ""))}
-                        placeholder="0814"
-                    />
-                </Field>
-            </div>
+            <Field label="Número de cuenta" htmlFor="account-number" optional>
+                <Input
+                    id="account-number"
+                    value={number}
+                    onChange={e => setNumber(e.target.value)}
+                    placeholder="Ej. 25XXX11, ••••0814 o el número completo"
+                    autoComplete="off"
+                />
+                <p className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground">
+                    Tal como lo muestra tu banco. Se guardan solo los dígitos
+                    visibles, y son los que identifican esta cuenta en los escaneos.
+                </p>
+            </Field>
         </FormSheet>
     );
 }

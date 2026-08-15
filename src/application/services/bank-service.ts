@@ -668,17 +668,15 @@ export class BankService {
             return;
         }
 
-        // El nombre tiene que aportar algo que el número no diga ya: «Cuenta
-        // ••••10» junto a «25••••10» es la misma información dos veces. Con
-        // emisor conocido lo nombra a él; sin emisor no queda más remedio.
-        const issuer = institutionId ? await this.institutions.findById(institutionId) : null;
-        const accountName = issuer
-            ? `Cuenta ${issuer.name}`
-            : `Cuenta ${formatBankNumber({ prefixDigits: null, lastFour: observation.suffixDigits }, "ACCOUNT")}`;
-
+        // Un nombre corto y provisional, que el usuario reemplaza en Bancos.
+        // Nombrarla por su emisor —«Cuenta COAC Jardín Azuayo»— la dejaba
+        // ilegible en la fila, que ya muestra el emisor al lado. Quien evita la
+        // repetición es la vista, no el nombre.
         await this.createAccount(userId, {
             institutionId,
-            name: accountName,
+            name: `Cuenta ${formatBankNumber(
+                { prefixDigits: null, lastFour: observation.suffixDigits }, "ACCOUNT",
+            )}`,
             accountType: (observation.accountTypeHint as BankAccount["accountType"]) ?? "SAVINGS",
             isUnconfirmed: true,
             ...common,

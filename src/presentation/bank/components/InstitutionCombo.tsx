@@ -93,14 +93,24 @@ export function InstitutionCombo({
     const matches = useMemo(() => {
         const query = normalizeForMatch(value.name);
         if (!query) return institutions;
+
+        // Con una elegida, su nombre completo llena el campo y filtrar por él
+        // dejaría solo a ella misma — justo cuando se abre la lista para
+        // cambiarla. Se ofrecen todas hasta que se escriba algo distinto.
+        if (value.id && normalizeForMatch(matchInstitution(institutions, value.name)?.name) === query) {
+            return institutions;
+        }
+
         return institutions.filter(i => normalizeForMatch(i.name).includes(query));
-    }, [institutions, value.name]);
+    }, [institutions, value.name, value.id]);
 
     const exact = matchInstitution(institutions, value.name);
     const willCreate = !value.id && !exact && value.name.trim().length > 0;
 
-    // La lista estorba una vez elegido: se abre al escribir, no al montar.
-    const showList = touched && !value.id && matches.length > 0;
+    // La lista se abre al tocar el campo, incluso con un emisor ya elegido:
+    // corregirlo es justo lo que se viene a hacer al editar una cuenta, y
+    // ocultarla dejaba el campo con pinta de no admitir cambios.
+    const showList = touched && matches.length > 0;
 
     function write(name: string) {
         setTouched(true);
@@ -127,7 +137,7 @@ export function InstitutionCombo({
                     value={value.name}
                     onChange={e => write(e.target.value)}
                     onFocus={() => setTouched(true)}
-                    placeholder="Ej. Banco del Austro"
+                    placeholder="Busca o escribe una institución"
                     autoComplete="off"
                 />
             </Field>
