@@ -67,7 +67,7 @@ export class SupabaseBankAccountRepository implements IBankAccountRepository {
         const { data, error } = await supabase
             .from("bank_accounts").select("*")
             .eq("owner_user_id", userId).eq("is_deleted", false)
-            .order("name");
+            .order("account_type").order("last_four");
 
         if (error) throw new Error(`Error loading bank accounts: ${error.message}`);
         return (data ?? []).map(mapToEntity);
@@ -78,7 +78,7 @@ export class SupabaseBankAccountRepository implements IBankAccountRepository {
         const { data, error } = await supabase
             .from("bank_accounts").select("*")
             .eq("owner_user_id", userId).eq("institution_id", institutionId)
-            .eq("is_deleted", false).order("name");
+            .eq("is_deleted", false).order("account_type").order("last_four");
 
         if (error) throw new Error(`Error loading bank accounts: ${error.message}`);
         return (data ?? []).map(mapToEntity);

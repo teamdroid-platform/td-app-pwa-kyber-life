@@ -84,7 +84,7 @@ export class SupabaseBankCardRepository implements IBankCardRepository {
         const { data, error } = await supabase
             .from("bank_cards").select("*")
             .eq("owner_user_id", userId).eq("is_deleted", false)
-            .order("name");
+            .order("card_type").order("last_four");
 
         if (error) throw new Error(`Error loading bank cards: ${error.message}`);
         return (data ?? []).map(mapToEntity);
@@ -95,7 +95,7 @@ export class SupabaseBankCardRepository implements IBankCardRepository {
         const { data, error } = await supabase
             .from("bank_cards").select("*")
             .eq("owner_user_id", userId).eq("account_id", accountId)
-            .eq("is_deleted", false).order("name");
+            .eq("is_deleted", false).order("card_type").order("last_four");
 
         if (error) throw new Error(`Error loading bank cards: ${error.message}`);
         return (data ?? []).map(mapToEntity);
