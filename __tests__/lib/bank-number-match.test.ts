@@ -96,6 +96,47 @@ describe("resolveFingerprint", () => {
     const cuenta9511 = { id: "a2", kind: "ACCOUNT" as const, fingerprint: mergeFingerprints([fp("XXXXXX9511")]) };
     const tarjeta8361 = { id: "c1", kind: "CARD" as const, fingerprint: mergeFingerprints([fp("542258XXXXXXX361"), fp("Mastercard 8361")]) };
 
+    // Una cuenta de cooperativa: dos dígitos por delante, dos por detrás.
+    const coop2510 = {
+        id: "a5", kind: "ACCOUNT" as const,
+        fingerprint: mergeFingerprints([fp("25XXX10")]),
+    };
+
+    it("dos dígitos en común no bastan sin prefijo que los respalde", () => {
+        // «10» también es el final de 8410, y una cuenta declarada solo por sus
+        // últimos cuatro no puede desmentirlo. Atribuirlo colgaría el movimiento
+        // de la cuenta equivocada.
+        const cuenta8410 = {
+            id: "a6", kind: "ACCOUNT" as const,
+            fingerprint: mergeFingerprints([fp("XXXXXX8410")]),
+        };
+        const r = resolveFingerprint(fp("25XXX10"), [cuenta8410]);
+
+        expect(r).toMatchObject({ resolution: "PENDING", targetId: null });
+        // El candidato no se pierde: la conciliación lo ofrece.
+        expect(r.candidateIds).toEqual(["a6"]);
+    });
+
+    it("con el prefijo de ambos lados, dos dígitos sí bastan", () => {
+        // Es la misma cuenta de siempre: 25 delante, 10 detrás.
+        const r = resolveFingerprint(fp("25XXXX10"), [coop2510, cuenta0814]);
+
+        expect(r).toMatchObject({ resolution: "INFERRED", targetId: "a5" });
+    });
+
+    it("y un prefijo distinto la descarta de plano", () => {
+        const r = resolveFingerprint(fp("77XXX10"), [coop2510]);
+
+        expect(r).toMatchObject({ resolution: "PENDING", targetId: null, candidateIds: [] });
+    });
+
+    it("tres dígitos en común se sostienen solos, sin prefijo", () => {
+        // `****361` y la Mastercard 8361 son el mismo plástico con otra máscara.
+        const r = resolveFingerprint(fp("****361"), [tarjeta8361]);
+
+        expect(r).toMatchObject({ resolution: "INFERRED", targetId: "c1" });
+    });
+
     it("sufijo de 4 y candidato único: EXACT", () => {
         const r = resolveFingerprint(fp("******0814"), [cuenta0814, cuenta9511]);
         expect(r).toMatchObject({ resolution: "EXACT", targetId: "a1" });

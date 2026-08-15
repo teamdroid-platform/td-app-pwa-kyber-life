@@ -90,6 +90,7 @@ export function TransactionCreateWizard() {
             notes: values.notes || undefined,
             institutionName: values.institutionName || undefined,
             bankInstitutionKind: values.bankInstitutionKind ?? undefined,
+            scannedOwnership: values.scannedOwnership ?? undefined,
             categoryName: values.categoryName || undefined,
             tags: values.tags.length > 0 ? values.tags : undefined,
             paidWithCredit: values.type === "EXPENSE" ? values.paidWithCredit : undefined,

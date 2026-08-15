@@ -104,12 +104,27 @@ export interface ScannedAccountEntry {
     account: string;
 }
 
+/**
+ * De quién es una cuenta del escaneo, cuando el usuario lo dice.
+ *
+ * Sin su palabra el sistema supone por el lado —lo que sale es tuyo, lo que
+ * entra es de otro—, y esa suposición falla en cuanto transfieres entre cuentas
+ * propias. `MINE` funda o ata la identidad; `EXTERNAL` la deja fuera de Bancos
+ * para siempre.
+ */
+export type AccountOwnership = "MINE" | "EXTERNAL";
+
+/** Qué dijo el usuario de cada número, indexado por la cadena cruda. */
+export type OwnershipByRaw = Record<string, AccountOwnership>;
+
 export interface ScannedTransactionInput {
     accounts: ScannedAccountEntry[];
     merchant?: string | null;
     currency?: string | null;
     /** Única señal fiable de que el número con BIN es una tarjeta de crédito. */
     paidWithCredit?: boolean | null;
+    /** Lo que el usuario declaró sobre cada cuenta del escaneo. */
+    ownership?: OwnershipByRaw | null;
     /**
      * Tipo declarado por el usuario para el emisor, cuando lo dijo. Gana sobre
      * cualquier inferencia desde el nombre.
@@ -131,6 +146,8 @@ export interface TransactionBankSyncInput {
     bankInstitutionId?: UUID | null;
     /** Números enmascarados. Solo llegan desde un escaneo. */
     scannedAccounts?: ScannedAccountEntry[] | null;
+    /** De quién es cada uno, cuando el usuario lo declaró. */
+    ownership?: OwnershipByRaw | null;
 }
 
 export interface ResolvedBankLinks {
@@ -187,6 +204,8 @@ export interface ScannedAccountView {
     } | null;
     /** El emisor que el propio texto nombra, cuando no hay identidad que consultar. */
     institutionHint: string | null;
+    /** Lo que el usuario declaró sobre esta cuenta. `null` = no lo ha dicho. */
+    ownership: AccountOwnership | null;
 }
 
 /** Sufijo mínimo para fundar una identidad sin preguntar. */
@@ -261,6 +280,7 @@ export class BankService {
             currency: input.currency ?? "USD",
             paidWithCredit: input.paidWithCredit ?? false,
             institutionKind: input.institutionKind ?? null,
+            ownership: input.ownership ?? null,
         };
 
         // Sin números que identificar, lo único que puede nacer es el emisor.
@@ -308,6 +328,7 @@ export class BankService {
      */
     async previewScannedAccounts(
         userId: UUID, entries: readonly ScannedAccountEntry[],
+        ownership?: OwnershipByRaw | null,
     ): Promise<ScannedAccountView[]> {
         const usable = entries.filter(e => e.account?.trim());
         if (usable.length === 0) return [];
@@ -359,6 +380,7 @@ export class BankService {
                     }
                     : null,
                 institutionHint: fingerprint.institutionHint,
+                ownership: ownership?.[raw] ?? null,
             };
         });
     }
@@ -401,6 +423,7 @@ export class BankService {
                     institutionName: institutionName(entity.institutionId),
                 },
                 institutionHint: null,
+                ownership: "MINE",
             };
         };
 
@@ -435,6 +458,7 @@ export class BankService {
                     resolution: "PENDING",
                     match: null,
                     institutionHint: fingerprint.institutionHint,
+                    ownership: "EXTERNAL",
                 });
             }
         }
@@ -461,7 +485,13 @@ export class BankService {
             let observation = await this.identification.observe(userId, raw);
             const isOrigin = isOriginEntry(entry);
 
-            if (isOrigin && this.canAutoCreate(observation)) {
+            // De quién es la cuenta. Lo que el usuario declaró manda; a falta de
+            // eso se supone por el lado, que acierta en una compra —de mi cuenta
+            // al comercio— y falla en una transferencia entre cuentas propias.
+            const declared = scan.ownership?.[raw] ?? null;
+            const isMine = declared ? declared === "MINE" : isOrigin;
+
+            if (isMine && await this.canAutoCreate(userId, observation)) {
                 await this.createIdentityFrom(userId, observation, institutionId, scan);
                 // Re-observar para que quede ligada a lo recién creado.
                 observation = await this.identification.reobserve(userId, raw);
@@ -483,8 +513,10 @@ export class BankService {
                 continue;
             }
 
-            // Sin identidad y no es origen: la cuenta es de un tercero.
-            if (!isOrigin) {
+            // Sin identidad y no es del usuario: es la cuenta del otro lado.
+            // Vale para cualquier lado — quien te transfiere es tan tercero como
+            // aquel a quien le transfieres.
+            if (!isMine) {
                 if (observation.resolution === "PENDING") {
                     observation = await this.identification.markExternal(userId, observation.id);
                 }
@@ -567,16 +599,29 @@ export class BankService {
     /**
      * Si el número da para fundar una identidad sin preguntar.
      *
-     * Ya no exige conocer al emisor: en una compra el comercio es la tienda, no
-     * el banco, así que exigirlo dejaba sin crear justo las tarjetas que más
+     * No exige conocer al emisor: en una compra el comercio es la tienda, no el
+     * banco, así que exigirlo dejaba sin crear justo las tarjetas que más
      * aparecen. La identidad nace sin emisor y el usuario lo asigna después.
      *
-     * Lo que sí se exige es sufijo suficiente: con menos de cuatro dígitos el
-     * número no distingue una identidad de otra y crearía duplicados.
+     * Lo que sí se exige son dígitos suficientes, contando los del principio y
+     * los del final: una cuenta de cooperativa llega como `25XXX10` —dos y dos—
+     * y mirar solo el final la descartaba, aunque cuatro dígitos en posiciones
+     * conocidas la distinguen igual de bien que los cuatro últimos.
      */
-    private canAutoCreate(observation: BankNumberObservation): boolean {
+    private async canAutoCreate(
+        userId: UUID, observation: BankNumberObservation,
+    ): Promise<boolean> {
         if (observation.resolution !== "PENDING") return false;
-        return observation.suffixDigits.length >= AUTOCREATE_MIN_SUFFIX;
+
+        const known = observation.prefixDigits.length + observation.suffixDigits.length;
+        if (known < AUTOCREATE_MIN_SUFFIX) return false;
+
+        // Pendiente pero con candidatos es «podría ser una de estas», no «es
+        // nueva». Fundar una tercera cuenta ahí duplicaría la que ya existe;
+        // esa ambigüedad la resuelve la conciliación, no una heurística.
+        const candidates = await this.identification.identityCandidates(userId);
+        const { candidateIds } = resolveFingerprint(parseBankNumber(observation.raw), candidates);
+        return candidateIds.length === 0;
     }
 
     /** Crea la cuenta o la tarjeta que la observación describe, sin confirmar. */

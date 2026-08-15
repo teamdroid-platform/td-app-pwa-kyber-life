@@ -13,7 +13,6 @@ import type { WizardValues } from "../../hooks/useTransactionWizard";
 import { normalizeTransactionType, SCANNER_TRANSACTION_TYPES } from "../../lib/transaction-type";
 import { InstitutionMatchHint, InstitutionMatchIcon } from "../InstitutionMatchBadge";
 import { ScanOriginalData } from "../ScanOriginalData";
-import { ScannedAccountsPanel } from "@/presentation/bank/components/ScannedAccountsPanel";
 import type { ScannedAccountView } from "@/application/services/bank-service";
 import { TransactionWizard } from "./TransactionWizard";
 
@@ -95,6 +94,7 @@ export function TransactionScanWizard({
                 notes: values.notes || null,
                 institutionName: values.institutionName || null,
                 bankInstitutionKind: values.bankInstitutionKind ?? null,
+                scannedOwnership: values.scannedOwnership ?? null,
                 categoryName: values.categoryName || null,
                 tags: values.tags,
                 paidWithCredit: values.type === "EXPENSE" ? values.paidWithCredit : null,
@@ -158,9 +158,9 @@ export function TransactionScanWizard({
             )}
             // On the summary, the level shows beside the institution itself, so
             // whether it was identified is visible without opening anything.
-            // El escaneo dice de dónde salió y a dónde fue; el paso solo elige
-            // con qué. Va como contexto, encima del selector.
-            paymentHint={<ScannedAccountsPanel accounts={scannedAccounts} />}
+            // El escaneo dice de dónde salió y a dónde fue; el paso deja además
+            // declarar de quién es cada cuenta antes de confirmar.
+            scannedAccounts={scannedAccounts}
             decorateSummary={() => ({
                 fieldMarkers: institutionMatch ? { institutionName: <InstitutionMatchIcon info={institutionMatch} /> } : undefined,
                 extra: <ScanOriginalData transaction={initialData} />,

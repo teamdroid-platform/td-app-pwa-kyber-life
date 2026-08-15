@@ -8,7 +8,6 @@ import { updateTransactionAction } from "@/app/actions/financial-transactions";
 import type { FinancialTransaction, FinancialTransactionType } from "@/domain/entities/financial";
 import type { WizardScreen, WizardValues } from "../../hooks/useTransactionWizard";
 import type { ScannedAccountView } from "@/application/services/bank-service";
-import { ScannedAccountsPanel } from "@/presentation/bank/components/ScannedAccountsPanel";
 import { TransactionWizard } from "./TransactionWizard";
 
 export interface TransactionEditWizardProps {
@@ -66,6 +65,7 @@ export function TransactionEditWizard({
                 institutionId: null, // Force the backend to resolve by name
                 institutionName: values.institutionName || undefined,
                 bankInstitutionKind: values.bankInstitutionKind ?? undefined,
+                scannedOwnership: values.scannedOwnership ?? undefined,
                 accountId: null,
                 categoryId: null,
                 categoryName: values.categoryName || undefined,
@@ -101,8 +101,9 @@ export function TransactionEditWizard({
             onSubmit={handleSubmit}
             onClose={onCancel}
             initialFocus={initialFocus}
-            // Editar no debe perder de vista de dónde salió el dinero.
-            paymentHint={<ScannedAccountsPanel accounts={bankAccounts} title="Cuentas del movimiento" />}
+            // Editar no debe perder de vista de dónde salió el dinero, ni la
+            // posibilidad de corregir de quién es cada cuenta.
+            scannedAccounts={bankAccounts}
         />
     );
 }

@@ -6,6 +6,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import type { FinancialTransaction } from "@/domain/entities/financial";
 import type { WizardScreen } from "../hooks/useTransactionWizard";
+import type { ScannedAccountView } from "@/application/services/bank-service";
+import { AccountsTrail } from "@/presentation/bank/components/ScannedAccountsPanel";
 import { SummaryHero, SummaryRow } from "./transaction-wizard/steps/SummaryStep";
 
 /** Format a wall-clock `YYYY-MM-DDTHH:mm` as "DD/MM/YYYY HH:mm". */
@@ -27,6 +29,8 @@ export interface TransactionDetailSummaryProps {
     date: string;
     /** Open the editor on the step that owns the tapped field. */
     onEditField: (screen: WizardScreen) => void;
+    /** Origen y destino según el módulo Bancos, resueltos en el servidor. */
+    bankAccounts?: ScannedAccountView[];
 }
 
 /**
@@ -46,6 +50,7 @@ export function TransactionDetailSummary({
     notes,
     date,
     onEditField,
+    bankAccounts = [],
 }: TransactionDetailSummaryProps) {
     const institution = displayNames.institution || transaction.merchant || "";
     const showsCredit = transaction.type === "EXPENSE" && transaction.paidWithCredit;
@@ -116,7 +121,12 @@ export function TransactionDetailSummary({
                         </Badge>
                     ) : undefined}
                 >
-                    {displayNames.account || <span className="text-text-tertiary">Sin cuenta</span>}
+                    {/* El recorrido del dinero es el valor de la fila, no un
+                        bloque aparte: la pregunta «¿qué cuenta?» se responde
+                        aquí o no se responde. */}
+                    {bankAccounts.length > 0
+                        ? <AccountsTrail accounts={bankAccounts} />
+                        : displayNames.account || <span className="text-text-tertiary">Sin cuenta</span>}
                 </SummaryRow>
 
                 <SummaryRow

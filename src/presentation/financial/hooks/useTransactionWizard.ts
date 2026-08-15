@@ -27,6 +27,12 @@ export interface WizardValues {
     bankInstitutionKind?: BankInstitutionKind | null;
     categoryName: string;
     paidWithCredit: boolean;
+    /**
+     * De quién es cada cuenta del escaneo, cuando el usuario lo declaró,
+     * indexado por la cadena cruda del banco. Sin declarar, el servicio supone
+     * por el lado — y esa suposición falla entre cuentas propias.
+     */
+    scannedOwnership?: Record<string, "MINE" | "EXTERNAL">;
     /** Cuenta de la que sale el dinero, cuando el usuario la eligió. */
     bankSourceAccountId?: string | null;
     /** Tarjeta usada. Con `paidWithCredit`, define un consumo diferido. */
@@ -86,6 +92,7 @@ export const FIELD_STEP: Record<keyof WizardValues, WizardScreen> = {
     categoryName: "category",
     categoryId: "category",
     paidWithCredit: "payment",
+    scannedOwnership: "payment",
     bankSourceAccountId: "payment",
     bankCardId: "payment",
     date: "date",
@@ -121,7 +128,12 @@ export function canLeaveStep(step: WizardStepId, values: WizardValues): boolean 
  * from the list clears its id, and counting that as an unsaved change would
  * inflate "N cambios" for an edit that never happened.
  */
-const DIFF_IGNORED: readonly (keyof WizardValues)[] = ["institutionId", "categoryId", "bankSourceAccountId", "bankCardId"];
+const DIFF_IGNORED: readonly (keyof WizardValues)[] = [
+    "institutionId", "categoryId", "bankSourceAccountId", "bankCardId",
+    // Un objeto nunca es igual a otro por identidad, así que compararlo
+    // marcaría la fila como cambiada en cada render.
+    "scannedOwnership",
+];
 
 /** Fields whose value differs from the one the wizard opened with. */
 export function diffValues(initial: WizardValues, current: WizardValues): (keyof WizardValues)[] {

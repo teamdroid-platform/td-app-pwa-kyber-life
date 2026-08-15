@@ -35,6 +35,12 @@ export interface ResolutionResult {
 /** Sufijo de 4 o más: suficiente para afirmar sin pedir confirmación. */
 const STRONG_SUFFIX = 4;
 
+/**
+ * Dígitos en común por debajo de los cuales el sufijo no sostiene la afirmación
+ * solo y hace falta que el prefijo la respalde.
+ */
+const WEAK_SUFFIX = 3;
+
 /** El más corto es sufijo del más largo, y ninguno está vacío. */
 function suffixContained(a: string, b: string): boolean {
     if (!a || !b) return false;
@@ -42,6 +48,11 @@ function suffixContained(a: string, b: string): boolean {
 }
 
 /** Uno vacío, o uno es prefijo del otro. */
+/**
+ * `required` invierte el trato del prefijo ausente: de «no contradice, pasa» a
+ * «no lo prueba, no pasa». Se exige cuando el sufijo es demasiado corto para
+ * sostener la afirmación por sí solo.
+ */
 function prefixCompatible(a: string, b: string): boolean {
     if (!a || !b) return true;
     return a.length <= b.length ? b.startsWith(a) : a.startsWith(b);
@@ -90,6 +101,11 @@ export function mergeFingerprints(
  * Dos huellas pueden ser el mismo número si ninguna parte conocida se
  * contradice. El largo queda fuera a propósito: contar caracteres de máscara
  * no es fiable, así que solo sirve para desempatar, nunca para rechazar.
+ *
+ * Ser compatible es no contradecirse, que es un listón bajo a propósito: la
+ * conciliación necesita ver todos los candidatos posibles para ofrecerlos. Lo
+ * que exige respaldo es *afirmar* que son el mismo — eso lo decide
+ * `resolveFingerprint`.
  */
 export function areCompatible(
     a: NumberFingerprint | IdentityFingerprint,
@@ -99,6 +115,21 @@ export function areCompatible(
         && prefixCompatible(a.prefixDigits, b.prefixDigits)
         && noConflict(a.bin, b.bin)
         && noConflict(a.brand, b.brand);
+}
+
+/**
+ * Si los dígitos en común bastan para afirmar, por sí solos, que dos huellas
+ * son el mismo número.
+ *
+ * Mira los dígitos **compartidos**, no el largo de cada sufijo: `361` y `8361`
+ * comparten tres y son la misma tarjeta vista con distinta máscara. `25XXX10`
+ * y `••••8410` comparten dos, y dos dígitos encajan con demasiadas cuentas —
+ * ahí hace falta que los prefijos lo respalden.
+ */
+function suffixIsEnough(a: NumberFingerprint, b: IdentityFingerprint): boolean {
+    const shared = Math.min(a.suffixDigits.length, b.suffixDigits.length);
+    if (shared >= WEAK_SUFFIX) return true;
+    return !!a.prefixDigits && !!b.prefixDigits;
 }
 
 /**
@@ -125,6 +156,19 @@ export function resolveFingerprint(
     }
 
     const [only] = compatible;
+
+    // Candidato único, pero con tan pocos dígitos en común que sin el respaldo
+    // del prefijo la coincidencia podría ser de cualquier otra cuenta. Se deja
+    // pendiente con su candidato a la vista, para que lo resuelva quien sabe.
+    if (!suffixIsEnough(fingerprint, only.fingerprint)) {
+        return {
+            resolution: "PENDING",
+            targetId: null,
+            targetKind: null,
+            candidateIds: [only.id],
+        };
+    }
+
     return {
         resolution: fingerprint.suffixDigits.length >= STRONG_SUFFIX ? "EXACT" : "INFERRED",
         targetId: only.id,

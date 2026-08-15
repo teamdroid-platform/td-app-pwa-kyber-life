@@ -1,6 +1,6 @@
 import React from "react";
-import { render, screen } from "@testing-library/react";
-import { ScannedAccountsPanel } from "@/presentation/bank/components/ScannedAccountsPanel";
+import { render, screen, fireEvent } from "@testing-library/react";
+import { ScannedAccountsPanel, AccountsTrail } from "@/presentation/bank/components/ScannedAccountsPanel";
 import type { ScannedAccountView } from "@/application/services/bank-service";
 
 function view(overrides: Partial<ScannedAccountView> = {}): ScannedAccountView {
@@ -12,6 +12,7 @@ function view(overrides: Partial<ScannedAccountView> = {}): ScannedAccountView {
         resolution: "EXACT",
         match: { id: "acc-1", name: "Ahorros Principal", institutionName: "Banco del Austro" },
         institutionHint: null,
+        ownership: null,
         ...overrides,
     };
 }
@@ -94,5 +95,100 @@ describe("ScannedAccountsPanel", () => {
         render(<ScannedAccountsPanel accounts={[view()]} title="Cuentas del movimiento" />);
 
         expect(screen.getByText("Cuentas del movimiento")).toBeInTheDocument();
+    });
+});
+
+describe("declarar de quién es cada cuenta", () => {
+    const sinIdentificar = () => view({ match: null, resolution: "PENDING" });
+
+    it("no pregunta cuando el panel es de solo lectura", () => {
+        render(<ScannedAccountsPanel accounts={[sinIdentificar()]} />);
+
+        expect(screen.queryByRole("button", { name: "Es mía" })).not.toBeInTheDocument();
+    });
+
+    it("pregunta por lo que no está identificado", () => {
+        render(<ScannedAccountsPanel accounts={[sinIdentificar()]} onOwnershipChange={jest.fn()} />);
+
+        expect(screen.getByRole("button", { name: "Es mía" })).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "De un tercero" })).toBeInTheDocument();
+    });
+
+    it("no discute lo que ya corresponde a una cuenta tuya", () => {
+        // El número apunta a un registro que existe: no hay nada que declarar.
+        render(<ScannedAccountsPanel accounts={[view()]} onOwnershipChange={jest.fn()} />);
+
+        expect(screen.queryByRole("button", { name: "Es mía" })).not.toBeInTheDocument();
+    });
+
+    it("marca la suposición como tal hasta que el usuario elige", () => {
+        render(<ScannedAccountsPanel accounts={[sinIdentificar()]} onOwnershipChange={jest.fn()} />);
+
+        expect(screen.getByText("supuesto")).toBeInTheDocument();
+        // Un origen se supone propio…
+        expect(screen.getByRole("button", { name: "Es mía" })).toHaveAttribute("aria-pressed", "true");
+    });
+
+    it("…y un destino se supone ajeno, que es lo que fallaba entre cuentas propias", () => {
+        render(
+            <ScannedAccountsPanel
+                accounts={[sinIdentificar()].map(a => ({ ...a, role: "DESTINATION" as const }))}
+                onOwnershipChange={jest.fn()}
+            />,
+        );
+
+        expect(screen.getByRole("button", { name: "De un tercero" })).toHaveAttribute("aria-pressed", "true");
+    });
+
+    it("elegir emite la declaración con la cadena del banco", () => {
+        const onOwnershipChange = jest.fn();
+        render(
+            <ScannedAccountsPanel
+                accounts={[sinIdentificar()].map(a => ({ ...a, role: "DESTINATION" as const }))}
+                onOwnershipChange={onOwnershipChange}
+            />,
+        );
+
+        fireEvent.click(screen.getByRole("button", { name: "Es mía" }));
+
+        expect(onOwnershipChange).toHaveBeenCalledWith("AHO - XXXXXX0814", "MINE");
+    });
+
+    it("una vez declarado deja de decir que es una suposición", () => {
+        render(
+            <ScannedAccountsPanel
+                accounts={[view({ match: null, resolution: "PENDING", ownership: "MINE" })]}
+                onOwnershipChange={jest.fn()}
+            />,
+        );
+
+        expect(screen.queryByText("supuesto")).not.toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "Es mía" })).toHaveAttribute("aria-pressed", "true");
+    });
+});
+
+describe("AccountsTrail", () => {
+    it("resume el recorrido para caber dentro de otra fila", () => {
+        render(
+            <AccountsTrail accounts={[
+                view({ display: "••••0814" }),
+                view({ role: "DESTINATION", display: "••••1582", match: null, raw: "XXXXXX1582" }),
+            ]} />,
+        );
+
+        expect(screen.getByText("••••0814")).toBeInTheDocument();
+        expect(screen.getByText("••••1582")).toBeInTheDocument();
+        expect(screen.getByLabelText("Origen")).toBeInTheDocument();
+        expect(screen.getByLabelText("Destino")).toBeInTheDocument();
+    });
+
+    it("nombra la cuenta cuando se sabe cuál es", () => {
+        render(<AccountsTrail accounts={[view()]} />);
+        expect(screen.getByText("Ahorros Principal")).toBeInTheDocument();
+    });
+
+    it("sin cuentas no pinta nada", () => {
+        const { container } = render(<AccountsTrail accounts={[]} />);
+        expect(container).toBeEmptyDOMElement();
     });
 });

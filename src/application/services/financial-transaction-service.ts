@@ -24,6 +24,8 @@ export interface CreateFinancialTransactionDTO {
     bankCardStatementId?: UUID | null;
     /** Tipo de emisor declarado por el usuario al crear la institución. */
     bankInstitutionKind?: 'BANK' | 'COOPERATIVE' | 'WALLET' | 'OTHER' | null;
+    /** De quién es cada cuenta del escaneo, según el usuario. */
+    scannedOwnership?: Record<string, 'MINE' | 'EXTERNAL'> | null;
     tags?: string[] | null;
     notes?: string | null;
     executionId?: UUID | null;
@@ -116,6 +118,7 @@ export class FinancialTransactionService {
                 currency: dto.currency,
                 paidWithCredit: dto.paidWithCredit ?? false,
                 institutionKind: dto.bankInstitutionKind ?? null,
+                ownership: dto.scannedOwnership ?? null,
                 bankSourceAccountId: dto.bankSourceAccountId ?? null,
                 bankDestinationAccountId: dto.bankDestinationAccountId ?? null,
                 bankCardId: dto.bankCardId ?? null,
@@ -207,7 +210,7 @@ export class FinancialTransactionService {
             }
         }
 
-        const { categoryName, institutionName, bankInstitutionKind, ...restData } = data;
+        const { categoryName, institutionName, bankInstitutionKind, scannedOwnership, ...restData } = data;
 
         // Editar también sincroniza: si el merchant pasó a ser un banco, el
         // emisor nace aquí. Lo que el usuario haya elegido a mano no se pisa, y
@@ -219,6 +222,7 @@ export class FinancialTransactionService {
                 currency: data.currency ?? tx.currency,
                 paidWithCredit: data.paidWithCredit ?? tx.paidWithCredit ?? false,
                 institutionKind: bankInstitutionKind ?? null,
+                ownership: scannedOwnership ?? null,
                 bankSourceAccountId: data.bankSourceAccountId ?? tx.bankSourceAccountId ?? null,
                 bankDestinationAccountId: data.bankDestinationAccountId ?? tx.bankDestinationAccountId ?? null,
                 bankCardId: data.bankCardId ?? tx.bankCardId ?? null,

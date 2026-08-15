@@ -342,6 +342,7 @@ setDisplayNames({ institution: instName, category: catName });
                 )}
 
                 <TransactionDetailSummary
+                    bankAccounts={bankAccounts}
                     transaction={transaction}
                     displayNames={displayNames}
                     notes={displayContext}

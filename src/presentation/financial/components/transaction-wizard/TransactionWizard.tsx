@@ -23,6 +23,8 @@ import { AmountStep } from "./steps/AmountStep";
 import { CategoryStep, InstitutionStep } from "./steps/PickerSteps";
 import { PaymentStep } from "./steps/PaymentStep";
 import { paymentSourceForCard } from "@/presentation/bank/components/PaymentSourcePicker";
+import type { ScannedAccountView } from "@/application/services/bank-service";
+import { ScannedAccountsPanel } from "@/presentation/bank/components/ScannedAccountsPanel";
 import { DateStep } from "./steps/DateStep";
 import { SummaryStep, type FieldMarkers } from "./steps/SummaryStep";
 
@@ -68,11 +70,10 @@ export interface TransactionWizardProps {
     /** Shown inside the institution step, e.g. how confident the scan's match is. */
     institutionHint?: ReactNode;
     /**
-     * Shown inside the payment step, above the picker — e.g. the accounts a scan
-     * already extracted, which are context for the choice rather than the choice
-     * itself.
+     * Origen y destino que trae el escaneo o los vínculos del movimiento. Se
+     * muestran como valor de la fila de pago y, en el paso, con sus controles.
      */
-    paymentHint?: ReactNode;
+    scannedAccounts?: ScannedAccountView[];
     /**
      * Open straight on one field, as if its summary row had been tapped. Set
      * when the editor is entered from a specific row on the detail screen.
@@ -99,7 +100,7 @@ export function TransactionWizard({
     decorateSummary,
     secondaryAction,
     institutionHint,
-    paymentHint,
+    scannedAccounts = [],
     initialFocus,
 }: TransactionWizardProps) {
     const wizard = useTransactionWizard({ mode, initialValues, initialFocus });
@@ -275,6 +276,16 @@ export function TransactionWizard({
         setCategoryQuery("");
     };
 
+    // Lo que el usuario ya declaró se refleja en el panel sin esperar al
+    // servidor: la elección tiene que verse en el mismo toque.
+    const scannedAccountsWithChoice = useMemo(
+        () => scannedAccounts.map(account => ({
+            ...account,
+            ownership: values.scannedOwnership?.[account.raw] ?? account.ownership,
+        })),
+        [scannedAccounts, values.scannedOwnership],
+    );
+
     const stepDefinition = WIZARD_STEPS.find((s) => s.id === screen);
     const stepNumber = WIZARD_STEPS.findIndex((s) => s.id === screen) + 1;
 
@@ -362,7 +373,15 @@ export function TransactionWizard({
                             bankCardId: source.cardId ?? null,
                             paidWithCredit: source.paidWithCredit,
                         })}
-                        hint={paymentHint}
+                        hint={
+                            <ScannedAccountsPanel
+                                accounts={scannedAccountsWithChoice}
+                                title="Cuentas del movimiento"
+                                onOwnershipChange={(raw, ownership) => wizard.patch({
+                                    scannedOwnership: { ...values.scannedOwnership, [raw]: ownership },
+                                })}
+                            />
+                        }
                         institutions={bankInstitutions}
                         onAccountCreated={handleAccountCreated}
                         onCardCreated={handleCardCreated}
@@ -389,9 +408,9 @@ export function TransactionWizard({
                         fieldMarkers={decoration.fieldMarkers}
                         accounts={bankAccounts}
                         cards={bankCards}
-                        // Las cuentas del movimiento pertenecen junto a la forma
-                        // de pago, no al final: es la fila que responden.
-                        paymentExtra={paymentHint}
+                        // El recorrido va DENTRO de la fila de pago, no en un
+                        // bloque aparte: responde a esa misma pregunta.
+                        bankAccounts={scannedAccounts}
                     />
                 );
             }

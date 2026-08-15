@@ -12,6 +12,8 @@ import { resolveTransactionTypeOption } from "../../TransactionTypeChips";
 import { describePaymentSource, isGenericPaymentLabel } from "../../../lib/payment-summary";
 import type { MissingField, WizardMode, WizardScreen, WizardValues } from "../../../hooks/useTransactionWizard";
 import type { BankAccount, BankCard } from "@/domain/entities/bank";
+import type { ScannedAccountView } from "@/application/services/bank-service";
+import { AccountsTrail } from "@/presentation/bank/components/ScannedAccountsPanel";
 
 const MAX_NOTES = 200;
 
@@ -150,8 +152,8 @@ interface SummaryStepProps {
     /** Cuentas y tarjetas del usuario, para nombrar con qué se pagó. */
     accounts?: readonly BankAccount[];
     cards?: readonly BankCard[];
-    /** Contexto que acompaña a la forma de pago, p. ej. las cuentas del escaneo. */
-    paymentExtra?: ReactNode;
+    /** Origen y destino, mostrados como valor de la fila de pago. */
+    bankAccounts?: ScannedAccountView[];
     /**
      * Markers shown beside a value — a scan's match confidence, or whether
      * confirming will reuse a record or create one.
@@ -189,7 +191,7 @@ export function SummaryStep({
     fieldMarkers,
     accounts = [],
     cards = [],
-    paymentExtra,
+    bankAccounts = [],
 }: SummaryStepProps) {
     const [openEditor, setOpenEditor] = useState<"notes" | "tags" | null>(null);
 
@@ -283,14 +285,16 @@ export function SummaryStep({
                     onEdit={() => onEdit("payment")}
                     changed={didChange("paidWithCredit")}
                 >
-                    {/* Una cuenta concreta se enseña como valor; el texto genérico
-                        se atenúa, porque significa que no hay nada atado. */}
-                    {isGenericPaymentLabel(paymentLabel)
-                        ? <span className="text-text-tertiary">{paymentLabel}</span>
-                        : paymentLabel}
+                    {/* El recorrido del dinero manda cuando el escaneo lo trae:
+                        responde a la misma pregunta con más detalle. Si no, la
+                        cuenta elegida; y el texto genérico atenuado, porque
+                        significa que no hay nada atado. */}
+                    {bankAccounts.length > 0
+                        ? <AccountsTrail accounts={bankAccounts} />
+                        : isGenericPaymentLabel(paymentLabel)
+                            ? <span className="text-text-tertiary">{paymentLabel}</span>
+                            : paymentLabel}
                 </SummaryRow>
-
-                {paymentExtra}
 
                 <SummaryRow
                     icon={Calendar}

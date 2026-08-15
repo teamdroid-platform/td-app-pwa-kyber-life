@@ -1,6 +1,8 @@
+"use client";
+
 import { ArrowDownLeft, ArrowUpRight, Landmark } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { ScannedAccountView } from "@/application/services/bank-service";
+import type { AccountOwnership, ScannedAccountView } from "@/application/services/bank-service";
 
 interface ScannedAccountsPanelProps {
     accounts: ScannedAccountView[];
@@ -10,6 +12,11 @@ interface ScannedAccountsPanelProps {
      */
     title?: string;
     className?: string;
+    /**
+     * Deja declarar de quién es cada cuenta. Sin esto el panel es de solo
+     * lectura, que es como se muestra en el resumen y en el detalle.
+     */
+    onOwnershipChange?: (raw: string, ownership: AccountOwnership) => void;
 }
 
 /**
@@ -25,7 +32,7 @@ interface ScannedAccountsPanelProps {
  * propia; la pantalla de conciliación es donde esa evidencia se examina.
  */
 export function ScannedAccountsPanel({
-    accounts, title = "Cuentas del escaneo", className,
+    accounts, title = "Cuentas del escaneo", className, onOwnershipChange,
 }: ScannedAccountsPanelProps) {
     if (accounts.length === 0) return null;
 
@@ -37,29 +44,127 @@ export function ScannedAccountsPanel({
 
             <ul className="flex flex-col gap-1">
                 {accounts.map((account, index) => (
-                    <ScannedAccountRow key={`${account.role}-${account.raw}-${index}`} account={account} />
+                    <ScannedAccountRow
+                        key={`${account.role}-${account.raw}-${index}`}
+                        account={account}
+                        onOwnershipChange={onOwnershipChange}
+                    />
                 ))}
             </ul>
         </div>
     );
 }
 
-function ScannedAccountRow({ account }: { account: ScannedAccountView }) {
+function ScannedAccountRow({
+    account, onOwnershipChange,
+}: {
+    account: ScannedAccountView;
+    onOwnershipChange?: (raw: string, ownership: AccountOwnership) => void;
+}) {
     const isSource = account.role === "SOURCE";
     const RoleIcon = isSource ? ArrowUpRight : ArrowDownLeft;
 
+    // Una cuenta ya identificada como tuya no admite discusión: el número
+    // corresponde a un registro que existe. Se pregunta por lo que no lo está.
+    const askable = !!onOwnershipChange && !account.match;
+
     return (
-        <li
-            className="flex items-center gap-1.5 text-xs"
-            title={evidence(account)}
-        >
-            <RoleIcon
-                className={cn("h-3.5 w-3.5 shrink-0", isSource ? "text-rose-500" : "text-emerald-500")}
-                aria-label={isSource ? "Origen" : "Destino"}
-            />
-            <span className="shrink-0 font-mono text-text-primary">{account.display}</span>
-            <span className="truncate text-text-tertiary">{attribution(account)}</span>
+        <li className={cn("text-xs", askable && "flex flex-col gap-1 py-0.5")}>
+            <span className="flex items-center gap-1.5" title={evidence(account)}>
+                <RoleIcon
+                    className={cn("h-3.5 w-3.5 shrink-0", isSource ? "text-rose-500" : "text-emerald-500")}
+                    aria-label={isSource ? "Origen" : "Destino"}
+                />
+                <span className="shrink-0 font-mono text-text-primary">{account.display}</span>
+                <span className="truncate text-text-tertiary">{attribution(account)}</span>
+            </span>
+
+            {askable && (
+                <OwnershipChoice
+                    value={account.ownership ?? (isSource ? "MINE" : "EXTERNAL")}
+                    declared={account.ownership != null}
+                    onChange={next => onOwnershipChange!(account.raw, next)}
+                />
+            )}
         </li>
+    );
+}
+
+/**
+ * De quién es la cuenta, en dos botones.
+ *
+ * Arranca en lo que el sistema supone por el lado y lo dice —«supuesto»— hasta
+ * que el usuario elige: transferir entre cuentas propias es normal, y dar el
+ * destino por ajeno sin avisar es lo que hacía desaparecer una cuenta suya.
+ */
+function OwnershipChoice({
+    value, declared, onChange,
+}: {
+    value: AccountOwnership;
+    declared: boolean;
+    onChange: (next: AccountOwnership) => void;
+}) {
+    const options: { value: AccountOwnership; label: string }[] = [
+        { value: "MINE", label: "Es mía" },
+        { value: "EXTERNAL", label: "De un tercero" },
+    ];
+
+    return (
+        <span className="flex items-center gap-1 pl-5">
+            {options.map(option => (
+                <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => onChange(option.value)}
+                    aria-pressed={value === option.value}
+                    className={cn(
+                        "rounded-lg border px-2 py-0.5 text-[11px] transition-colors",
+                        value === option.value
+                            ? "border-accent-primary bg-accent-primary/10 text-text-primary"
+                            : "border-border/40 text-text-tertiary hover:border-border",
+                    )}
+                >
+                    {option.label}
+                </button>
+            ))}
+            {!declared && <span className="text-[10px] text-text-tertiary">supuesto</span>}
+        </span>
+    );
+}
+
+/**
+ * El recorrido del dinero en una línea, para ir dentro de otra fila.
+ *
+ * Es la misma información del panel comprimida al máximo: sirve como valor de
+ * la fila «Cuenta», donde compite con el resto del resumen y no puede permitirse
+ * un bloque propio.
+ */
+export function AccountsTrail({ accounts }: { accounts: ScannedAccountView[] }) {
+    if (accounts.length === 0) return null;
+
+    return (
+        <span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+            {accounts.map((account, index) => {
+                const isSource = account.role === "SOURCE";
+                const Icon = isSource ? ArrowUpRight : ArrowDownLeft;
+                return (
+                    <span
+                        key={`${account.role}-${account.raw}-${index}`}
+                        className="inline-flex items-center gap-1"
+                        title={[account.raw, attribution(account)].filter(Boolean).join(" · ")}
+                    >
+                        <Icon
+                            className={cn("h-3.5 w-3.5 shrink-0", isSource ? "text-rose-500" : "text-emerald-500")}
+                            aria-label={isSource ? "Origen" : "Destino"}
+                        />
+                        <span className="font-mono text-sm">{account.display}</span>
+                        {account.match && (
+                            <span className="text-xs text-text-tertiary">{account.match.name}</span>
+                        )}
+                    </span>
+                );
+            })}
+        </span>
     );
 }
 
