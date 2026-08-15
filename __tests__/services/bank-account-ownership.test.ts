@@ -64,7 +64,7 @@ describe("de quién es cada cuenta", () => {
 
         const links = await service.syncTransactionBankLinks(USER, {
             ...BASE,
-            ownership: { "10XXXXXX11": "MINE" },
+            ownership: { "10XXXXXX11": { ownership: "MINE" } },
         });
 
         expect(links.bankDestinationAccountId).toBeTruthy();
@@ -78,7 +78,7 @@ describe("de quién es cada cuenta", () => {
 
         const links = await service.syncTransactionBankLinks(USER, {
             ...BASE,
-            ownership: { "25XXX10": "EXTERNAL", "10XXXXXX11": "MINE" },
+            ownership: { "25XXX10": { ownership: "EXTERNAL" }, "10XXXXXX11": { ownership: "MINE" } },
         });
 
         expect(links.bankSourceAccountId).toBeNull();
@@ -120,7 +120,7 @@ describe("de quién es cada cuenta", () => {
     it("lo declarado se respeta al reeditar, sin volver a preguntar", async () => {
         const { service, accounts } = build();
 
-        const ownership = { "10XXXXXX11": "MINE" as const };
+        const ownership = { "10XXXXXX11": { ownership: "MINE" as const } };
         const primera = await service.syncTransactionBankLinks(USER, { ...BASE, ownership });
         const segunda = await service.syncTransactionBankLinks(USER, { ...BASE, ownership });
 
@@ -138,7 +138,7 @@ describe("de quién es cada cuenta", () => {
         // El usuario corrige: esa cuenta es suya.
         const links = await service.syncTransactionBankLinks(USER, {
             ...BASE,
-            ownership: { "10XXXXXX11": "MINE" },
+            ownership: { "10XXXXXX11": { ownership: "MINE" } },
         });
 
         expect(links.bankDestinationAccountId).toBeTruthy();
@@ -151,7 +151,7 @@ describe("de quién es cada cuenta", () => {
         await service.syncTransactionBankLinks(USER, BASE);
         const links = await service.syncTransactionBankLinks(USER, {
             ...BASE,
-            ownership: { "10XXXXXX11": "MINE" },
+            ownership: { "10XXXXXX11": { ownership: "MINE" } },
         });
 
         // Antes se perdía: ni cuenta, ni contraparte, ni rastro en la fila.
@@ -177,12 +177,113 @@ describe("de quién es cada cuenta", () => {
         const { service } = build();
 
         const vistas = await service.previewScannedAccounts(
-            USER, TRANSFERENCIA, { "10XXXXXX11": "MINE" },
+            USER, TRANSFERENCIA, { "10XXXXXX11": { ownership: "MINE" } },
         );
 
         expect(vistas.map(v => [v.raw, v.ownership])).toEqual([
             ["25XXX10", null],
             ["10XXXXXX11", "MINE"],
         ]);
+    });
+});
+
+describe("corregir la cuenta antes de confirmar", () => {
+    it("la crea con la institución que el usuario eligió", async () => {
+        const { service, accounts } = build();
+        const otro = await service.createInstitution(USER, { name: "Banco Pichincha", kind: "BANK" });
+
+        const links = await service.syncTransactionBankLinks(USER, {
+            ...BASE,
+            ownership: {
+                "25XXX10": { ownership: "MINE", institutionId: otro.id },
+            },
+        });
+
+        const cuenta = await accounts.findById(links.bankSourceAccountId!);
+        // El escaneo decía Jardín Azuayo; manda lo que el usuario corrigió.
+        expect(cuenta?.institutionId).toBe(otro.id);
+    });
+
+    it("crea el emisor que el usuario escribió, con el tipo que declaró", async () => {
+        const { service, accounts, institutions } = build();
+
+        const links = await service.syncTransactionBankLinks(USER, {
+            ...BASE,
+            ownership: {
+                "25XXX10": {
+                    ownership: "MINE",
+                    institutionName: "Mutualista Azuay",
+                    institutionKind: "COOPERATIVE",
+                },
+            },
+        });
+
+        const cuenta = await accounts.findById(links.bankSourceAccountId!);
+        const emisor = (await institutions.findByOwnerId(USER)).find(i => i.id === cuenta?.institutionId);
+        expect(emisor).toMatchObject({ name: "Mutualista Azuay", kind: "COOPERATIVE" });
+    });
+
+    it("respeta que sea una tarjeta cuando el número no lo delataba", async () => {
+        const { service, cards } = build();
+
+        const links = await service.syncTransactionBankLinks(USER, {
+            ...BASE,
+            ownership: {
+                "25XXX10": { ownership: "MINE", kind: "CARD", cardType: "CREDIT" },
+            },
+        });
+
+        expect(links.bankCardId).toBeTruthy();
+        const [tarjeta] = await cards.findByOwnerId(USER);
+        expect(tarjeta).toMatchObject({ cardType: "CREDIT", lastFour: "10" });
+    });
+
+    it("respeta el tipo de cuenta declarado", async () => {
+        const { service, accounts } = build();
+
+        const links = await service.syncTransactionBankLinks(USER, {
+            ...BASE,
+            ownership: {
+                "25XXX10": { ownership: "MINE", accountType: "CHECKING" },
+            },
+        });
+
+        expect((await accounts.findById(links.bankSourceAccountId!))?.accountType).toBe("CHECKING");
+    });
+
+    it("guarda los dígitos corregidos, no los que leyó el escáner", async () => {
+        const { service, accounts } = build();
+
+        const links = await service.syncTransactionBankLinks(USER, {
+            ...BASE,
+            ownership: {
+                // El banco escribió 25XXX10; el número real es otro.
+                "25XXX10": { ownership: "MINE", number: "2501234510" },
+            },
+        });
+
+        const cuenta = await accounts.findById(links.bankSourceAccountId!);
+        // Del número completo se guardan las dos partes que identifican: el
+        // principio y los últimos cuatro. Nada de los dígitos que leyó el
+        // escáner sobrevive.
+        expect(cuenta).toMatchObject({ prefixDigits: "250123", lastFour: "4510" });
+    });
+
+    it("y ata la cadena original a lo creado, aunque ya no se parezcan", async () => {
+        const { service, observations } = build();
+
+        const links = await service.syncTransactionBankLinks(USER, {
+            ...BASE,
+            ownership: {
+                "25XXX10": { ownership: "MINE", number: "9999888877" },
+            },
+        });
+
+        // Sin fijar el vínculo, el emparejamiento no reconocería «25XXX10» en
+        // una cuenta que ahora termina en otra cosa, y el escaneo siguiente
+        // volvería a crearla.
+        const observacion = await observations.findByRaw(USER, "25XXX10");
+        expect(observacion?.accountId).toBe(links.bankSourceAccountId);
+        expect(observacion?.resolution).toBe("MANUAL");
     });
 });

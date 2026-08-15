@@ -2,7 +2,15 @@
 
 import { ArrowDownLeft, ArrowUpRight, Landmark } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { AccountOwnership, ScannedAccountView } from "@/application/services/bank-service";
+import { useState } from "react";
+import type {
+    AccountOwnership, ScannedAccountDecision, ScannedAccountView,
+} from "@/application/services/bank-service";
+import { Input } from "@/components/ui/input";
+import { Field } from "@/components/ui/field";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { InstitutionCombo, EMPTY_INSTITUTION_CHOICE, type InstitutionChoice } from "./InstitutionCombo";
+import type { BankInstitution } from "@/domain/entities/bank";
 
 
 interface ScannedAccountsPanelProps {
@@ -17,7 +25,9 @@ interface ScannedAccountsPanelProps {
      * Deja declarar de quién es cada cuenta. Sin esto el panel es de solo
      * lectura, que es como se muestra en el resumen y en el detalle.
      */
-    onOwnershipChange?: (raw: string, ownership: AccountOwnership) => void;
+    onOwnershipChange?: (raw: string, decision: ScannedAccountDecision) => void;
+    /** Emisores del usuario, para poder asignar uno desde aquí. */
+    institutions?: BankInstitution[];
 }
 
 /**
@@ -34,6 +44,7 @@ interface ScannedAccountsPanelProps {
  */
 export function ScannedAccountsPanel({
     accounts, title = "Cuentas del escaneo", className, onOwnershipChange,
+    institutions = [],
 }: ScannedAccountsPanelProps) {
     if (accounts.length === 0) return null;
 
@@ -49,6 +60,7 @@ export function ScannedAccountsPanel({
                         key={`${account.role}-${account.raw}-${index}`}
                         account={account}
                         onOwnershipChange={onOwnershipChange}
+                        institutions={institutions}
                     />
                 ))}
             </ul>
@@ -57,10 +69,11 @@ export function ScannedAccountsPanel({
 }
 
 function ScannedAccountRow({
-    account, onOwnershipChange,
+    account, onOwnershipChange, institutions = [],
 }: {
     account: ScannedAccountView;
-    onOwnershipChange?: (raw: string, ownership: AccountOwnership) => void;
+    onOwnershipChange?: (raw: string, decision: ScannedAccountDecision) => void;
+    institutions?: BankInstitution[];
 }) {
     const isSource = account.role === "SOURCE";
     const RoleIcon = isSource ? ArrowUpRight : ArrowDownLeft;
@@ -81,10 +94,11 @@ function ScannedAccountRow({
             </span>
 
             {askable && (
-                <OwnershipChoice
-                    value={account.ownership ?? (isSource ? "MINE" : "EXTERNAL")}
-                    declared={account.ownership != null}
-                    onChange={next => onOwnershipChange!(account.raw, next)}
+                <AccountDecisionForm
+                    account={account}
+                    institutions={institutions}
+                    defaultOwnership={isSource ? "MINE" : "EXTERNAL"}
+                    onChange={decision => onOwnershipChange!(account.raw, decision)}
                 />
             )}
         </li>
@@ -98,6 +112,151 @@ function ScannedAccountRow({
  * que el usuario elige: transferir entre cuentas propias es normal, y dar el
  * destino por ajeno sin avisar es lo que hacía desaparecer una cuenta suya.
  */
+/**
+ * Todo lo que el usuario puede corregir de una cuenta antes de confirmar.
+ *
+ * Empieza cerrado en la pregunta que siempre aplica —de quién es— y solo
+ * despliega el resto cuando la respuesta es «mía», porque solo entonces va a
+ * nacer algo en Bancos. Lo que se corrija aquí viaja con la transacción y se
+ * aplica al guardarla: el escáner solo vio una cadena enmascarada, el usuario
+ * sabe de qué banco es, si es cuenta o tarjeta, y hasta si los dígitos vinieron
+ * mal.
+ */
+function AccountDecisionForm({
+    account, institutions, defaultOwnership, onChange,
+}: {
+    account: ScannedAccountView;
+    institutions: BankInstitution[];
+    defaultOwnership: AccountOwnership;
+    onChange: (decision: ScannedAccountDecision) => void;
+}) {
+    const current = account.decision;
+    const ownership = current?.ownership ?? defaultOwnership;
+
+    const [open, setOpen] = useState(false);
+    const [institution, setInstitution] = useState<InstitutionChoice>(() => {
+        const chosen = institutions.find(i => i.id === current?.institutionId);
+        if (chosen) return { id: chosen.id, name: chosen.name, kind: chosen.kind };
+        if (current?.institutionName) {
+            return { id: null, name: current.institutionName, kind: current.institutionKind ?? "OTHER" };
+        }
+        return EMPTY_INSTITUTION_CHOICE;
+    });
+
+    /** Cada cambio emite la decisión entera: el servidor recibe una foto, no un parche. */
+    const emit = (patch: Partial<ScannedAccountDecision>) => {
+        onChange({
+            ownership,
+            kind: account.kind,
+            accountType: current?.accountType ?? null,
+            cardType: current?.cardType ?? null,
+            institutionId: institution.id,
+            institutionName: institution.id ? null : institution.name || null,
+            institutionKind: institution.kind,
+            number: current?.number ?? null,
+            ...patch,
+        });
+    };
+
+    const kind = current?.kind ?? account.kind;
+
+    return (
+        <span className="flex flex-col gap-1.5 pl-5">
+            <OwnershipChoice
+                value={ownership}
+                declared={account.ownership != null}
+                onChange={next => {
+                    emit({ ownership: next });
+                    if (next === "EXTERNAL") setOpen(false);
+                }}
+            />
+
+            {ownership === "MINE" && (
+                <button
+                    type="button"
+                    onClick={() => setOpen(o => !o)}
+                    className="self-start text-[11px] text-accent-primary underline-offset-2 hover:underline"
+                >
+                    {open ? "Listo" : "Ajustar sus datos"}
+                </button>
+            )}
+
+            {ownership === "MINE" && open && (
+                <div className="flex flex-col gap-2.5 rounded-xl border border-border/40 bg-bg-primary/40 p-2.5">
+                    <InstitutionCombo
+                        id={`decision-institution-${account.raw}`}
+                        institutions={institutions}
+                        value={institution}
+                        onChange={next => {
+                            setInstitution(next);
+                            emit({
+                                institutionId: next.id,
+                                institutionName: next.id ? null : next.name || null,
+                                institutionKind: next.kind,
+                            });
+                        }}
+                    />
+
+                    <div className="grid grid-cols-2 gap-2">
+                        <Field label="Qué es">
+                            <Select
+                                value={kind}
+                                onValueChange={v => emit({ kind: v as "ACCOUNT" | "CARD" })}
+                            >
+                                <SelectTrigger aria-label="Qué es"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="ACCOUNT">Cuenta</SelectItem>
+                                    <SelectItem value="CARD">Tarjeta</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </Field>
+
+                        <Field label="Tipo">
+                            {kind === "CARD" ? (
+                                <Select
+                                    value={current?.cardType ?? "DEBIT"}
+                                    onValueChange={v => emit({ cardType: v as "DEBIT" | "CREDIT" })}
+                                >
+                                    <SelectTrigger aria-label="Tipo"><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="DEBIT">Débito</SelectItem>
+                                        <SelectItem value="CREDIT">Crédito</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            ) : (
+                                <Select
+                                    value={current?.accountType ?? "SAVINGS"}
+                                    onValueChange={v => emit({ accountType: v as "SAVINGS" | "CHECKING" | "INVESTMENT" })}
+                                >
+                                    <SelectTrigger aria-label="Tipo"><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="SAVINGS">Ahorros</SelectItem>
+                                        <SelectItem value="CHECKING">Corriente</SelectItem>
+                                        <SelectItem value="INVESTMENT">Inversión</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            )}
+                        </Field>
+                    </div>
+
+                    <Field label="Número" htmlFor={`decision-number-${account.raw}`} optional>
+                        <Input
+                            id={`decision-number-${account.raw}`}
+                            value={current?.number ?? account.display}
+                            onChange={e => emit({ number: e.target.value })}
+                            autoComplete="off"
+                        />
+                    </Field>
+
+                    <p className="text-[11px] leading-relaxed text-text-tertiary">
+                        Se guardará al confirmar, junto con la transacción.
+                    </p>
+                </div>
+            )}
+        </span>
+    );
+}
+
 function OwnershipChoice({
     value, declared, onChange,
 }: {

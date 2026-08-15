@@ -17,6 +17,21 @@ export const transactionStatusSchema = z.enum(TRANSACTION_STATUSES);
 
 // ─── Create Transaction ──────────────────────────────────────
 
+/**
+ * Lo que el usuario corrigió de una cuenta del escaneo antes de confirmar:
+ * de quién es y, si es suya, qué es exactamente.
+ */
+const scannedDecisionSchema = z.object({
+    ownership: z.enum(["MINE", "EXTERNAL"]),
+    kind: z.enum(["ACCOUNT", "CARD"]).optional().nullable(),
+    accountType: z.enum(["CHECKING", "SAVINGS", "CASH", "INVESTMENT"]).optional().nullable(),
+    cardType: z.enum(["DEBIT", "CREDIT"]).optional().nullable(),
+    institutionId: z.string().uuid().optional().nullable(),
+    institutionName: z.string().max(120).optional().nullable(),
+    institutionKind: z.enum(["BANK", "COOPERATIVE", "WALLET", "OTHER"]).optional().nullable(),
+    number: z.string().max(40).optional().nullable(),
+});
+
 export const createTransactionSchema = z.object({
     type: transactionTypeSchema,
     status: transactionStatusSchema.optional(),
@@ -42,7 +57,7 @@ export const createTransactionSchema = z.object({
     // Tipo declarado por el usuario para el emisor, cuando la transacción lo funda.
     bankInstitutionKind: z.enum(["BANK", "COOPERATIVE", "WALLET", "OTHER"]).optional().nullable(),
     // Lo declarado por el usuario sobre cada cuenta del escaneo.
-    scannedOwnership: z.record(z.string(), z.enum(["MINE", "EXTERNAL"])).optional().nullable(),
+    scannedOwnership: z.record(z.string(), scannedDecisionSchema).optional().nullable(),
     bankCardStatementId: z.string().uuid("Invalid statement ID").optional().nullable(),
     tags: z.array(z.string().max(50)).max(20).optional().nullable(),
     notes: z.string().max(2000).optional().nullable(),
@@ -143,7 +158,7 @@ export const mapInboxTransactionSchema = z.object({
     // Tipo declarado por el usuario para el emisor, cuando la confirmación lo funda.
     bankInstitutionKind: z.enum(["BANK", "COOPERATIVE", "WALLET", "OTHER"]).optional().nullable(),
     // Lo declarado por el usuario sobre cada cuenta del escaneo.
-    scannedOwnership: z.record(z.string(), z.enum(["MINE", "EXTERNAL"])).optional().nullable(),
+    scannedOwnership: z.record(z.string(), scannedDecisionSchema).optional().nullable(),
     bankCardStatementId: z.string().uuid("Invalid statement ID").optional().nullable(),
     type: transactionTypeSchema.optional(),
     notes: z.string().max(2000).optional().nullable(),

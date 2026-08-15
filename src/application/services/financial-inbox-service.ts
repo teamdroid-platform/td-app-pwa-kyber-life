@@ -32,8 +32,8 @@ export interface MapScannerTransactionDTO {
     paidWithCredit?: boolean;
     /** Tipo declarado por el usuario para el emisor, si la confirmación lo funda. */
     bankInstitutionKind?: 'BANK' | 'COOPERATIVE' | 'WALLET' | 'OTHER' | null;
-    /** De quién es cada cuenta del escaneo, según el usuario. */
-    scannedOwnership?: Record<string, 'MINE' | 'EXTERNAL'> | null;
+    /** Lo que el usuario corrigió sobre cada cuenta del escaneo. */
+    scannedOwnership?: Record<string, import("./bank-service").ScannedAccountDecision> | null;
 }
 
 export class FinancialInboxService {

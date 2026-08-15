@@ -281,7 +281,8 @@ export function TransactionWizard({
     const scannedAccountsWithChoice = useMemo(
         () => scannedAccounts.map(account => ({
             ...account,
-            ownership: values.scannedOwnership?.[account.raw] ?? account.ownership,
+            decision: values.scannedOwnership?.[account.raw] ?? account.decision,
+            ownership: values.scannedOwnership?.[account.raw]?.ownership ?? account.ownership,
         })),
         [scannedAccounts, values.scannedOwnership],
     );
@@ -377,8 +378,9 @@ export function TransactionWizard({
                             <ScannedAccountsPanel
                                 accounts={scannedAccountsWithChoice}
                                 title="Cuentas del movimiento"
-                                onOwnershipChange={(raw, ownership) => wizard.patch({
-                                    scannedOwnership: { ...values.scannedOwnership, [raw]: ownership },
+                                institutions={bankInstitutions}
+                                onOwnershipChange={(raw, decision) => wizard.patch({
+                                    scannedOwnership: { ...values.scannedOwnership, [raw]: decision },
                                 })}
                             />
                         }

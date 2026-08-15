@@ -24,8 +24,8 @@ export interface CreateFinancialTransactionDTO {
     bankCardStatementId?: UUID | null;
     /** Tipo de emisor declarado por el usuario al crear la institución. */
     bankInstitutionKind?: 'BANK' | 'COOPERATIVE' | 'WALLET' | 'OTHER' | null;
-    /** De quién es cada cuenta del escaneo, según el usuario. */
-    scannedOwnership?: Record<string, 'MINE' | 'EXTERNAL'> | null;
+    /** Lo que el usuario corrigió sobre cada cuenta del escaneo. */
+    scannedOwnership?: Record<string, import("./bank-service").ScannedAccountDecision> | null;
     tags?: string[] | null;
     notes?: string | null;
     executionId?: UUID | null;

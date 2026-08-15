@@ -114,8 +114,31 @@ export interface ScannedAccountEntry {
  */
 export type AccountOwnership = "MINE" | "EXTERNAL";
 
+/**
+ * Lo que el usuario corrigió sobre una cuenta del escaneo, antes de confirmar.
+ *
+ * El escáner solo da una cadena enmascarada; todo lo demás —si es cuenta o
+ * tarjeta, de qué tipo, de qué banco, y hasta los dígitos si vinieron mal— lo
+ * sabe el usuario y hasta ahora no tenía dónde decirlo. Lo que declara aquí
+ * gana sobre cualquier inferencia y se guarda junto con la transacción.
+ */
+export interface ScannedAccountDecision {
+    ownership: AccountOwnership;
+    /** Cuenta o tarjeta. Sin decirlo, lo deduce el número. */
+    kind?: "ACCOUNT" | "CARD" | null;
+    accountType?: BankAccount["accountType"] | null;
+    cardType?: BankCard["cardType"] | null;
+    /** Emisor ya existente. */
+    institutionId?: UUID | null;
+    /** Emisor a crear, cuando el usuario escribe uno que no tiene. */
+    institutionName?: string | null;
+    institutionKind?: BankInstitution["kind"] | null;
+    /** El número corregido, tal como el usuario lo escriba. */
+    number?: string | null;
+}
+
 /** Qué dijo el usuario de cada número, indexado por la cadena cruda. */
-export type OwnershipByRaw = Record<string, AccountOwnership>;
+export type OwnershipByRaw = Record<string, ScannedAccountDecision>;
 
 export interface ScannedTransactionInput {
     accounts: ScannedAccountEntry[];
@@ -210,6 +233,8 @@ export interface ScannedAccountView {
     institutionHint: string | null;
     /** Lo que el usuario declaró sobre esta cuenta. `null` = no lo ha dicho. */
     ownership: AccountOwnership | null;
+    /** Su corrección completa, para repintar el formulario tal como la dejó. */
+    decision: ScannedAccountDecision | null;
 }
 
 /** Sufijo mínimo para fundar una identidad sin preguntar. */
@@ -383,7 +408,8 @@ export class BankService {
                     }
                     : null,
                 institutionHint: fingerprint.institutionHint,
-                ownership: ownership?.[raw] ?? null,
+                ownership: ownership?.[raw]?.ownership ?? null,
+                decision: ownership?.[raw] ?? null,
             };
         });
     }
@@ -427,6 +453,7 @@ export class BankService {
                 },
                 institutionHint: null,
                 ownership: "MINE",
+                decision: null,
             };
         };
 
@@ -462,6 +489,7 @@ export class BankService {
                     match: null,
                     institutionHint: fingerprint.institutionHint,
                     ownership: "EXTERNAL",
+                    decision: null,
                 });
             }
         }
@@ -491,7 +519,8 @@ export class BankService {
             // De quién es la cuenta. Lo que el usuario declaró manda; a falta de
             // eso se supone por el lado, que acierta en una compra —de mi cuenta
             // al comercio— y falla en una transferencia entre cuentas propias.
-            const declared = scan.ownership?.[raw] ?? null;
+            const decision = scan.ownership?.[raw] ?? null;
+            const declared = decision?.ownership ?? null;
             const isMine = declared ? declared === "MINE" : isOrigin;
 
             // Declararla propia deshace un «de un tercero» anterior. Sin esto,
@@ -503,9 +532,20 @@ export class BankService {
             }
 
             if (isMine && await this.canAutoCreate(userId, observation)) {
-                await this.createIdentityFrom(userId, observation, institutionId, scan);
-                // Re-observar para que quede ligada a lo recién creado.
-                observation = await this.identification.reobserve(userId, raw);
+                const createdId = await this.createIdentityFrom(
+                    userId, observation, institutionId, scan, decision,
+                );
+
+                // Con el número corregido, la cadena original puede dejar de
+                // encajar con lo que se acaba de crear. El vínculo lo fija la
+                // decisión del usuario, no el emparejamiento.
+                observation = decision?.number?.trim()
+                    ? await this.identification.assignObservation(userId, observation.id, {
+                        kind: decision.kind === "CARD" || (!decision.kind && !!(observation.bin || observation.brand))
+                            ? "CARD" : "ACCOUNT",
+                        targetId: createdId,
+                    })
+                    : await this.identification.reobserve(userId, raw);
             }
 
             if (observation.cardId) {
@@ -639,42 +679,62 @@ export class BankService {
     private async createIdentityFrom(
         userId: UUID, observation: BankNumberObservation,
         institutionId: UUID | null, scan: ScannedTransactionInput,
-    ): Promise<void> {
+        decision?: ScannedAccountDecision | null,
+    ): Promise<UUID> {
         const currency = scan.currency ?? "USD";
+
+        // Los dígitos que el usuario corrigió, si los corrigió. El escáner lee
+        // lo que el banco escribió, y a veces lo escribe mal.
+        const corrected = decision?.number?.trim() ? parseBankNumber(decision.number) : null;
         const common = {
-            lastFour: observation.suffixDigits,
-            prefixDigits: observation.prefixDigits || null,
+            lastFour: corrected?.suffixDigits || observation.suffixDigits,
+            prefixDigits: (corrected ? corrected.prefixDigits : observation.prefixDigits) || null,
             currency,
         };
 
-        // Tarjeta o cuenta: lo dice el BIN o, a falta de él, la marca que el
-        // propio texto nombra. «Mastercard-8361» no trae BIN y aun así no hay
-        // duda de qué es — la misma regla que usa el panel del escaneo.
-        if (observation.bin || observation.brand) {
+        // El emisor que el usuario eligió, o el que escribió y hay que crear.
+        const issuerId = decision?.institutionId
+            ?? (decision?.institutionName?.trim()
+                ? (await this.createInstitution(userId, {
+                    name: decision.institutionName.trim(),
+                    kind: decision.institutionKind ?? undefined,
+                })).id
+                : institutionId);
+
+        // Tarjeta o cuenta: lo dice el usuario y, si calla, el BIN o la marca
+        // que el propio texto nombra. «Mastercard-8361» no trae BIN y aun así
+        // no hay duda — la misma regla que usa el panel del escaneo.
+        const isCard = decision?.kind
+            ? decision.kind === "CARD"
+            : !!(observation.bin || observation.brand);
+
+        if (isCard) {
             // Solo un gasto a crédito prueba que la tarjeta lo sea. Sin esa
             // señal nace como débito: es lo más frecuente y, sobre todo, es lo
-            // que no inventa deuda. Queda sin cuenta y sin confirmar, a la
-            // espera de que el usuario la ate desde Bancos.
-            const cardType = scan.paidWithCredit ? "CREDIT" : "DEBIT";
-            const brand = observation.brand ?? brandFromBin(observation.bin ?? null);
-            await this.createCard(userId, {
-                institutionId,
+            // que no inventa deuda.
+            const cardType = decision?.cardType ?? (scan.paidWithCredit ? "CREDIT" : "DEBIT");
+            const brand = observation.brand ?? brandFromBin(corrected?.bin ?? observation.bin ?? null);
+            const card = await this.createCard(userId, {
+                institutionId: issuerId,
                 cardType,
                 brand,
-                bin: observation.bin,
+                bin: corrected?.bin ?? observation.bin,
                 isUnconfirmed: true,
                 ...common,
             });
-            return;
+            return card.id;
         }
 
-        const accountType = (observation.accountTypeHint as BankAccount["accountType"]) ?? "SAVINGS";
-        await this.createAccount(userId, {
-            institutionId,
+        const accountType = decision?.accountType
+            ?? (observation.accountTypeHint as BankAccount["accountType"])
+            ?? "SAVINGS";
+        const account = await this.createAccount(userId, {
+            institutionId: issuerId,
             accountType,
             isUnconfirmed: true,
             ...common,
         });
+        return account.id;
     }
 
     /**

@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useState } from "react";
 import type { BankInstitutionKind } from "@/domain/entities/bank";
+import type { ScannedAccountDecision } from "@/application/services/bank-service";
 import type { FinancialTransactionType } from "@/domain/entities/financial";
 
 /** Types for which "paid with credit card" is a meaningful, editable flag. */
@@ -32,7 +33,7 @@ export interface WizardValues {
      * indexado por la cadena cruda del banco. Sin declarar, el servicio supone
      * por el lado — y esa suposición falla entre cuentas propias.
      */
-    scannedOwnership?: Record<string, "MINE" | "EXTERNAL">;
+    scannedOwnership?: Record<string, ScannedAccountDecision>;
     /** Cuenta de la que sale el dinero, cuando el usuario la eligió. */
     bankSourceAccountId?: string | null;
     /** Tarjeta usada. Con `paidWithCredit`, define un consumo diferido. */

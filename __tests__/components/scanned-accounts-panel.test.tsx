@@ -13,6 +13,7 @@ function view(overrides: Partial<ScannedAccountView> = {}): ScannedAccountView {
         match: { id: "acc-1", typeLabel: "Ahorros", institutionName: "Banco del Austro" },
         institutionHint: null,
         ownership: null,
+        decision: null,
         ...overrides,
     };
 }
@@ -151,7 +152,10 @@ describe("declarar de quién es cada cuenta", () => {
 
         fireEvent.click(screen.getByRole("button", { name: "Es mía" }));
 
-        expect(onOwnershipChange).toHaveBeenCalledWith("AHO - XXXXXX0814", "MINE");
+        expect(onOwnershipChange).toHaveBeenCalledWith(
+            "AHO - XXXXXX0814",
+            expect.objectContaining({ ownership: "MINE" }),
+        );
     });
 
     it("lo declarado manda sobre la suposición del lado", () => {
