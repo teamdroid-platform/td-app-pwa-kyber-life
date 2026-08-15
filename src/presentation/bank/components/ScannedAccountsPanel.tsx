@@ -191,10 +191,14 @@ function isJustANumber(name: string): boolean {
 function attribution(account: ScannedAccountView): string {
     if (account.match) return identityLabel(account.match);
 
-    // Sin identidad, lo que se puede decir depende del lado: el origen suele ser
-    // del usuario y solo falta registrarlo; el destino, en cambio, es de un
-    // tercero. Decir «no es tuya» de un origen sería afirmar de más.
-    const fallback = account.role === "SOURCE" ? "Sin registrar" : "De un tercero";
+    // Lo que el usuario declaró manda sobre cualquier suposición: decir «de un
+    // tercero» de una cuenta que acaba de marcar como suya le contradice a la
+    // cara. Sin declarar, se supone por el lado — el origen suele ser suyo y
+    // solo falta registrarlo; el destino, en cambio, es de otro.
+    const fallback = account.ownership
+        ? (account.ownership === "MINE" ? "Tuya, sin registrar aún" : "De un tercero")
+        : (account.role === "SOURCE" ? "Sin registrar" : "De un tercero");
+
     return account.institutionHint ? `${fallback} · ${account.institutionHint}` : fallback;
 }
 

@@ -154,6 +154,26 @@ describe("declarar de quién es cada cuenta", () => {
         expect(onOwnershipChange).toHaveBeenCalledWith("AHO - XXXXXX0814", "MINE");
     });
 
+    it("lo declarado manda sobre la suposición del lado", () => {
+        // Un destino que el usuario marcó suyo no puede seguir diciendo que es
+        // de otro: sería contradecirle a la cara.
+        render(<ScannedAccountsPanel accounts={[view({
+            role: "DESTINATION", match: null, resolution: "PENDING", ownership: "MINE",
+        })]} />);
+
+        expect(screen.getByText(/Tuya, sin registrar aún/)).toBeInTheDocument();
+        expect(screen.queryByText(/De un tercero/)).not.toBeInTheDocument();
+    });
+
+    it("y también en el recorrido de la fila", () => {
+        render(<AccountsTrail accounts={[view({
+            role: "DESTINATION", display: "10••••11", match: null,
+            resolution: "PENDING", ownership: "MINE",
+        })]} />);
+
+        expect(screen.getByText(/Tuya, sin registrar aún/)).toBeInTheDocument();
+    });
+
     it("una vez declarado deja de decir que es una suposición", () => {
         render(
             <ScannedAccountsPanel

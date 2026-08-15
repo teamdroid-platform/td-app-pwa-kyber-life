@@ -409,8 +409,11 @@ export function TransactionWizard({
                         accounts={bankAccounts}
                         cards={bankCards}
                         // El recorrido va DENTRO de la fila de pago, no en un
-                        // bloque aparte: responde a esa misma pregunta.
-                        bankAccounts={scannedAccounts}
+                        // bloque aparte: responde a esa misma pregunta. Con lo
+                        // declarado aplicado — el resumen mostraba la lista
+                        // cruda y contradecía lo que el usuario acababa de
+                        // elegir en el paso.
+                        bankAccounts={scannedAccountsWithChoice}
                     />
                 );
             }
