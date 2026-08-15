@@ -24,6 +24,7 @@ import { ISSUER_NAME, inferInstitutionKind } from "@/lib/bank-institution-kind";
 import { parseBankNumber } from "@/lib/bank-number-fingerprint";
 import { resolveFingerprint, type Resolution } from "@/lib/bank-number-match";
 import { formatBankNumber } from "@/lib/format-bank-number";
+import { defaultAccountName } from "@/lib/bank-account-name";
 import { BankIdentificationService } from "./bank-identification-service";
 
 function round2(value: number): number {
@@ -668,16 +669,16 @@ export class BankService {
             return;
         }
 
-        // Un nombre corto y provisional, que el usuario reemplaza en Bancos.
-        // Nombrarla por su emisor —«Cuenta COAC Jardín Azuayo»— la dejaba
-        // ilegible en la fila, que ya muestra el emisor al lado. Quien evita la
-        // repetición es la vista, no el nombre.
+        // El mismo nombre que compondría el formulario: una cuenta se reconoce
+        // por su número, no por un nombre que nadie escribió.
+        const accountType = (observation.accountTypeHint as BankAccount["accountType"]) ?? "SAVINGS";
         await this.createAccount(userId, {
             institutionId,
-            name: `Cuenta ${formatBankNumber(
-                { prefixDigits: null, lastFour: observation.suffixDigits }, "ACCOUNT",
-            )}`,
-            accountType: (observation.accountTypeHint as BankAccount["accountType"]) ?? "SAVINGS",
+            name: defaultAccountName(accountType, {
+                prefixDigits: observation.prefixDigits,
+                lastFour: observation.suffixDigits,
+            }),
+            accountType,
             isUnconfirmed: true,
             ...common,
         });

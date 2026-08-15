@@ -82,13 +82,39 @@ describe("AccountFormSheet — el número de la cuenta", () => {
         open();
 
         fireEvent.change(screen.getByLabelText("Institución"), { target: { value: "COAC Jardín Azuayo" } });
-        fireEvent.change(screen.getByLabelText("Nombre"), { target: { value: "Ahorros" } });
         fireEvent.click(screen.getByRole("button", { name: /Guardar/ }));
 
         await waitFor(() => expect(createBankAccountAction).toHaveBeenCalled());
         expect(createBankAccountAction).toHaveBeenCalledWith(expect.objectContaining({
             prefixDigits: null,
             lastFour: null,
+        }));
+    });
+
+    it("el formulario ya no pide un nombre: lo compone del tipo y el número", async () => {
+        open();
+
+        fireEvent.change(screen.getByLabelText("Institución"), { target: { value: "COAC Jardín Azuayo" } });
+        fireEvent.change(screen.getByLabelText(/Número de cuenta/), { target: { value: "25XXX10" } });
+
+        expect(screen.queryByLabelText("Nombre")).not.toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole("button", { name: /Guardar/ }));
+        await waitFor(() => expect(createBankAccountAction).toHaveBeenCalled());
+        expect(createBankAccountAction).toHaveBeenCalledWith(expect.objectContaining({
+            name: "Ahorros 25••••10",
+        }));
+    });
+
+    it("sin número queda el tipo, que es todo lo que se sabe", async () => {
+        open();
+
+        fireEvent.change(screen.getByLabelText("Institución"), { target: { value: "COAC Jardín Azuayo" } });
+        fireEvent.click(screen.getByRole("button", { name: /Guardar/ }));
+
+        await waitFor(() => expect(createBankAccountAction).toHaveBeenCalled());
+        expect(createBankAccountAction).toHaveBeenCalledWith(expect.objectContaining({
+            name: "Ahorros",
         }));
     });
 });

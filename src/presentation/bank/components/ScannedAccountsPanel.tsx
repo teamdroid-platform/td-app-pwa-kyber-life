@@ -3,6 +3,7 @@
 import { ArrowDownLeft, ArrowUpRight, Landmark } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { AccountOwnership, ScannedAccountView } from "@/application/services/bank-service";
+import { GENERIC_NAME_WORDS } from "@/lib/bank-account-name";
 
 interface ScannedAccountsPanelProps {
     accounts: ScannedAccountView[];
@@ -182,15 +183,15 @@ function identityLabel(match: NonNullable<ScannedAccountView["match"]>): string 
 }
 
 /**
- * Si el nombre no dice nada que la fila no muestre ya: «Cuenta ••••10» junto al
- * número, o «Cuenta COAC Jardín Azuayo» junto a su emisor. Son las dos formas
- * que toman los nombres generados al detectar una identidad, y el usuario los
- * reemplaza por uno de verdad desde Bancos.
+ * Si el nombre no dice nada que la fila no muestre ya: «Ahorros ••••10» junto
+ * al número, o el emisor repetido a su lado. Las cuentas no se nombran —su
+ * nombre se compone del tipo y el número—, así que casi siempre es el caso.
  */
 function addsNothing(name: string, institutionName: string): boolean {
     const rest = name
         .replace(institutionName, "")
-        .replace(/cuenta|tarjeta|[\s•X*·\-–0-9]/gi, "");
+        .replace(GENERIC_NAME_WORDS, "")
+        .replace(/[\s•X*·\-–0-9]/g, "");
     return rest.length === 0;
 }
 
