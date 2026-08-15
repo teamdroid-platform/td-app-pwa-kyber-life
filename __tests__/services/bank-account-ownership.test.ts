@@ -128,6 +128,61 @@ describe("de quién es cada cuenta", () => {
         expect(await accounts.findByOwnerId(USER)).toHaveLength(2);
     });
 
+    it("declararla mía después de haberla dado por ajena la recupera", async () => {
+        const { service, accounts, observations } = build();
+
+        // Primera confirmación: nadie preguntó, el destino se dio por ajeno.
+        await service.syncTransactionBankLinks(USER, BASE);
+        expect((await observations.findByRaw(USER, "10XXXXXX11"))?.resolution).toBe("EXTERNAL");
+
+        // El usuario corrige: esa cuenta es suya.
+        const links = await service.syncTransactionBankLinks(USER, {
+            ...BASE,
+            ownership: { "10XXXXXX11": "MINE" },
+        });
+
+        expect(links.bankDestinationAccountId).toBeTruthy();
+        expect(await accounts.findByOwnerId(USER)).toHaveLength(2);
+    });
+
+    it("corregirla no la deja fuera del movimiento", async () => {
+        const { service } = build();
+
+        await service.syncTransactionBankLinks(USER, BASE);
+        const links = await service.syncTransactionBankLinks(USER, {
+            ...BASE,
+            ownership: { "10XXXXXX11": "MINE" },
+        });
+
+        // Antes se perdía: ni cuenta, ni contraparte, ni rastro en la fila.
+        const vistas = await service.transactionAccounts(USER, links);
+        expect(vistas.map(v => v.role)).toEqual(["SOURCE", "DESTINATION"]);
+    });
+
+    it("una cuenta detectada se nombra por su emisor, no repitiendo el número", async () => {
+        const { service, accounts } = build();
+
+        await service.syncTransactionBankLinks(USER, BASE);
+
+        const [cuenta] = await accounts.findByOwnerId(USER);
+        // «Cuenta ••••10» junto a «25••••10» decía lo mismo dos veces.
+        expect(cuenta.name).toBe("Cuenta COAC Jardín Azuayo");
+    });
+
+    it("sin emisor conocido cae al número, que es lo único que hay", async () => {
+        const { service, accounts } = build();
+
+        await service.syncTransactionBankLinks(USER, {
+            ...BASE,
+            merchant: "FARMASHOP",
+            scannedAccounts: [{ type: "origen", account: "XXXXXX0814" }],
+        });
+
+        const [cuenta] = await accounts.findByOwnerId(USER);
+        expect(cuenta.name).toBe("Cuenta ••••0814");
+        expect(cuenta.institutionId).toBeNull();
+    });
+
     it("la vista devuelve lo declarado para que el control lo muestre", async () => {
         const { service } = build();
 

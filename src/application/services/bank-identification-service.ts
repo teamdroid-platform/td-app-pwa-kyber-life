@@ -230,6 +230,27 @@ export class BankIdentificationService {
      * transacción muestra a dónde fue el dinero— pero no le corresponde una
      * identidad, así que no suma a ningún saldo.
      */
+    /**
+     * Devuelve una observación a «sin decidir», para que pueda volver a
+     * identificarse o fundar una cuenta.
+     *
+     * `EXTERNAL` es una decisión, no un hecho, y el usuario cambia de opinión:
+     * un destino que se marcó de un tercero —a veces solo porque nadie preguntó—
+     * tiene que poder pasar a ser suyo. Sin esta vuelta atrás, declararlo propio
+     * no hacía nada y el número desaparecía del movimiento.
+     */
+    async reopen(userId: UUID, observationId: UUID): Promise<BankNumberObservation> {
+        const observation = await this.requireObservation(userId, observationId);
+        if (observation.resolution === "PENDING") return observation;
+
+        return this.observations.update({
+            ...observation,
+            accountId: null, cardId: null,
+            resolution: "PENDING",
+            updatedAt: new Date().toISOString(),
+        });
+    }
+
     async markExternal(userId: UUID, observationId: UUID): Promise<BankNumberObservation> {
         const observation = await this.requireObservation(userId, observationId);
         return this.observations.update({

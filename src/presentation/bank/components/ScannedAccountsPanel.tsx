@@ -158,9 +158,7 @@ export function AccountsTrail({ accounts }: { accounts: ScannedAccountView[] }) 
                             aria-label={isSource ? "Origen" : "Destino"}
                         />
                         <span className="font-mono text-sm">{account.display}</span>
-                        {account.match && (
-                            <span className="text-xs text-text-tertiary">{account.match.name}</span>
-                        )}
+                        <span className="text-xs text-text-tertiary">{attribution(account)}</span>
                     </span>
                 );
             })}
@@ -168,13 +166,30 @@ export function AccountsTrail({ accounts }: { accounts: ScannedAccountView[] }) 
     );
 }
 
+/**
+ * Cómo llamar a una cuenta identificada sin repetir lo que el número ya dijo.
+ *
+ * Las cuentas que nacen de un escaneo se llaman «Cuenta ••••10», así que
+ * ponerlas junto a «25••••10» enseña dos veces lo mismo. Cuando el nombre no
+ * aporta nada nuevo, manda el emisor, que sí distingue.
+ */
+function identityLabel(match: NonNullable<ScannedAccountView["match"]>): string {
+    if (isJustANumber(match.name) && match.institutionName) return match.institutionName;
+    return match.institutionName ? `${match.name} · ${match.institutionName}` : match.name;
+}
+
+/**
+ * Si el nombre no dice nada que el número no diga ya: «Cuenta ••••10»,
+ * «Tarjeta XXXX8361». Es la forma de los que se generan solos al detectar una
+ * identidad, y el usuario puede reemplazarlos por uno de verdad en Bancos.
+ */
+function isJustANumber(name: string): boolean {
+    return name.replace(/cuenta|tarjeta|[\s•X*·\-–0-9]/gi, "").length === 0;
+}
+
 /** A quién pertenece el número, en las palabras que el sistema puede sostener. */
 function attribution(account: ScannedAccountView): string {
-    if (account.match) {
-        return account.match.institutionName
-            ? `${account.match.name} · ${account.match.institutionName}`
-            : account.match.name;
-    }
+    if (account.match) return identityLabel(account.match);
 
     // Sin identidad, lo que se puede decir depende del lado: el origen suele ser
     // del usuario y solo falta registrarlo; el destino, en cambio, es de un

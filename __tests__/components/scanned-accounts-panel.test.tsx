@@ -184,7 +184,27 @@ describe("AccountsTrail", () => {
 
     it("nombra la cuenta cuando se sabe cuál es", () => {
         render(<AccountsTrail accounts={[view()]} />);
-        expect(screen.getByText("Ahorros Principal")).toBeInTheDocument();
+        expect(screen.getByText(/Ahorros Principal/)).toBeInTheDocument();
+    });
+
+    it("no repite el número dentro del nombre de la cuenta", () => {
+        // Las cuentas detectadas se llamaban «Cuenta ••••10», y junto a
+        // «25••••10» era la misma información dos veces.
+        render(<AccountsTrail accounts={[view({
+            display: "25••••10",
+            match: { id: "a1", name: "Cuenta ••••10", institutionName: "COAC Jardín Azuayo" },
+        })]} />);
+
+        expect(screen.getByText("COAC Jardín Azuayo")).toBeInTheDocument();
+        expect(screen.queryByText(/Cuenta ••••10/)).not.toBeInTheDocument();
+    });
+
+    it("dice a quién pertenece lo que no es tuyo", () => {
+        render(<AccountsTrail accounts={[view({
+            role: "DESTINATION", display: "••••1582", match: null, resolution: "PENDING",
+        })]} />);
+
+        expect(screen.getByText("De un tercero")).toBeInTheDocument();
     });
 
     it("sin cuentas no pinta nada", () => {

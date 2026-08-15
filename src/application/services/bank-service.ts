@@ -491,6 +491,14 @@ export class BankService {
             const declared = scan.ownership?.[raw] ?? null;
             const isMine = declared ? declared === "MINE" : isOrigin;
 
+            // Declararla propia deshace un «de un tercero» anterior. Sin esto,
+            // una cuenta marcada externa —a veces solo porque nadie preguntó—
+            // no podía volver atrás: ni se creaba ni se guardaba, y el número
+            // desaparecía del movimiento.
+            if (declared === "MINE" && observation.resolution === "EXTERNAL") {
+                observation = await this.identification.reopen(userId, observation.id);
+            }
+
             if (isMine && await this.canAutoCreate(userId, observation)) {
                 await this.createIdentityFrom(userId, observation, institutionId, scan);
                 // Re-observar para que quede ligada a lo recién creado.
@@ -660,11 +668,17 @@ export class BankService {
             return;
         }
 
+        // El nombre tiene que aportar algo que el número no diga ya: «Cuenta
+        // ••••10» junto a «25••••10» es la misma información dos veces. Con
+        // emisor conocido lo nombra a él; sin emisor no queda más remedio.
+        const issuer = institutionId ? await this.institutions.findById(institutionId) : null;
+        const accountName = issuer
+            ? `Cuenta ${issuer.name}`
+            : `Cuenta ${formatBankNumber({ prefixDigits: null, lastFour: observation.suffixDigits }, "ACCOUNT")}`;
+
         await this.createAccount(userId, {
             institutionId,
-            name: `Cuenta ${formatBankNumber(
-                { prefixDigits: null, lastFour: observation.suffixDigits }, "ACCOUNT",
-            )}`,
+            name: accountName,
             accountType: (observation.accountTypeHint as BankAccount["accountType"]) ?? "SAVINGS",
             isUnconfirmed: true,
             ...common,
