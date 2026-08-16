@@ -15,7 +15,7 @@ import {
     InstitutionCombo, EMPTY_INSTITUTION_CHOICE, ensureInstitution,
     type InstitutionChoice,
 } from "./InstitutionCombo";
-import type { BankInstitution, BankAccount, BankAccountType } from "@/domain/entities/bank";
+import type { BankInstitution, BankInstitutionKind, BankAccount, BankAccountType } from "@/domain/entities/bank";
 
 const TYPES: { value: BankAccountType; label: string }[] = [
     { value: "SAVINGS", label: "Ahorros" },
@@ -43,6 +43,12 @@ interface AccountFormSheetProps {
     account?: BankAccount;
     /** Número con el que abrir el alta, p. ej. el que leyó un escaneo. */
     defaultNumber?: string;
+    /**
+     * Emisor con el que abrir el alta. Lo usa quien ya sabe de qué institución
+     * será la cuenta — dar de alta una para atarla a una tarjeta del Austro no
+     * debería empezar preguntando el banco otra vez.
+     */
+    defaultInstitution?: { id: string | null; name: string; kind: BankInstitutionKind };
 }
 
 /**
@@ -53,16 +59,17 @@ interface AccountFormSheetProps {
  * cuenta en un solo guardado.
  */
 export function AccountFormSheet({
-    institutions, trigger, onCreated, account, defaultNumber = "",
+    institutions, trigger, onCreated, account, defaultNumber = "", defaultInstitution,
 }: AccountFormSheetProps) {
     const router = useRouter();
     const [open, setOpen] = useState(false);
     const isEdit = !!account;
     const [institution, setInstitution] = useState<InstitutionChoice>(() => {
-        const current = institutions.find(i => i.id === account?.institutionId) ?? institutions[0];
-        return current
-            ? { id: current.id, name: current.name, kind: current.kind }
-            : EMPTY_INSTITUTION_CHOICE;
+        const own = institutions.find(i => i.id === account?.institutionId);
+        if (own) return { id: own.id, name: own.name, kind: own.kind };
+        if (defaultInstitution) return defaultInstitution;
+        const first = institutions[0];
+        return first ? { id: first.id, name: first.name, kind: first.kind } : EMPTY_INSTITUTION_CHOICE;
     });
     const [accountType, setAccountType] = useState<BankAccountType>(
         account?.accountType === "CASH" ? "SAVINGS" : account?.accountType ?? "SAVINGS",

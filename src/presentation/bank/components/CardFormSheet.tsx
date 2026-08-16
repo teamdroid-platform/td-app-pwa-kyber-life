@@ -8,7 +8,9 @@ import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Plus } from "lucide-react";
 import { SegmentedChoice } from "./SegmentedChoice";
+import { AccountFormSheet } from "./AccountFormSheet";
 import { createBankCardAction, updateBankCardAction } from "@/app/actions/bank";
 import { parseBankNumber } from "@/lib/bank-number-fingerprint";
 import { accountLabel } from "@/lib/bank-identity-label";
@@ -37,6 +39,8 @@ interface CardFormSheetProps {
      * en `AccountFormSheet`: dentro del wizard un refresh tiraría lo escrito.
      */
     onCreated?: (created: { card: BankCard; institution: BankInstitution | null }) => void;
+    /** Avisa de una cuenta creada desde aquí, para que quien liste se entere. */
+    onAccountCreated?: (account: BankAccount) => void;
     /**
      * La tarjeta a corregir. Con ella el formulario edita en vez de dar de alta
      * — es el mantenimiento de lo que detectó un escaneo: atarla a su cuenta,
@@ -60,7 +64,7 @@ interface CardFormSheetProps {
  */
 export function CardFormSheet({
     institutions, accounts, trigger, open: controlledOpen, onOpenChange, onCreated, card,
-    defaultNumber = "",
+    defaultNumber = "", onAccountCreated,
 }: CardFormSheetProps) {
     const router = useRouter();
     const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
@@ -86,6 +90,10 @@ export function CardFormSheet({
     const [saving, setSaving] = useState(false);
 
     const isCredit = cardType === "CREDIT";
+
+    // Una tarjeta de débito solo puede colgar de una cuenta de su propio banco:
+    // ofrecer las demás invita a un error que la base ni siquiera detecta.
+    const ownAccounts = accounts.filter(a => a.institutionId === institution.id);
 
     function switchType(next: BankCardType) {
         setCardType(next);
@@ -238,16 +246,44 @@ export function CardFormSheet({
                 </>
             ) : (
                 <Field label="Atar a la cuenta">
-                    <Select value={accountId} onValueChange={setAccountId}>
-                        <SelectTrigger aria-label="Atar a la cuenta">
-                            <SelectValue placeholder="Elige la cuenta" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {accounts.map(a => (
-                                <SelectItem key={a.id} value={a.id}>{accountLabel(a)}</SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
+                    {ownAccounts.length > 0 ? (
+                        <Select value={accountId} onValueChange={setAccountId}>
+                            <SelectTrigger aria-label="Atar a la cuenta">
+                                <SelectValue placeholder="Elige la cuenta" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {ownAccounts.map(a => (
+                                    <SelectItem key={a.id} value={a.id}>{accountLabel(a)}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    ) : (
+                        <p className="text-[11px] leading-relaxed text-muted-foreground">
+                            {institution.name.trim()
+                                ? `No tienes cuentas en ${institution.name.trim()}.`
+                                : "Elige primero la institución."}
+                        </p>
+                    )}
+
+                    {/* Una tarjeta de débito gasta de una cuenta del mismo
+                        banco, y esa cuenta puede no estar registrada todavía.
+                        El alta se abre con el emisor ya puesto. */}
+                    <AccountFormSheet
+                        institutions={institutions}
+                        defaultInstitution={institution}
+                        onCreated={({ account: created }) => {
+                            onAccountCreated?.(created);
+                            setAccountId(created.id);
+                        }}
+                        trigger={(
+                            <button
+                                type="button"
+                                className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-border/60 p-2.5 text-xs font-medium text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground"
+                            >
+                                <Plus className="h-3.5 w-3.5" /> Nueva cuenta
+                            </button>
+                        )}
+                    />
                 </Field>
             )}
         </FormSheet>
