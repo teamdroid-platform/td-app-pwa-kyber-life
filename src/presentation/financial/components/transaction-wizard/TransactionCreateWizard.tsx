@@ -24,6 +24,7 @@ function emptyValues(): WizardValues {
         categoryName: "",
         paidWithCredit: false,
         bankSourceAccountId: null,
+        bankDestinationAccountId: null,
         bankCardId: null,
         date: nowValue(),
         notes: "",
@@ -95,6 +96,7 @@ export function TransactionCreateWizard() {
             tags: values.tags.length > 0 ? values.tags : undefined,
             paidWithCredit: values.type === "EXPENSE" ? values.paidWithCredit : undefined,
             bankSourceAccountId: values.bankSourceAccountId ?? undefined,
+            bankDestinationAccountId: values.bankDestinationAccountId ?? undefined,
             bankCardId: values.bankCardId ?? undefined,
         };
 

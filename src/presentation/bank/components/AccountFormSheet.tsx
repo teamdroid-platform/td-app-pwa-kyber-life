@@ -41,6 +41,8 @@ interface AccountFormSheetProps {
      * moverla al emisor correcto, ajustar su tipo.
      */
     account?: BankAccount;
+    /** Número con el que abrir el alta, p. ej. el que leyó un escaneo. */
+    defaultNumber?: string;
 }
 
 /**
@@ -50,7 +52,9 @@ interface AccountFormSheetProps {
  * El emisor se elige o se escribe: si no existe todavía, nace junto con la
  * cuenta en un solo guardado.
  */
-export function AccountFormSheet({ institutions, trigger, onCreated, account }: AccountFormSheetProps) {
+export function AccountFormSheet({
+    institutions, trigger, onCreated, account, defaultNumber = "",
+}: AccountFormSheetProps) {
     const router = useRouter();
     const [open, setOpen] = useState(false);
     const isEdit = !!account;
@@ -69,7 +73,7 @@ export function AccountFormSheet({ institutions, trigger, onCreated, account }: 
     // descomponerlo a mano y perdía los dígitos del principio, que son los que
     // distinguen una cuenta de cooperativa de otra.
     const [number, setNumber] = useState(
-        account ? formatBankNumber(account, "ACCOUNT") : "",
+        account ? formatBankNumber(account, "ACCOUNT") : defaultNumber,
     );
     const [saving, setSaving] = useState(false);
 

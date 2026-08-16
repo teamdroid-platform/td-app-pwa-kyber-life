@@ -69,6 +69,7 @@ export function TransactionAiWizard({ extraction, method, sourceText, onDiscard 
                     tags: values.tags.length > 0 ? values.tags : undefined,
                 paidWithCredit: values.type === "EXPENSE" ? values.paidWithCredit : undefined,
                 bankSourceAccountId: values.bankSourceAccountId ?? undefined,
+                bankDestinationAccountId: values.bankDestinationAccountId ?? undefined,
                 bankCardId: values.bankCardId ?? undefined,
                 // Keeps the capture auditable: what was said, and what came back.
                 originStats: {

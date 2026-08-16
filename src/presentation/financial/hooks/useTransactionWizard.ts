@@ -36,6 +36,8 @@ export interface WizardValues {
     scannedOwnership?: Record<string, ScannedAccountDecision>;
     /** Cuenta de la que sale el dinero, cuando el usuario la eligió. */
     bankSourceAccountId?: string | null;
+    /** Cuenta a la que entra, en un movimiento con dos lados propios. */
+    bankDestinationAccountId?: string | null;
     /** Tarjeta usada. Con `paidWithCredit`, define un consumo diferido. */
     bankCardId?: string | null;
     date: string;
@@ -95,6 +97,7 @@ export const FIELD_STEP: Record<keyof WizardValues, WizardScreen> = {
     paidWithCredit: "payment",
     scannedOwnership: "payment",
     bankSourceAccountId: "payment",
+    bankDestinationAccountId: "payment",
     bankCardId: "payment",
     date: "date",
     notes: "summary",
@@ -130,7 +133,7 @@ export function canLeaveStep(step: WizardStepId, values: WizardValues): boolean 
  * inflate "N cambios" for an edit that never happened.
  */
 const DIFF_IGNORED: readonly (keyof WizardValues)[] = [
-    "institutionId", "categoryId", "bankSourceAccountId", "bankCardId",
+    "institutionId", "categoryId", "bankSourceAccountId", "bankDestinationAccountId", "bankCardId",
     // Un objeto nunca es igual a otro por identidad, así que compararlo
     // marcaría la fila como cambiada en cada render.
     "scannedOwnership",

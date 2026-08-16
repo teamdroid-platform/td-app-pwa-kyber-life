@@ -74,6 +74,7 @@ export function TransactionScanWizard({
         categoryName: initialData.category || "",
         paidWithCredit: false,
         bankSourceAccountId: null,
+        bankDestinationAccountId: null,
         bankCardId: null,
         date: isoToWallClockInput(initialData.date) ?? "",
         notes: extractSummary(initialData),
@@ -99,6 +100,7 @@ export function TransactionScanWizard({
                 tags: values.tags,
                 paidWithCredit: values.type === "EXPENSE" ? values.paidWithCredit : null,
                 bankSourceAccountId: values.bankSourceAccountId ?? undefined,
+                bankDestinationAccountId: values.bankDestinationAccountId ?? undefined,
                 bankCardId: values.bankCardId ?? undefined,
             });
 

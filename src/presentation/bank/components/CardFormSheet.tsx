@@ -43,6 +43,8 @@ interface CardFormSheetProps {
      * moverla al emisor correcto, ponerle nombre.
      */
     card?: BankCard;
+    /** Número con el que abrir el alta, p. ej. el que leyó un escaneo. */
+    defaultNumber?: string;
 }
 
 /**
@@ -58,6 +60,7 @@ interface CardFormSheetProps {
  */
 export function CardFormSheet({
     institutions, accounts, trigger, open: controlledOpen, onOpenChange, onCreated, card,
+    defaultNumber = "",
 }: CardFormSheetProps) {
     const router = useRouter();
     const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
@@ -76,7 +79,7 @@ export function CardFormSheet({
     const [brand, setBrand] = useState(card?.brand ?? "");
     // Un solo campo para el número, como en el alta de cuenta: lo que el banco
     // muestra —`493176XXXXXX2780`— trae principio y final a la vez.
-    const [number, setNumber] = useState(card ? formatBankNumber(card, "CARD") : "");
+    const [number, setNumber] = useState(card ? formatBankNumber(card, "CARD") : defaultNumber);
     const [creditLimit, setCreditLimit] = useState(card?.creditLimit != null ? String(card.creditLimit) : "");
     const [statementDay, setStatementDay] = useState(card?.statementDay != null ? String(card.statementDay) : "");
     const [dueDay, setDueDay] = useState(card?.dueDay != null ? String(card.dueDay) : "");

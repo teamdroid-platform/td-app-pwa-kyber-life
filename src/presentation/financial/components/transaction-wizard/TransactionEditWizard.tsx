@@ -50,6 +50,7 @@ export function TransactionEditWizard({
         categoryName: displayNames.category,
         paidWithCredit: transaction.paidWithCredit ?? false,
         bankSourceAccountId: transaction.bankSourceAccountId ?? null,
+        bankDestinationAccountId: transaction.bankDestinationAccountId ?? null,
         bankCardId: transaction.bankCardId ?? null,
         date: isoToWallClockInput(transaction.date) ?? "",
         notes,
@@ -76,6 +77,7 @@ export function TransactionEditWizard({
                 tags: values.tags,
                 paidWithCredit: values.type === "EXPENSE" ? values.paidWithCredit : undefined,
                 bankSourceAccountId: values.bankSourceAccountId ?? undefined,
+                bankDestinationAccountId: values.bankDestinationAccountId ?? undefined,
                 bankCardId: values.bankCardId ?? undefined,
             });
 

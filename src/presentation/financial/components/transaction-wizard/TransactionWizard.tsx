@@ -24,7 +24,6 @@ import { CategoryStep, InstitutionStep } from "./steps/PickerSteps";
 import { PaymentStep } from "./steps/PaymentStep";
 import { paymentSourceForCard } from "@/presentation/bank/components/PaymentSourcePicker";
 import type { ScannedAccountView } from "@/application/services/bank-service";
-import { ScannedAccountsPanel } from "@/presentation/bank/components/ScannedAccountsPanel";
 import { DateStep } from "./steps/DateStep";
 import { SummaryStep, type FieldMarkers } from "./steps/SummaryStep";
 
@@ -374,17 +373,12 @@ export function TransactionWizard({
                             bankCardId: source.cardId ?? null,
                             paidWithCredit: source.paidWithCredit,
                         })}
-                        hint={
-                            <ScannedAccountsPanel
-                                accounts={scannedAccountsWithChoice}
-                                title="Este movimiento"
-                                flat
-                                institutions={bankInstitutions}
-                                onOwnershipChange={(raw, decision) => wizard.patch({
-                                    scannedOwnership: { ...values.scannedOwnership, [raw]: decision },
-                                })}
-                            />
-                        }
+                        destinationAccountId={values.bankDestinationAccountId}
+                        onDestinationChange={(id) => setValue("bankDestinationAccountId", id)}
+                        scannedAccounts={scannedAccountsWithChoice}
+                        onScannedDecision={(raw, decision) => wizard.patch({
+                            scannedOwnership: { ...values.scannedOwnership, [raw]: decision },
+                        })}
                         institutions={bankInstitutions}
                         onAccountCreated={handleAccountCreated}
                         onCardCreated={handleCardCreated}
