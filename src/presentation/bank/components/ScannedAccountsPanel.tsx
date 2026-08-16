@@ -28,6 +28,12 @@ interface ScannedAccountsPanelProps {
     onOwnershipChange?: (raw: string, decision: ScannedAccountDecision) => void;
     /** Emisores del usuario, para poder asignar uno desde aquí. */
     institutions?: BankInstitution[];
+    /**
+     * Sin caja propia, para integrarse en una lista mayor. En el paso de pago
+     * las cuentas del movimiento y las del usuario son la misma pregunta, y dos
+     * marcos anidados las hacían parecer dos.
+     */
+    flat?: boolean;
 }
 
 /**
@@ -44,17 +50,27 @@ interface ScannedAccountsPanelProps {
  */
 export function ScannedAccountsPanel({
     accounts, title = "Cuentas del escaneo", className, onOwnershipChange,
-    institutions = [],
+    institutions = [], flat = false,
 }: ScannedAccountsPanelProps) {
     if (accounts.length === 0) return null;
 
     return (
-        <div className={cn("rounded-2xl border border-border/40 bg-bg-secondary/30 px-3 py-2.5", className)}>
-            <p className="mb-1.5 flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.1em] text-text-tertiary">
-                <Landmark className="h-3 w-3" /> {title}
+        <div
+            className={cn(
+                flat
+                    ? "flex flex-col gap-1.5"
+                    : "rounded-2xl border border-border/40 bg-bg-secondary/30 px-3 py-2.5",
+                className,
+            )}
+        >
+            <p className={cn(
+                "flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.1em] text-text-tertiary",
+                !flat && "mb-1.5",
+            )}>
+                {!flat && <Landmark className="h-3 w-3" />} {title}
             </p>
 
-            <ul className="flex flex-col gap-1">
+            <ul className={cn("flex flex-col", flat ? "gap-1.5" : "gap-1")}>
                 {accounts.map((account, index) => (
                     <ScannedAccountRow
                         key={`${account.role}-${account.raw}-${index}`}
@@ -105,13 +121,6 @@ function ScannedAccountRow({
     );
 }
 
-/**
- * De quién es la cuenta, en dos botones.
- *
- * Arranca en lo que el sistema supone por el lado y lo dice —«supuesto»— hasta
- * que el usuario elige: transferir entre cuentas propias es normal, y dar el
- * destino por ajeno sin avisar es lo que hacía desaparecer una cuenta suya.
- */
 /**
  * Todo lo que el usuario puede corregir de una cuenta antes de confirmar.
  *
@@ -164,7 +173,6 @@ function AccountDecisionForm({
         <span className="flex flex-col gap-1.5 pl-5">
             <OwnershipChoice
                 value={ownership}
-                declared={account.ownership != null}
                 onChange={next => {
                     emit({ ownership: next });
                     if (next === "EXTERNAL") setOpen(false);
@@ -257,11 +265,17 @@ function AccountDecisionForm({
     );
 }
 
+/**
+ * De quién es la cuenta, en dos botones.
+ *
+ * Arranca en lo que el sistema supone por el lado: transferir entre cuentas
+ * propias es normal, y dar el destino por ajeno sin avisar es lo que hacía
+ * desaparecer una cuenta suya.
+ */
 function OwnershipChoice({
-    value, declared, onChange,
+    value, onChange,
 }: {
     value: AccountOwnership;
-    declared: boolean;
     onChange: (next: AccountOwnership) => void;
 }) {
     const options: { value: AccountOwnership; label: string }[] = [
@@ -287,7 +301,6 @@ function OwnershipChoice({
                     {option.label}
                 </button>
             ))}
-            {!declared && <span className="text-[10px] text-text-tertiary">supuesto</span>}
         </span>
     );
 }

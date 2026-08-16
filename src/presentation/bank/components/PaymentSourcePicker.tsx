@@ -2,7 +2,6 @@
 
 import { CreditCard, Landmark, Wallet, PiggyBank, TrendingUp, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { formatBankNumber } from "@/lib/format-bank-number";
 import { accountLabel, cardLabel } from "@/lib/bank-identity-label";
 import { AccountFormSheet } from "./AccountFormSheet";
 import { CardFormSheet } from "./CardFormSheet";
@@ -49,6 +48,8 @@ interface PaymentSourcePickerProps {
     institutions?: BankInstitution[];
     onAccountCreated?: (created: { account: BankAccount; institution: BankInstitution | null }) => void;
     onCardCreated?: (created: { card: BankCard; institution: BankInstitution | null }) => void;
+    /** Rótulo sobre la lista. Solo hace falta cuando algo la precede. */
+    heading?: string;
 }
 
 /**
@@ -63,7 +64,7 @@ interface PaymentSourcePickerProps {
  */
 export function PaymentSourcePicker({
     accounts, cards, value, onChange,
-    institutions, onAccountCreated, onCardCreated,
+    institutions, onAccountCreated, onCardCreated, heading,
 }: PaymentSourcePickerProps) {
     const isEmpty = accounts.length === 0 && cards.length === 0;
     const canCreate = !!institutions && !!onAccountCreated && !!onCardCreated;
@@ -115,11 +116,16 @@ export function PaymentSourcePicker({
 
     return (
         <div className="flex flex-col gap-3">
+            {heading && (
+                <p className="text-[10px] font-medium uppercase tracking-[0.1em] text-text-tertiary">
+                    {heading}
+                </p>
+            )}
+
             {accounts.length > 0 && (
                 <div className="flex flex-col gap-1.5">
                     {accounts.map(account => {
                         const Icon = ACCOUNT_ICON[account.accountType];
-                        const number = formatBankNumber(account, "ACCOUNT");
                         return (
                             <Option
                                 key={account.id}
@@ -128,11 +134,13 @@ export function PaymentSourcePicker({
                                 icon={<Icon className="h-4 w-4" />}
                                 iconClass="bg-emerald-500/15 text-emerald-500"
                                 title={accountLabel(account)}
+                                // El título ya lleva el número; repetirlo debajo
+                                // llenaba la fila de lo mismo dos veces.
                                 subtitle={[
-                                    number,
+                                    account.institutionName,
                                     // Detectada por un escaneo y aún sin revisar:
                                     // se puede usar, pero no cuenta para los
-                                    // totales hasta que se confirme en Bancos.
+                                    // totales hasta confirmarla en Bancos.
                                     account.isUnconfirmed ? "sin revisar" : null,
                                 ].filter(Boolean).join(" · ") || undefined}
                             />
@@ -145,7 +153,6 @@ export function PaymentSourcePicker({
                 <div className="flex flex-col gap-1.5">
                     {cards.map(card => {
                         const isCredit = card.cardType === "CREDIT";
-                        const number = formatBankNumber(card, "CARD");
                         return (
                             <Option
                                 key={card.id}
@@ -158,7 +165,7 @@ export function PaymentSourcePicker({
                                 title={cardLabel(card)}
                                 subtitle={[
                                     isCredit ? "Crédito" : "Débito",
-                                    number,
+                                    card.institutionName,
                                     card.isUnconfirmed ? "sin revisar" : null,
                                 ].filter(Boolean).join(" · ")}
                             />
@@ -169,10 +176,12 @@ export function PaymentSourcePicker({
 
             {createButtons}
 
-            <p className="rounded-xl border border-border/40 bg-bg-secondary/40 p-3 text-[11px] leading-relaxed text-text-tertiary">
-                Si eliges una tarjeta de crédito, el gasto <b>no baja tu saldo hoy</b>.
-                Baja cuando registres el pago de la tarjeta.
-            </p>
+            {cards.some(c => c.cardType === "CREDIT") && (
+                <p className="rounded-xl border border-border/40 bg-bg-secondary/40 p-3 text-[11px] leading-relaxed text-text-tertiary">
+                    Si eliges una tarjeta de crédito, el gasto <b>no baja tu saldo hoy</b>.
+                    Baja cuando registres el pago de la tarjeta.
+                </p>
+            )}
         </div>
     );
 }

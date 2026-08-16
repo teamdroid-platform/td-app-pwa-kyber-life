@@ -377,7 +377,8 @@ export function TransactionWizard({
                         hint={
                             <ScannedAccountsPanel
                                 accounts={scannedAccountsWithChoice}
-                                title="Cuentas del movimiento"
+                                title="Este movimiento"
+                                flat
                                 institutions={bankInstitutions}
                                 onOwnershipChange={(raw, decision) => wizard.patch({
                                     scannedOwnership: { ...values.scannedOwnership, [raw]: decision },

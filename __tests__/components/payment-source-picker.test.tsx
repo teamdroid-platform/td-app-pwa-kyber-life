@@ -215,3 +215,33 @@ describe("PaymentSourcePicker — lo detectado también se puede elegir", () => 
         });
     });
 });
+
+describe("PaymentSourcePicker — una sola lista", () => {
+    it("cada opción dice su número una vez, no dos", () => {
+        render(<PaymentSourcePicker accounts={accounts} cards={cards} value={{}} onChange={jest.fn()} />);
+
+        // El título ya lleva el número; el subtítulo repetía lo mismo debajo.
+        expect(screen.getAllByText(/••••0814/)).toHaveLength(1);
+        expect(screen.getAllByText(/XXXX8361/)).toHaveLength(1);
+    });
+
+    it("acepta un rótulo para separarse de lo que la precede", () => {
+        render(
+            <PaymentSourcePicker
+                accounts={accounts} cards={cards} value={{}} onChange={jest.fn()}
+                heading="O elige una tuya"
+            />,
+        );
+
+        expect(screen.getByText("O elige una tuya")).toBeInTheDocument();
+    });
+
+    it("el aviso del crédito solo sale si hay alguna de crédito que elegir", () => {
+        const soloDebito = cards.filter(c => c.cardType === "DEBIT");
+        render(
+            <PaymentSourcePicker accounts={accounts} cards={soloDebito} value={{}} onChange={jest.fn()} />,
+        );
+
+        expect(screen.queryByText(/no baja tu saldo hoy/i)).not.toBeInTheDocument();
+    });
+});

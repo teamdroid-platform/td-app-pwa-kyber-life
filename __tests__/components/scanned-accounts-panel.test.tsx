@@ -122,11 +122,9 @@ describe("declarar de quién es cada cuenta", () => {
         expect(screen.queryByRole("button", { name: "Es mía" })).not.toBeInTheDocument();
     });
 
-    it("marca la suposición como tal hasta que el usuario elige", () => {
+    it("arranca en lo que se supone por el lado: un origen es propio…", () => {
         render(<ScannedAccountsPanel accounts={[sinIdentificar()]} onOwnershipChange={jest.fn()} />);
 
-        expect(screen.getByText("supuesto")).toBeInTheDocument();
-        // Un origen se supone propio…
         expect(screen.getByRole("button", { name: "Es mía" })).toHaveAttribute("aria-pressed", "true");
     });
 
@@ -178,7 +176,7 @@ describe("declarar de quién es cada cuenta", () => {
         expect(screen.getByText(/Tuya, sin registrar aún/)).toBeInTheDocument();
     });
 
-    it("una vez declarado deja de decir que es una suposición", () => {
+    it("y refleja lo declarado cuando el usuario ya eligió", () => {
         render(
             <ScannedAccountsPanel
                 accounts={[view({ match: null, resolution: "PENDING", ownership: "MINE" })]}
@@ -186,7 +184,6 @@ describe("declarar de quién es cada cuenta", () => {
             />,
         );
 
-        expect(screen.queryByText("supuesto")).not.toBeInTheDocument();
         expect(screen.getByRole("button", { name: "Es mía" })).toHaveAttribute("aria-pressed", "true");
     });
 });

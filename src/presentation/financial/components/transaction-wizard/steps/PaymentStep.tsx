@@ -39,6 +39,9 @@ export function PaymentStep({
                 question="¿Con qué lo pagaste?"
                 hint="Puedes omitirlo si no quieres asociar una cuenta."
             />
+            {/* Las cuentas del movimiento y las del usuario responden a la
+                misma pregunta, así que van en una sola lista: primero lo que
+                trae el movimiento, después lo que ya tienes. */}
             {hint}
             <PaymentSourcePicker
                 accounts={accounts}
@@ -48,6 +51,7 @@ export function PaymentStep({
                 institutions={institutions}
                 onAccountCreated={onAccountCreated}
                 onCardCreated={onCardCreated}
+                heading={hint ? "O elige una tuya" : undefined}
             />
         </>
     );
