@@ -62,10 +62,13 @@ export function PaymentSourceSheet({
 
     const matches = useMemo(() => {
         const q = normalizeForMatch(query);
-        const keep = (label: string) => !q || normalizeForMatch(label).includes(q);
+        // El emisor se busca igual que el número: es lo primero que el usuario
+        // recuerda de una cuenta, y ya se muestra en la fila.
+        const keep = (...parts: (string | null | undefined)[]) =>
+            !q || parts.some(p => p && normalizeForMatch(p).includes(q));
         return {
-            accounts: accounts.filter(a => keep(accountLabel(a))),
-            cards: cards.filter(c => keep(cardLabel(c))),
+            accounts: accounts.filter(a => keep(accountLabel(a), a.institutionName)),
+            cards: cards.filter(c => keep(cardLabel(c), c.institutionName)),
         };
     }, [accounts, cards, query]);
 
@@ -104,7 +107,7 @@ export function PaymentSourceSheet({
                                 iconClass="bg-emerald-500/15 text-emerald-500"
                                 title={accountLabel(account)}
                                 subtitle={[
-                                    account.institutionName,
+                                    issuerOf(account),
                                     account.isUnconfirmed ? "sin revisar" : null,
                                 ].filter(Boolean).join(" · ")}
                             />
@@ -124,7 +127,7 @@ export function PaymentSourceSheet({
                             title={cardLabel(card)}
                             subtitle={[
                                 card.cardType === "CREDIT" ? "Crédito" : "Débito",
-                                card.institutionName,
+                                issuerOf(card),
                                 card.isUnconfirmed ? "sin revisar" : null,
                             ].filter(Boolean).join(" · ")}
                         />
@@ -177,6 +180,16 @@ export function PaymentSourceSheet({
             </div>
         </FormSheet>
     );
+}
+
+/**
+ * De qué banco es. Cuando no cuelga de ninguno lo dice en vez de callarlo:
+ * una cuenta huérfana —las que nacen de un escaneo que no dedujo el emisor—
+ * se vería igual que una bien atada, y el usuario nunca sabría cuál le falta
+ * mantenimiento en Bancos.
+ */
+function issuerOf(entity: { institutionName?: string }): string {
+    return entity.institutionName ?? "Sin institución";
 }
 
 interface OptionProps {

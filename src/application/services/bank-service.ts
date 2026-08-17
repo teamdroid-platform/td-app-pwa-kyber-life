@@ -36,6 +36,24 @@ function stamps() {
     return { createdAt: now, updatedAt: now, isDeleted: false };
 }
 
+/**
+ * Pone el nombre del emisor sobre la cuenta o la tarjeta.
+ *
+ * `institutionName` no persiste —la tabla solo guarda el id— así que sin este
+ * paso la identidad llega al cliente sabiendo de qué banco es sin poder
+ * decirlo, y todo lo que lo muestra cae al texto de reserva en silencio.
+ *
+ * Se deja sin poner cuando no hay emisor: el efectivo no cuelga de ninguno, y
+ * una cuenta que detectó un escaneo todavía puede no tenerlo. Quien la muestre
+ * decide qué decir en ese hueco.
+ */
+function namedByInstitution<T extends { institutionId?: UUID | null }>(
+    entity: T, institutions: readonly BankInstitution[],
+): T {
+    const name = institutions.find(i => i.id === entity.institutionId)?.name;
+    return name ? { ...entity, institutionName: name } : entity;
+}
+
 export interface BankAccountWithBalance extends BankAccount {
     balance: number;
     lastSnapshotAt?: string | null;
@@ -799,8 +817,10 @@ export class BankService {
             this.movements.findAllForOwner(userId),
         ]);
 
-        const accounts = await Promise.all(rawAccounts.map(a => this.withBalance(a, allMovements)));
-        const cards = await Promise.all(rawCards.map(c => this.withDebt(c, allMovements)));
+        const accounts = await Promise.all(rawAccounts.map(async a =>
+            namedByInstitution(await this.withBalance(a, allMovements), institutions)));
+        const cards = await Promise.all(rawCards.map(async c =>
+            namedByInstitution(await this.withDebt(c, allMovements), institutions)));
 
         const countable = accounts.filter(a => !a.isUnconfirmed && a.status === "ACTIVE");
         const countableCards = cards.filter(c => !c.isUnconfirmed && c.cardType === "CREDIT");
@@ -832,12 +852,15 @@ export class BankService {
         const account = await this.accounts.findById(accountId);
         if (!account || account.ownerUserId !== userId) return null;
 
-        const [snapshots, movements] = await Promise.all([
+        const [snapshots, movements, institutions] = await Promise.all([
             this.snapshots.findByAccountId(accountId),
             this.movements.find(userId, { accountId }),
+            this.institutions.findByOwnerId(userId),
         ]);
 
-        const withBalance = await this.withBalance(account, movements);
+        const withBalance = namedByInstitution(
+            await this.withBalance(account, movements), institutions,
+        );
 
         return {
             account: withBalance,
@@ -853,14 +876,15 @@ export class BankService {
 
         await this.closeDueStatements(userId, new Date());
 
-        const [statements, movements, allAccounts, allMovements] = await Promise.all([
+        const [statements, movements, allAccounts, allMovements, institutions] = await Promise.all([
             this.statements.findByCardId(cardId),
             this.movements.find(userId, { cardId }),
             this.accounts.findByOwnerId(userId),
             this.movements.findAllForOwner(userId),
+            this.institutions.findByOwnerId(userId),
         ]);
 
-        const withDebt = await this.withDebt(card, movements);
+        const withDebt = namedByInstitution(await this.withDebt(card, movements), institutions);
         const open = withDebt.openStatement;
         const periodMovements = open
             ? movements.filter(m =>
@@ -871,7 +895,7 @@ export class BankService {
         const payableAccounts = await Promise.all(
             allAccounts
                 .filter(a => !a.isUnconfirmed && a.status === "ACTIVE")
-                .map(a => this.withBalance(a, allMovements)),
+                .map(async a => namedByInstitution(await this.withBalance(a, allMovements), institutions)),
         );
 
         return { card: withDebt, statements, movements, periodMovements, payableAccounts };

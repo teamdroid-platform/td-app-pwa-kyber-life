@@ -16,19 +16,26 @@ jest.mock("@/app/actions/bank", () => ({
 const STAMPS = { createdAt: "", updatedAt: "", isDeleted: false };
 
 const ahorros = {
-    id: "a1", ownerUserId: "u", institutionId: "i1",
+    id: "a1", ownerUserId: "u", institutionId: "i1", institutionName: "Banco del Austro",
     accountType: "SAVINGS" as const, lastFour: "0814", currency: "USD",
     status: "ACTIVE" as const, isUnconfirmed: false, ...STAMPS,
 };
 
 const corriente = {
     ...ahorros, id: "a2", accountType: "CHECKING" as const, lastFour: "9511",
+    institutionId: "i2", institutionName: "Banco Pichincha",
 };
 
 const credito = {
-    id: "c1", ownerUserId: "u", institutionId: "i1",
+    id: "c1", ownerUserId: "u", institutionId: "i1", institutionName: "Banco del Austro",
     cardType: "CREDIT" as const, brand: "Mastercard", lastFour: "8361",
     currency: "USD", status: "ACTIVE" as const, isUnconfirmed: false, ...STAMPS,
+};
+
+/** Nace de un escaneo que no dedujo el banco: existe, pero cuelga de nadie. */
+const huerfana = {
+    ...ahorros, id: "a3", lastFour: "1860",
+    institutionId: null, institutionName: undefined,
 };
 
 function scanned(role: "SOURCE" | "DESTINATION", display: string): ScannedAccountView {
@@ -158,6 +165,45 @@ describe("PaymentStep — elegir desde la hoja", () => {
 
         fireEvent.click(screen.getByText("Origen"));
         fireEvent.change(screen.getByLabelText("Buscar"), { target: { value: "corriente" } });
+
+        expect(screen.getByText("Corriente ••••9511")).toBeInTheDocument();
+        expect(screen.queryByText("Ahorros ••••0814")).not.toBeInTheDocument();
+    });
+});
+
+describe("PaymentStep — cada opción dice de qué banco es", () => {
+    it("la cuenta enseña su emisor", () => {
+        renderStep();
+
+        fireEvent.click(screen.getByText("Origen"));
+
+        expect(screen.getByText("Banco del Austro")).toBeInTheDocument();
+        expect(screen.getByText("Banco Pichincha")).toBeInTheDocument();
+    });
+
+    it("la tarjeta enseña su emisor junto al tipo", () => {
+        renderStep();
+
+        fireEvent.click(screen.getByText("Origen"));
+
+        expect(screen.getByText("Crédito · Banco del Austro")).toBeInTheDocument();
+    });
+
+    it("una cuenta sin banco lo dice, en vez de callar", () => {
+        // Callarlo la deja indistinguible de una bien atada, y el usuario nunca
+        // sabe cuál necesita mantenimiento.
+        renderStep({ accounts: [huerfana], cards: [] });
+
+        fireEvent.click(screen.getByText("Origen"));
+
+        expect(screen.getByText("Sin institución")).toBeInTheDocument();
+    });
+
+    it("el buscador también entiende el nombre del banco", () => {
+        renderStep();
+
+        fireEvent.click(screen.getByText("Origen"));
+        fireEvent.change(screen.getByLabelText("Buscar"), { target: { value: "pichincha" } });
 
         expect(screen.getByText("Corriente ••••9511")).toBeInTheDocument();
         expect(screen.queryByText("Ahorros ••••0814")).not.toBeInTheDocument();
