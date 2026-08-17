@@ -48,7 +48,6 @@ const TRANSACTION: FinancialTransaction = {
     merchant: "FeelTheTickets",
     categoryId: null,
     institutionId: null,
-    accountId: null,
     tags: [],
     description: "Pago comisiones concierto The Strokes",
     notes: "Compra con tarjeta",

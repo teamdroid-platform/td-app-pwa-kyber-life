@@ -1,6 +1,6 @@
 import { InMemoryRepository } from "./in-memory-repository";
-import { User, Supermarket, Category, Unit, GenericItem, BrandProduct, Template, TemplateItem, Purchase, PurchaseLine, PriceObservation, PasswordResetToken, FinancialTransaction, FinancialTransactionAuditLog, FinancialScanExecution, FinancialScannerTransaction, FinancialInstitution, FinancialInstitutionType, FinancialAccount, FinancialCategory, Notification, PushSubscription } from "@/domain/entities";
-import { IUserRepository, ISupermarketRepository, ICategoryRepository, IUnitRepository, IGenericItemRepository, IBrandProductRepository, ITemplateRepository, ITemplateItemRepository, IPurchaseRepository, IPurchaseLineRepository, IPriceObservationRepository, IPasswordResetTokenRepository, IFinancialTransactionRepository, IFinancialTransactionAuditLogRepository, IFinancialScanExecutionRepository, IFinancialScannerTransactionRepository, IFinancialInstitutionTypeRepository, IFinancialInstitutionRepository, IFinancialAccountRepository, IFinancialCategoryRepository, INotificationRepository, IPushSubscriptionRepository, NotificationQueryOptions, DashboardRangeFilter } from "@/domain/repositories";
+import { User, Supermarket, Category, Unit, GenericItem, BrandProduct, Template, TemplateItem, Purchase, PurchaseLine, PriceObservation, PasswordResetToken, FinancialTransaction, FinancialTransactionAuditLog, FinancialScanExecution, FinancialScannerTransaction, FinancialInstitution, FinancialInstitutionType, FinancialCategory, Notification, PushSubscription } from "@/domain/entities";
+import { IUserRepository, ISupermarketRepository, ICategoryRepository, IUnitRepository, IGenericItemRepository, IBrandProductRepository, ITemplateRepository, ITemplateItemRepository, IPurchaseRepository, IPurchaseLineRepository, IPriceObservationRepository, IPasswordResetTokenRepository, IFinancialTransactionRepository, IFinancialTransactionAuditLogRepository, IFinancialScanExecutionRepository, IFinancialScannerTransactionRepository, IFinancialInstitutionTypeRepository, IFinancialInstitutionRepository, IFinancialCategoryRepository, INotificationRepository, IPushSubscriptionRepository, NotificationQueryOptions, DashboardRangeFilter } from "@/domain/repositories";
 import { UUID } from "@/domain/core";
 import { PaginationParams, PaginatedResult, TransactionSearchFilters } from "@/domain/pagination";
 import { DASHBOARD_ACTIVE_STATUSES } from "@/domain/services/financial-balance";
@@ -14,6 +14,9 @@ export class InMemoryFinancialTransactionAuditLogRepository extends InMemoryRepo
 export class InMemoryFinancialScannerTransactionRepository extends InMemoryRepository<FinancialScannerTransaction> implements IFinancialScannerTransactionRepository {
     async findUnprocessedByOwnerId(userId: UUID): Promise<FinancialScannerTransaction[]> {
         return (await this.findAll()).filter(t => t.ownerUserId === userId && t.status === 'DETECTED');
+    }
+    async findByOwnerId(userId: UUID): Promise<FinancialScannerTransaction[]> {
+        return (await this.findAll()).filter(t => t.ownerUserId === userId);
     }
 }
 
@@ -67,15 +70,6 @@ export class InMemoryFinancialInstitutionTypeRepository extends InMemoryReposito
 export class InMemoryFinancialInstitutionRepository extends InMemoryRepository<FinancialInstitution> implements IFinancialInstitutionRepository {
     async findByOwnerId(userId: UUID): Promise<FinancialInstitution[]> {
         return (await this.findAll()).filter(i => i.ownerUserId === userId);
-    }
-}
-
-export class InMemoryFinancialAccountRepository extends InMemoryRepository<FinancialAccount> implements IFinancialAccountRepository {
-    async findByOwnerId(userId: UUID): Promise<FinancialAccount[]> {
-        return (await this.findAll()).filter(a => a.ownerUserId === userId);
-    }
-    async findByInstitutionId(institutionId: UUID): Promise<FinancialAccount[]> {
-        return (await this.findAll()).filter(a => a.institutionId === institutionId);
     }
 }
 
@@ -151,7 +145,6 @@ export class InMemoryFinancialTransactionRepository extends InMemoryRepository<F
         }
         if (filters.categoryId) filtered = filtered.filter(t => t.categoryId === filters.categoryId);
         if (filters.institutionId) filtered = filtered.filter(t => t.institutionId === filters.institutionId);
-        if (filters.accountId) filtered = filtered.filter(t => t.accountId === filters.accountId);
         if (filters.dateFrom) filtered = filtered.filter(t => t.date >= filters.dateFrom!);
         if (filters.dateTo) filtered = filtered.filter(t => t.date <= filters.dateTo!);
         if (filters.amountMin !== undefined) filtered = filtered.filter(t => t.amount >= filters.amountMin!);

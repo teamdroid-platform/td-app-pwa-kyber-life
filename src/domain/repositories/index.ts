@@ -76,3 +76,4 @@ export interface IPriceObservationRepository extends IRepository<PriceObservatio
 
 export * from './financial';
 export * from './notification';
+export * from './bank';

@@ -81,7 +81,6 @@ describe("toWizardValues", () => {
             institutionName: "Anthropic",
             institutionId: "6a78fcda-b4e0-4686-a9d8-04c68b8ce821",
             categoryName: "Servicios",
-            accountId: null,
             paidWithCredit: true,
             tags: [],
         });
@@ -93,7 +92,6 @@ describe("toWizardValues", () => {
         const { values } = toWizardValues(
             extraction({ account_number: "**** 4821", account_id: null }), { fallbackDate: FALLBACK_DATE },
         );
-        expect(values.accountName).toBe("**** 4821");
     });
 
     it("ignores what the sentence called the account, so no 'Débito' is created", () => {
@@ -101,8 +99,6 @@ describe("toWizardValues", () => {
         const { values } = toWizardValues(
             extraction({ account_name: "débito", account_number: null }), { fallbackDate: FALLBACK_DATE },
         );
-        expect(values.accountName).toBe("");
-        expect(values.accountId).toBeNull();
     });
 
     it("leaves the amount empty when the extractor answered zero", () => {
@@ -168,7 +164,6 @@ describe("toWizardValues", () => {
             description: "",
             institutionName: "",
             categoryName: "",
-            accountName: "",
             paidWithCredit: false,
             notes: "",
             tags: [],
@@ -213,25 +208,21 @@ describe("resolveEntityStatus", () => {
 
 describe("collectPendingCreations", () => {
     it("lists only what will actually be created, in summary order", () => {
-        const { values } = toWizardValues(
-            extraction({ account_number: "**** 4821" }), { fallbackDate: FALLBACK_DATE },
-        );
+        const { values } = toWizardValues(extraction(), { fallbackDate: FALLBACK_DATE });
         const pending = collectPendingCreations(values, {
             institution: "new",
             category: "existing",
-            account: "new",
         });
 
         expect(pending).toEqual([
             { label: "Institución", name: "Anthropic" },
-            { label: "Cuenta", name: "**** 4821" },
         ]);
     });
 
     it("is empty when everything already exists", () => {
         const { values } = toWizardValues(extraction(), { fallbackDate: FALLBACK_DATE });
         expect(collectPendingCreations(values, {
-            institution: "existing", category: "existing", account: "existing",
+            institution: "existing", category: "existing",
         })).toEqual([]);
     });
 });

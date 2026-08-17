@@ -21,13 +21,14 @@ import { TagInput } from "@/components/ui/tag-input";
 import { Switch } from "@/components/ui/switch";
 import { TransactionTypeChips } from "./TransactionTypeChips";
 import { AmountHeroInput } from "./AmountHeroInput";
-import { AccountSelect } from "./AccountSelect";
 import { InstitutionPicker, type PendingInstitutionEdit } from "./InstitutionPicker";
 import { CategoryPicker } from "./CategoryPicker";
 import { InstitutionMatchBadge } from "./InstitutionMatchBadge";
 import { FINANCIAL_FLAGS } from "@/lib/feature-flags";
 import { TransactionScanWizard, extractSummary } from "./transaction-wizard/TransactionScanWizard";
 import type { InstitutionMatchInfo } from "@/lib/institution-match";
+import type { ScannedAccountView } from "@/application/services/bank-service";
+import { ScannedAccountsPanel } from "@/presentation/bank/components/ScannedAccountsPanel";
 import { isoToWallClockInput, wallClockInputToISO } from "@/lib/date-range";
 import type { FinancialTransactionType } from "@/domain/entities/financial";
 import {
@@ -48,6 +49,8 @@ interface ScanDetailsFormProps {
     resolvedInstitutionName?: string;
     /** Confidence of the scanned merchant → existing institution identification. */
     institutionMatch?: InstitutionMatchInfo;
+    /** Las cuentas del escaneo, ya identificadas contra las del usuario. */
+    scannedAccounts?: ScannedAccountView[];
 }
 
 function normalizeType(type?: string | null): FinancialTransactionType {
@@ -76,7 +79,9 @@ export function ScanDetailsForm(props: ScanDetailsFormProps) {
 }
 
 /** The original single-screen confirmation form. Superseded by the wizard. */
-export function LegacyScanDetailsForm({ initialData, resolvedInstitutionName, institutionMatch }: ScanDetailsFormProps) {
+export function LegacyScanDetailsForm({
+    initialData, resolvedInstitutionName, institutionMatch, scannedAccounts = [],
+}: ScanDetailsFormProps) {
     const router = useRouter();
     const [isProcessing, setIsProcessing] = useState(false);
     const formRef = useRef<HTMLDivElement>(null);
@@ -127,7 +132,6 @@ export function LegacyScanDetailsForm({ initialData, resolvedInstitutionName, in
         date: isoToWallClockInput(initialData.date) ?? "",
         notes: extractSummary(initialData) || "",
         institutionName: resolvedInstitutionName || initialData.merchant || "",
-        accountName: "",
         categoryName: initialData.category || "",
         tags: [] as string[],
         paidWithCredit: false,
@@ -138,13 +142,12 @@ export function LegacyScanDetailsForm({ initialData, resolvedInstitutionName, in
     const {
         institutions,
         institutionTypes,
-        accounts,
+
         categories,
         error: optionsError,
         setInstitutions,
         setCategories,
     } = useTransactionFormOptions();
-    const accountsList = accounts.map((a) => a.name);
     const [tagSuggestions, setTagSuggestions] = useState<string[]>([]);
 
     const [institutionQuery, setInstitutionQuery] = useState("");
@@ -229,7 +232,6 @@ export function LegacyScanDetailsForm({ initialData, resolvedInstitutionName, in
                 date: wallClockInputToISO(formData.date) ?? null,
                 notes: formData.notes || null,
                 institutionName: formData.institutionName || null,
-                accountName: formData.accountName || null,
                 categoryName: formData.categoryName || null,
                 tags: formData.tags,
                 paidWithCredit: formData.type === "EXPENSE" ? formData.paidWithCredit : null,
@@ -272,10 +274,10 @@ export function LegacyScanDetailsForm({ initialData, resolvedInstitutionName, in
 
     // Collapsed accordion previews
     const paidWithCreditActive = formData.paidWithCredit && creditEligible;
-    const accountPreview = formData.accountName
-        ? (paidWithCreditActive ? `${formData.accountName} · Tarjeta de crédito` : formData.accountName)
-        : (paidWithCreditActive ? "Tarjeta de crédito" : "Ej. Ahorros Múltiple, Tarjeta Visa");
-    const accountHasValue = !!formData.accountName || paidWithCreditActive;
+    // El selector de cuenta o tarjeta llega con el módulo Bancos; por ahora
+    // este campo solo declara si el gasto se difirió a una tarjeta de crédito.
+    const accountPreview = paidWithCreditActive ? "Tarjeta de crédito" : "Efectivo o débito";
+    const accountHasValue = paidWithCreditActive;
     const datePreview = formatDateTimePreview(formData.date) || "Selecciona fecha y hora";
 
     const originStats = initialData.originStats as Record<string, unknown> | null | undefined;
@@ -335,13 +337,13 @@ export function LegacyScanDetailsForm({ initialData, resolvedInstitutionName, in
                 <AccordionField
                     icon={<Landmark className="h-4 w-4" />}
                     iconClass="bg-emerald-500/15 text-emerald-500"
-                    label="Cuenta"
+                    label="Forma de pago"
                     preview={accountPreview}
                     hasValue={accountHasValue}
                     expanded={expanded === "account"}
                     onToggle={() => toggle("account")}
                 >
-                    <AccountSelect accounts={accountsList} value={formData.accountName} onChange={(v) => handleChange("accountName", v)} />
+                    <ScannedAccountsPanel accounts={scannedAccounts} className="mt-3" />
 
                     {creditEligible && (
                         <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-border/40 bg-bg-secondary/40 p-3">

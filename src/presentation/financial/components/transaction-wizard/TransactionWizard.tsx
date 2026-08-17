@@ -22,6 +22,8 @@ import { WizardShell } from "./WizardShell";
 import { AmountStep } from "./steps/AmountStep";
 import { CategoryStep, InstitutionStep } from "./steps/PickerSteps";
 import { PaymentStep } from "./steps/PaymentStep";
+import { paymentSourceForCard } from "@/presentation/bank/components/PaymentSourcePicker";
+import type { ScannedAccountView } from "@/application/services/bank-service";
 import { DateStep } from "./steps/DateStep";
 import { SummaryStep, type FieldMarkers } from "./steps/SummaryStep";
 
@@ -67,6 +69,11 @@ export interface TransactionWizardProps {
     /** Shown inside the institution step, e.g. how confident the scan's match is. */
     institutionHint?: ReactNode;
     /**
+     * Origen y destino que trae el escaneo o los vínculos del movimiento. Se
+     * muestran como valor de la fila de pago y, en el paso, con sus controles.
+     */
+    scannedAccounts?: ScannedAccountView[];
+    /**
      * Open straight on one field, as if its summary row had been tapped. Set
      * when the editor is entered from a specific row on the detail screen.
      */
@@ -92,6 +99,7 @@ export function TransactionWizard({
     decorateSummary,
     secondaryAction,
     institutionHint,
+    scannedAccounts = [],
     initialFocus,
 }: TransactionWizardProps) {
     const wizard = useTransactionWizard({ mode, initialValues, initialFocus });
@@ -112,14 +120,16 @@ export function TransactionWizard({
     const {
         institutions,
         institutionTypes,
-        accounts,
+        bankAccounts,
+        bankCards,
+        bankInstitutions,
         categories,
         loading: optionsLoading,
         error: optionsError,
         setInstitutions,
         setCategories,
+        addBankEntities,
     } = useTransactionFormOptions();
-    const accountsList = useMemo(() => accounts.map((a) => a.name), [accounts]);
 
     useEffect(() => {
         if (optionsError) toast.error("No se pudieron cargar categorías e instituciones. Reintenta.");
@@ -158,9 +168,8 @@ export function TransactionWizard({
             institutionName: values.institutionName,
             amount: values.amount,
             date: values.date,
-            accountName: values.accountName,
         }),
-        [values.type, values.description, values.institutionName, values.amount, values.date, values.accountName],
+        [values.type, values.description, values.institutionName, values.amount, values.date],
     );
 
     useEffect(() => {
@@ -238,8 +247,26 @@ export function TransactionWizard({
     // Choosing from the picker makes the name authoritative again: any id a
     // pre-filled flow had resolved refers to a different record than the one
     // just selected, and keeping it would silently override the choice.
+    // Lo que se crea en el paso de pago se elige solo: nadie abre ese formulario
+    // para después no usar lo que acaba de registrar.
+    const handleAccountCreated: React.ComponentProps<typeof PaymentStep>["onAccountCreated"] = ({ account, institution }) => {
+        addBankEntities({ account, institution });
+        wizard.patch({ bankSourceAccountId: account.id, bankCardId: null, paidWithCredit: false });
+    };
+
+    const handleCardCreated: React.ComponentProps<typeof PaymentStep>["onCardCreated"] = ({ card, institution }) => {
+        addBankEntities({ card, institution });
+        const source = paymentSourceForCard(card);
+        wizard.patch({
+            bankCardId: source.cardId ?? null,
+            bankSourceAccountId: source.accountId ?? null,
+            paidWithCredit: source.paidWithCredit,
+        });
+    };
+
+    // El tipo declarado pertenece al emisor anterior, no al recién elegido.
     const handleSelectInstitution = (name: string) => {
-        wizard.patch({ institutionName: name, institutionId: null });
+        wizard.patch({ institutionName: name, institutionId: null, bankInstitutionKind: null });
         setInstitutionQuery("");
     };
 
@@ -248,9 +275,16 @@ export function TransactionWizard({
         setCategoryQuery("");
     };
 
-    const handleSelectAccount = (name: string) => {
-        wizard.patch({ accountName: name, accountId: null });
-    };
+    // Lo que el usuario ya declaró se refleja en el panel sin esperar al
+    // servidor: la elección tiene que verse en el mismo toque.
+    const scannedAccountsWithChoice = useMemo(
+        () => scannedAccounts.map(account => ({
+            ...account,
+            decision: values.scannedOwnership?.[account.raw] ?? account.decision,
+            ownership: values.scannedOwnership?.[account.raw]?.ownership ?? account.ownership,
+        })),
+        [scannedAccounts, values.scannedOwnership],
+    );
 
     const stepDefinition = WIZARD_STEPS.find((s) => s.id === screen);
     const stepNumber = WIZARD_STEPS.findIndex((s) => s.id === screen) + 1;
@@ -307,6 +341,8 @@ export function TransactionWizard({
                         pendingEdit={pendingInstitutionEdit}
                         onPendingEditChange={setPendingInstitutionEdit}
                         hint={institutionHint}
+                        bankInstitutionKind={values.bankInstitutionKind}
+                        onBankInstitutionKindChange={(kind) => setValue("bankInstitutionKind", kind)}
                     />
                 );
             case "category":
@@ -324,18 +360,34 @@ export function TransactionWizard({
             case "payment":
                 return (
                     <PaymentStep
-                        accounts={accountsList}
-                        value={values.accountName}
-                        onSelect={handleSelectAccount}
+                        accounts={bankAccounts}
+                        cards={bankCards}
                         creditEligible={wizard.creditEligible}
-                        paidWithCredit={values.paidWithCredit}
-                        onPaidWithCreditChange={(v) => setValue("paidWithCredit", v)}
+                        value={{
+                            accountId: values.bankSourceAccountId ?? undefined,
+                            cardId: values.bankCardId ?? undefined,
+                            paidWithCredit: values.paidWithCredit,
+                        }}
+                        onChange={(source) => wizard.patch({
+                            bankSourceAccountId: source.accountId ?? null,
+                            bankCardId: source.cardId ?? null,
+                            paidWithCredit: source.paidWithCredit,
+                        })}
+                        destinationAccountId={values.bankDestinationAccountId}
+                        onDestinationChange={(id) => setValue("bankDestinationAccountId", id)}
+                        scannedAccounts={scannedAccountsWithChoice}
+                        onScannedDecision={(raw, decision) => wizard.patch({
+                            scannedOwnership: { ...values.scannedOwnership, [raw]: decision },
+                        })}
+                        institutions={bankInstitutions}
+                        onAccountCreated={handleAccountCreated}
+                        onCardCreated={handleCardCreated}
                     />
                 );
             case "date":
                 return <DateStep value={values.date} onChange={(v) => setValue("date", v)} />;
             case "summary": {
-                const decoration = decorateSummary?.({ values, institutions, institutionTypes, accounts, categories }) ?? {};
+                const decoration = decorateSummary?.({ values, institutions, institutionTypes, categories, bankAccounts, bankCards, bankInstitutions }) ?? {};
                 return (
                     <SummaryStep
                         values={values}
@@ -351,6 +403,14 @@ export function TransactionWizard({
                         notesOrigin={notesOrigin}
                         extra={decoration.extra}
                         fieldMarkers={decoration.fieldMarkers}
+                        accounts={bankAccounts}
+                        cards={bankCards}
+                        // El recorrido va DENTRO de la fila de pago, no en un
+                        // bloque aparte: responde a esa misma pregunta. Con lo
+                        // declarado aplicado — el resumen mostraba la lista
+                        // cruda y contradecía lo que el usuario acababa de
+                        // elegir en el paso.
+                        bankAccounts={scannedAccountsWithChoice}
                     />
                 );
             }
@@ -413,7 +473,7 @@ export function TransactionWizard({
                         </Button>
                     )}
 
-                    {screen === "payment" && !values.accountName && !values.paidWithCredit && (
+                    {screen === "payment" && !values.paidWithCredit && !values.bankSourceAccountId && !values.bankCardId && (
                         <Button type="button" variant="outline" onClick={wizard.next} className="h-10 w-full rounded-2xl">
                             Omitir
                         </Button>

@@ -30,7 +30,7 @@ export interface TransactionSearchFilters {
     types?: FinancialTransactionType[];
     categoryId?: UUID;
     institutionId?: UUID;
-    accountId?: UUID;
+
     dateFrom?: string;
     dateTo?: string;
     amountMin?: number;

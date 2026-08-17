@@ -7,7 +7,6 @@ import {
     FinancialScannerTransaction,
     FinancialInstitution,
     FinancialInstitutionType,
-    FinancialAccount,
     FinancialCategory,
     FinancialTransactionAuditLog
 } from "../entities/financial";
@@ -69,6 +68,8 @@ export interface IFinancialScanExecutionRepository extends IRepository<Financial
 
 export interface IFinancialScannerTransactionRepository extends IRepository<FinancialScannerTransaction> {
     findUnprocessedByOwnerId(userId: UUID): Promise<FinancialScannerTransaction[]>;
+    /** Todos los escaneos del usuario, procesados o no. Lo usa el re-ligado del historial. */
+    findByOwnerId(userId: UUID): Promise<FinancialScannerTransaction[]>;
 }
 
 
@@ -78,11 +79,6 @@ export interface IFinancialInstitutionTypeRepository extends IRepository<Financi
 
 export interface IFinancialInstitutionRepository extends IRepository<FinancialInstitution> {
     findByOwnerId(userId: UUID): Promise<FinancialInstitution[]>;
-}
-
-export interface IFinancialAccountRepository extends IRepository<FinancialAccount> {
-    findByOwnerId(userId: UUID): Promise<FinancialAccount[]>;
-    findByInstitutionId(institutionId: UUID): Promise<FinancialAccount[]>;
 }
 
 export interface IFinancialCategoryRepository extends IRepository<FinancialCategory> {

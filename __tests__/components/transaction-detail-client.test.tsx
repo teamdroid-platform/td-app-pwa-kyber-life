@@ -49,7 +49,6 @@ const TRANSACTION: FinancialTransaction = {
     merchant: "Supermercado Central",
     categoryId: null,
     institutionId: null,
-    accountId: null,
     tags: ["mercado"],
     description: "Compra semanal",
     notes: "Compra semanal en el supermercado",

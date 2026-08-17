@@ -9,7 +9,11 @@ import { cn } from "@/lib/utils";
 import { Textarea } from "@/components/ui/textarea";
 import { TagInput } from "@/components/ui/tag-input";
 import { resolveTransactionTypeOption } from "../../TransactionTypeChips";
+import { describePaymentSource, isGenericPaymentLabel } from "../../../lib/payment-summary";
 import type { MissingField, WizardMode, WizardScreen, WizardValues } from "../../../hooks/useTransactionWizard";
+import type { BankAccount, BankCard } from "@/domain/entities/bank";
+import type { ScannedAccountView } from "@/application/services/bank-service";
+import { AccountsTrail } from "@/presentation/bank/components/ScannedAccountsPanel";
 
 const MAX_NOTES = 200;
 
@@ -126,7 +130,7 @@ export function SummaryHero({ type, description, amount, currency, institutionNa
 }
 
 /** Rows that can carry a small non-interactive marker after their value. */
-export type MarkableField = "institutionName" | "categoryName" | "accountName";
+export type MarkableField = "institutionName" | "categoryName";
 
 export type FieldMarkers = Partial<Record<MarkableField, ReactNode>>;
 
@@ -145,6 +149,11 @@ interface SummaryStepProps {
     notesOrigin: "auto" | "scan" | "manual";
     /** Read-only content appended after the rows (e.g. the scan's original data). */
     extra?: ReactNode;
+    /** Cuentas y tarjetas del usuario, para nombrar con qué se pagó. */
+    accounts?: readonly BankAccount[];
+    cards?: readonly BankCard[];
+    /** Origen y destino, mostrados como valor de la fila de pago. */
+    bankAccounts?: ScannedAccountView[];
     /**
      * Markers shown beside a value — a scan's match confidence, or whether
      * confirming will reuse a record or create one.
@@ -180,6 +189,9 @@ export function SummaryStep({
     notesOrigin,
     extra,
     fieldMarkers,
+    accounts = [],
+    cards = [],
+    bankAccounts = [],
 }: SummaryStepProps) {
     const [openEditor, setOpenEditor] = useState<"notes" | "tags" | null>(null);
 
@@ -194,6 +206,16 @@ export function SummaryStep({
         const text = Array.isArray(value) ? value.join(", ") : String(value ?? "");
         return text.trim() || "Sin valor";
     };
+
+    const paymentLabel = describePaymentSource(
+        {
+            accountId: values.bankSourceAccountId,
+            cardId: values.bankCardId,
+            paidWithCredit: values.paidWithCredit,
+        },
+        accounts,
+        cards,
+    );
 
     return (
         <>
@@ -259,14 +281,19 @@ export function SummaryStep({
                 <SummaryRow
                     icon={Landmark}
                     iconClass="bg-emerald-500/15 text-emerald-500"
-                    label="Cuenta"
+                    label="Forma de pago"
                     onEdit={() => onEdit("payment")}
-                    changed={didChange("accountName") || didChange("paidWithCredit")}
-                    previous={previousOf("accountName")}
-                    marker={fieldMarkers?.accountName}
+                    changed={didChange("paidWithCredit")}
                 >
-                    {values.accountName || <span className="text-text-tertiary">Sin cuenta</span>}
-                    {values.paidWithCredit && " · Tarjeta de crédito"}
+                    {/* El recorrido del dinero manda cuando el escaneo lo trae:
+                        responde a la misma pregunta con más detalle. Si no, la
+                        cuenta elegida; y el texto genérico atenuado, porque
+                        significa que no hay nada atado. */}
+                    {bankAccounts.length > 0
+                        ? <AccountsTrail accounts={bankAccounts} />
+                        : isGenericPaymentLabel(paymentLabel)
+                            ? <span className="text-text-tertiary">{paymentLabel}</span>
+                            : paymentLabel}
                 </SummaryRow>
 
                 <SummaryRow

@@ -1,6 +1,7 @@
 import { Metadata } from "next";
 import { getScannerTransactionByIdAction } from "@/app/actions/financial-inbox";
 import { getInstitutionsAction } from "@/app/actions/financial-settings";
+import { getScannedAccountsPreviewAction } from "@/app/actions/bank";
 import { getInstitutionMatchInfo, INSTITUTION_MATCH_THRESHOLD } from "@/lib/institution-match";
 import { ScanDetailsForm } from "@/presentation/financial/components/ScanDetailsForm";
 import { ArrowLeft, AlertCircle } from "lucide-react";
@@ -43,7 +44,11 @@ export default async function ScanDetailsPage({ params }: ScanDetailsPageProps) 
 
     // Resolve the scanned merchant against existing institutions on the server,
     // so the form renders the final name immediately (no client-side flash).
-    const institutions = await getInstitutionsAction();
+    // Las cuentas del escaneo se identifican en la misma pasada, por lo mismo.
+    const [institutions, scannedAccounts] = await Promise.all([
+        getInstitutionsAction(),
+        getScannedAccountsPreviewAction(id),
+    ]);
     const institutionMatch = getInstitutionMatchInfo(
         response.data.merchant,
         institutions.map((i) => i.name),
@@ -77,6 +82,7 @@ export default async function ScanDetailsPage({ params }: ScanDetailsPageProps) 
                     initialData={response.data}
                     resolvedInstitutionName={resolvedInstitutionName}
                     institutionMatch={institutionMatch}
+                    scannedAccounts={scannedAccounts.success ? scannedAccounts.data : []}
                 />
             </div>
         </div>

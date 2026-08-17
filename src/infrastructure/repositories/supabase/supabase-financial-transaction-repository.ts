@@ -12,8 +12,13 @@ export class SupabaseFinancialTransactionRepository implements IFinancialTransac
         const insertData = {
             id: entity.id,
             owner_user_id: entity.ownerUserId,
-            account_id: entity.accountId,
             institution_id: entity.institutionId,
+            bank_source_account_id: entity.bankSourceAccountId ?? null,
+            bank_destination_account_id: entity.bankDestinationAccountId ?? null,
+            bank_card_id: entity.bankCardId ?? null,
+            bank_institution_id: entity.bankInstitutionId ?? null,
+            bank_card_statement_id: entity.bankCardStatementId ?? null,
+            bank_counterparty_observation_id: entity.bankCounterpartyObservationId ?? null,
             type: entity.type,
             status: entity.status,
             amount: entity.amount,
@@ -63,8 +68,13 @@ export class SupabaseFinancialTransactionRepository implements IFinancialTransac
         const supabase = await createClient();
         
         const updateData = {
-            account_id: entity.accountId,
             institution_id: entity.institutionId,
+            bank_source_account_id: entity.bankSourceAccountId ?? null,
+            bank_destination_account_id: entity.bankDestinationAccountId ?? null,
+            bank_card_id: entity.bankCardId ?? null,
+            bank_institution_id: entity.bankInstitutionId ?? null,
+            bank_card_statement_id: entity.bankCardStatementId ?? null,
+            bank_counterparty_observation_id: entity.bankCounterpartyObservationId ?? null,
             type: entity.type,
             status: entity.status,
             amount: entity.amount,
@@ -335,7 +345,6 @@ export class SupabaseFinancialTransactionRepository implements IFinancialTransac
         if (filters.types && filters.types.length > 0) qb = qb.in('type', filters.types);
         if (filters.categoryId) qb = qb.eq('category_id', filters.categoryId);
         if (filters.institutionId) qb = qb.eq('institution_id', filters.institutionId);
-        if (filters.accountId) qb = qb.eq('account_id', filters.accountId);
         if (filters.currency) qb = qb.eq('currency', filters.currency);
         if (filters.dateFrom) qb = qb.gte('date', filters.dateFrom);
         if (filters.dateTo) qb = qb.lte('date', filters.dateTo);
@@ -350,8 +359,13 @@ export class SupabaseFinancialTransactionRepository implements IFinancialTransac
         return {
             id: row.id,
             ownerUserId: row.owner_user_id,
-            accountId: row.account_id,
             institutionId: row.institution_id,
+            bankSourceAccountId: row.bank_source_account_id ?? null,
+            bankDestinationAccountId: row.bank_destination_account_id ?? null,
+            bankCardId: row.bank_card_id ?? null,
+            bankInstitutionId: row.bank_institution_id ?? null,
+            bankCardStatementId: row.bank_card_statement_id ?? null,
+            bankCounterpartyObservationId: row.bank_counterparty_observation_id ?? null,
             type: row.type,
             status: row.status,
             amount: row.amount,

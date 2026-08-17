@@ -13,7 +13,6 @@ const BASE: WizardValues = {
     amount: "47.90",
     description: "Compra semanal",
     institutionName: "Supermaxi",
-    accountName: "Visa Oro",
     categoryName: "Supermercado",
     paidWithCredit: true,
     date: "2026-07-28T19:40",
@@ -69,8 +68,8 @@ describe("collectMissing", () => {
             .toEqual(["institutionName", "date"]);
     });
 
-    it("does not require a category or an account", () => {
-        expect(collectMissing(values({ categoryName: "", accountName: "" }))).toEqual([]);
+    it("does not require a category", () => {
+        expect(collectMissing(values({ categoryName: "" }))).toEqual([]);
     });
 });
 

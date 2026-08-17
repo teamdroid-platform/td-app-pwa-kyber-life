@@ -6,7 +6,6 @@ import {
 import {
     IFinancialInstitutionTypeRepository,
     IFinancialInstitutionRepository,
-    IFinancialAccountRepository,
 } from "@/domain/repositories/financial";
 import { FinancialCategory, FinancialTransaction } from "@/domain/entities/financial";
 
@@ -16,7 +15,6 @@ const OTHER_USER = "user-2";
 // deleteCategory only touches the category + transaction repos; the rest are stubs.
 const stub = {} as unknown as IFinancialInstitutionTypeRepository;
 const stubInst = {} as unknown as IFinancialInstitutionRepository;
-const stubAcc = {} as unknown as IFinancialAccountRepository;
 
 function makeCategory(over: Partial<FinancialCategory> & { id: string; name: string }): FinancialCategory {
     return {
@@ -56,7 +54,7 @@ async function setup() {
     // A user category we will delete.
     await categoryRepo.create(makeCategory({ id: "cat-food", name: "Comida" }));
 
-    const service = new FinancialSettingsService(stub, stubInst, stubAcc, categoryRepo, transactionRepo);
+    const service = new FinancialSettingsService(stub, stubInst, categoryRepo, transactionRepo);
     return { service, categoryRepo, transactionRepo };
 }
 

@@ -90,12 +90,6 @@ export function toWizardValues(extraction: AiExtraction, { fallbackDate }: ToWiz
 
     const institutionName = toText(extraction.institution_name);
     const categoryName = toText(extraction.category_name);
-    // The account is identified by its number, not by what the sentence called
-    // it: "con débito" describes a payment method, and taking it as a name
-    // creates an account called "Débito" beside the real one. Without a number
-    // there is nothing to identify, so the row stays empty for the user to pick.
-    const accountName = toText(extraction.account_number);
-
     return {
         currency: toCurrency(extraction.currency),
         dateWasInferred: !date,
@@ -104,13 +98,13 @@ export function toWizardValues(extraction: AiExtraction, { fallbackDate }: ToWiz
             amount: toAmountValue(extraction.amount),
             description: toText(extraction.title),
             institutionName,
+            // El extractor no clasifica emisores: lo declara el usuario en el paso.
+            bankInstitutionKind: null,
             categoryName,
-            accountName,
             // An id without a name is unusable: the row would render blank while
             // silently pointing at a record. Keep them together or not at all.
             institutionId: institutionName ? extraction.institution_id ?? null : null,
             categoryId: categoryName ? extraction.category_id ?? null : null,
-            accountId: accountName ? extraction.account_id ?? null : null,
             paidWithCredit: type === "EXPENSE" && toBoolean(extraction.is_credit_card),
             date: date ?? fallbackDate,
             notes: toText(extraction.notes),
@@ -151,7 +145,6 @@ export interface PendingCreation {
 export interface EntityStatuses {
     institution: EntityStatus;
     category: EntityStatus;
-    account: EntityStatus;
 }
 
 /** The records the user is about to add to their catalogs, in summary order. */
@@ -159,6 +152,5 @@ export function collectPendingCreations(values: WizardValues, statuses: EntitySt
     const pending: PendingCreation[] = [];
     if (statuses.institution === "new") pending.push({ label: "Institución", name: values.institutionName });
     if (statuses.category === "new") pending.push({ label: "Categoría", name: values.categoryName });
-    if (statuses.account === "new") pending.push({ label: "Cuenta", name: values.accountName });
     return pending;
 }

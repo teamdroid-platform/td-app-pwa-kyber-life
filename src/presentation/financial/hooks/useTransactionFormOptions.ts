@@ -5,18 +5,25 @@ import { getTransactionFormOptionsAction } from "@/app/actions/financial-setting
 import type {
     FinancialInstitution,
     FinancialInstitutionType,
-    FinancialAccount,
     FinancialCategory,
 } from "@/domain/entities/financial";
+import type { BankAccount, BankCard, BankInstitution } from "@/domain/entities/bank";
 
 export interface TransactionFormOptions {
     institutions: FinancialInstitution[];
-    accounts: FinancialAccount[];
     categories: FinancialCategory[];
     institutionTypes: FinancialInstitutionType[];
+    /** Cuentas y tarjetas confirmadas, para el paso de pago. */
+    bankAccounts: BankAccount[];
+    bankCards: BankCard[];
+    /** Emisores, para dar de alta una cuenta o tarjeta desde ese mismo paso. */
+    bankInstitutions: BankInstitution[];
 }
 
-const EMPTY: TransactionFormOptions = { institutions: [], accounts: [], categories: [], institutionTypes: [] };
+const EMPTY: TransactionFormOptions = {
+    institutions: [], categories: [], institutionTypes: [],
+    bankAccounts: [], bankCards: [], bankInstitutions: [],
+};
 
 /** One retry covers the common transient case (a token refresh racing the request). */
 const RETRY_DELAY_MS = 600;
@@ -24,8 +31,8 @@ const RETRY_DELAY_MS = 600;
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
- * Loads the institutions / accounts / categories / types that every transaction
- * form's pickers need, through a single server action.
+ * Loads the institutions / categories / types that every transaction form's
+ * pickers need, through a single server action.
  *
  * Resilience matters here: when this data failed to load the pickers silently
  * rendered as "you have none yet", which reads as data loss. So a failed attempt
@@ -64,7 +71,10 @@ export function useTransactionFormOptions(onLoaded?: (options: TransactionFormOp
             if (!activeRef.current) return;
 
             if (result.success) {
-                setOptions(result.data);
+                // Mezclado con EMPTY: una respuesta a la que le falte una lista
+                // dejaría un `undefined` donde los pickers esperan un array, y
+                // el fallo aparecería lejos de aquí.
+                setOptions({ ...EMPTY, ...result.data });
                 setError(null);
                 setLoading(false);
                 onLoadedRef.current?.(result.data);
@@ -104,6 +114,28 @@ export function useTransactionFormOptions(onLoaded?: (options: TransactionFormOp
         setOptions((prev) => ({ ...prev, categories }));
     }, []);
 
+    /**
+     * Suma lo que el paso de pago acaba de crear, sin recargar.
+     *
+     * Recargar la ruta aquí tiraría lo que el usuario lleva escrito en el
+     * wizard, así que la lista se actualiza en memoria y el servidor ya quedó
+     * al día por su cuenta.
+     */
+    const addBankEntities = useCallback((added: {
+        account?: BankAccount;
+        card?: BankCard;
+        institution?: BankInstitution | null;
+    }) => {
+        setOptions((prev) => ({
+            ...prev,
+            bankAccounts: added.account ? [...prev.bankAccounts, added.account] : prev.bankAccounts,
+            bankCards: added.card ? [...prev.bankCards, added.card] : prev.bankCards,
+            bankInstitutions: added.institution
+                ? [...prev.bankInstitutions, added.institution]
+                : prev.bankInstitutions,
+        }));
+    }, []);
+
     return {
         ...options,
         loading,
@@ -111,5 +143,6 @@ export function useTransactionFormOptions(onLoaded?: (options: TransactionFormOp
         reload,
         setInstitutions,
         setCategories,
+        addBankEntities,
     };
 }

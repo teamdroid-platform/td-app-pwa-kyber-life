@@ -3,6 +3,8 @@
 import { useState, useEffect, useRef } from "react";
 import { FinancialTransaction, FinancialTransactionType } from "@/domain/entities/financial";
 import { getTransactionDisplayTitle } from "@/lib/financial-utils";
+import type { ScannedAccountView } from "@/application/services/bank-service";
+import { ScannedAccountsPanel } from "@/presentation/bank/components/ScannedAccountsPanel";
 import { AuditTrail } from "./AuditTrail";
 import { DuplicateResolver } from "./DuplicateResolver";
 import { OriginStatsViewer } from "./OriginStatsViewer";
@@ -26,7 +28,6 @@ import { InstitutionPicker, type PendingInstitutionEdit } from "./InstitutionPic
 import { CategoryPicker } from "./CategoryPicker";
 import { TransactionTypeChips, resolveTransactionTypeOption } from "./TransactionTypeChips";
 import { AmountHeroInput } from "./AmountHeroInput";
-import { AccountSelect } from "./AccountSelect";
 import { cn } from "@/lib/utils";
 import { isoToWallClockInput, wallClockInputToISO } from "@/lib/date-range";
 import { TagInput } from "@/components/ui/tag-input";
@@ -92,9 +93,13 @@ function extractContext(tx: FinancialTransaction): string {
 // ─── Component ────────────────────────────────────────────────
 interface TransactionDetailClientProps {
     initialTransaction: FinancialTransaction;
+    /** Origen y destino según el módulo Bancos, resueltos en el servidor. */
+    bankAccounts?: ScannedAccountView[];
 }
 
-export function TransactionDetailClient({ initialTransaction }: TransactionDetailClientProps) {
+export function TransactionDetailClient({
+    initialTransaction, bankAccounts = [],
+}: TransactionDetailClientProps) {
     const router = useRouter();
     const [transaction, setTransaction] = useState<FinancialTransaction>(initialTransaction);
     const [isLoading, setIsLoading] = useState(false);
@@ -122,7 +127,6 @@ export function TransactionDetailClient({ initialTransaction }: TransactionDetai
     const {
         institutions,
         institutionTypes,
-        accounts,
         categories,
         error: optionsError,
         setInstitutions,
@@ -132,20 +136,17 @@ export function TransactionDetailClient({ initialTransaction }: TransactionDetai
         // category/institution isn't in the lists doesn't lose its name.
         const instName = opts.institutions.find(i => i.id === transaction.institutionId)?.name
             || transaction.institutionName || transaction.merchant || "";
-        const accName = opts.accounts.find(a => a.id === transaction.accountId)?.name || "";
         const catName = opts.categories.find(c => c.id === transaction.categoryId)?.name
             || transaction.categoryName || "";
 
-        setDisplayNames({ institution: instName, account: accName, category: catName });
+setDisplayNames({ institution: instName, category: catName });
         setEditState(prev => ({
             ...prev,
             merchant: instName,
             institutionName: instName,
-            accountName: accName,
             categoryName: catName,
         }));
     });
-    const accountsList = accounts.map(a => a.name);
 
     const [institutionQuery, setInstitutionQuery] = useState("");
     const [categoryQuery, setCategoryQuery] = useState("");
@@ -155,11 +156,9 @@ export function TransactionDetailClient({ initialTransaction }: TransactionDetai
 
     // Seeded from the transaction the server already resolved: it arrives with
     // `institutionName` and `categoryName` filled in, so the screen shouldn't
-    // render "Sin categoría" and then pop once the option lists land. Only the
-    // account name still has to wait — it isn't resolved server-side.
+    // render "Sin categoría" and then pop once the option lists land.
     const [displayNames, setDisplayNames] = useState({
         institution: transaction.institutionName || transaction.merchant || "",
-        account: "",
         category: transaction.categoryName || "",
     });
 
@@ -187,7 +186,6 @@ export function TransactionDetailClient({ initialTransaction }: TransactionDetai
         description: transaction.description || "",
         merchant: transaction.merchant || "",
         institutionName: "",
-        accountName: "",
         categoryName: "",
         type: transaction.type || "EXPENSE",
         amount: transaction.amount ?? null,
@@ -211,7 +209,6 @@ export function TransactionDetailClient({ initialTransaction }: TransactionDetai
                 description: transaction.description || getTransactionDisplayTitle(transaction),
                 merchant: displayNames.institution,
                 institutionName: displayNames.institution,
-                accountName: displayNames.account,
                 categoryName: displayNames.category,
                 type: transaction.type || "EXPENSE",
                 amount: transaction.amount ?? null,
@@ -246,8 +243,6 @@ export function TransactionDetailClient({ initialTransaction }: TransactionDetai
                 merchant: editState.merchant || editState.institutionName,
                 institutionId: null, // Force backend to resolve by name
                 institutionName: editState.institutionName || undefined,
-                accountId: null,
-                accountName: editState.accountName || undefined,
                 categoryId: null,
                 categoryName: editState.categoryName || undefined,
                 type: editState.type,
@@ -288,10 +283,13 @@ export function TransactionDetailClient({ initialTransaction }: TransactionDetai
 
     // Collapsed accordion previews (edit mode only)
     const paidWithCreditActive = editState.paidWithCredit && creditEligible;
-    const accountPreview = editState.accountName
-        ? (paidWithCreditActive ? `${editState.accountName} · Tarjeta de crédito` : editState.accountName)
-        : (paidWithCreditActive ? "Tarjeta de crédito" : "Ej. Ahorros Múltiple, Tarjeta Visa");
-    const accountHasValue = !!editState.accountName || paidWithCreditActive;
+    // La cuenta con la que se pagó, cuando el movimiento está atado a una del
+    // módulo Bancos. Sin vínculo queda el genérico, que es todo lo que se sabe.
+    const paymentSource = bankAccounts.find(a => a.role === "SOURCE");
+    const accountPreview = paymentSource?.match
+        ? [paymentSource.match.typeLabel, paymentSource.display].filter(Boolean).join(" · ")
+        : paidWithCreditActive ? "Tarjeta de crédito" : "Efectivo o débito";
+    const accountHasValue = paidWithCreditActive || !!paymentSource?.match;
     const datePreview = formatDateTimeLocalPreview(editState.date) || "Selecciona fecha y hora";
 
     // Behind the flag, editing is the stepped wizard: it opens on the summary
@@ -306,6 +304,7 @@ export function TransactionDetailClient({ initialTransaction }: TransactionDetai
                 // Set when the user tapped a specific field on the detail
                 // screen: the editor opens there instead of on the summary.
                 initialFocus={editFocus ?? undefined}
+                bankAccounts={bankAccounts}
                 onSaved={(updated) => {
                     setTransaction(updated);
                     setIsEditing(false);
@@ -343,6 +342,7 @@ export function TransactionDetailClient({ initialTransaction }: TransactionDetai
                 )}
 
                 <TransactionDetailSummary
+                    bankAccounts={bankAccounts}
                     transaction={transaction}
                     displayNames={displayNames}
                     notes={displayContext}
@@ -501,18 +501,17 @@ export function TransactionDetailClient({ initialTransaction }: TransactionDetai
                         </FieldCard>
                     )}
 
-                    {/* Cuenta (con pagado-con-tarjeta dentro) */}
+                    {/* Forma de pago */}
                     {isEditing ? (
                         <AccordionField
                             icon={<Landmark className="h-4 w-4" />}
                             iconClass="bg-emerald-500/15 text-emerald-500"
-                            label="Cuenta"
+                            label="Forma de pago"
                             preview={accountPreview}
                             hasValue={accountHasValue}
                             expanded={expandedSection === "account"}
                             onToggle={() => toggleSection("account")}
                         >
-                            <AccountSelect accounts={accountsList} value={editState.accountName} onChange={(v) => updateEditState("accountName", v)} />
                             {creditEligible && (
                                 <div className={cn(
                                     "mt-3 flex items-center justify-between gap-3 rounded-xl border p-3 transition-colors",
@@ -529,18 +528,23 @@ export function TransactionDetailClient({ initialTransaction }: TransactionDetai
                             )}
                         </AccordionField>
                     ) : (
-                        <FieldCard icon={<Landmark className="h-4 w-4" />} iconClass="bg-emerald-500/15 text-emerald-500" label="Cuenta">
-                            {/* Paying on credit is a property of how the account was used,
-                                so it belongs here rather than in a section of its own. */}
-                            <div className="flex flex-wrap items-center gap-2">
-                                <p className="text-base font-bold text-text-primary">{displayNames.account || "Sin cuenta"}</p>
-                                {transaction.type === "EXPENSE" && transaction.paidWithCredit && (
-                                    <Badge variant="outline" className="gap-1.5 rounded-full px-2.5 text-xs">
-                                        <CreditCard className="h-3.5 w-3.5" /> Tarjeta de crédito
-                                    </Badge>
-                                )}
-                            </div>
-                        </FieldCard>
+                        <>
+                            <FieldCard icon={<Landmark className="h-4 w-4" />} iconClass="bg-emerald-500/15 text-emerald-500" label="Forma de pago">
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <p className="text-base font-bold text-text-primary">
+                                        {accountPreview}
+                                    </p>
+                                    {transaction.type === "EXPENSE" && transaction.paidWithCredit && (
+                                        <Badge variant="outline" className="gap-1.5 rounded-full px-2.5 text-xs">
+                                            <CreditCard className="h-3.5 w-3.5" /> Tarjeta de crédito
+                                        </Badge>
+                                    )}
+                                </div>
+                            </FieldCard>
+
+                            {/* De dónde salió y a dónde fue, según el módulo Bancos. */}
+                            <ScannedAccountsPanel accounts={bankAccounts} title="Cuentas del movimiento" />
+                        </>
                     )}
 
                     {/* Categoría */}

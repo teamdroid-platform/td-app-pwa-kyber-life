@@ -52,24 +52,24 @@ describe("financial-deduplication", () => {
 
         it("should return an empty array if no duplicates exist", () => {
             const existing: FinancialTransaction[] = [
-                { id: "1", ownerUserId: "user1", amount: 60.00, date: "2026-05-18T10:00:00Z", merchant: "Starbucks", type: "EXPENSE", status: "CONFIRMED", currency: "USD", originalAmount: null, categoryId: null, institutionId: null, accountId: null, tags: [], notes: null, createdAt: "2026-05-18T10:00:00Z", updatedAt: "2026-05-18T10:00:00Z", possibleDuplicate: false, isDeleted: false, description: "Test", originStats: null }
+                { id: "1", ownerUserId: "user1", amount: 60.00, date: "2026-05-18T10:00:00Z", merchant: "Starbucks", type: "EXPENSE", status: "CONFIRMED", currency: "USD", originalAmount: null, categoryId: null, institutionId: null, tags: [], notes: null, createdAt: "2026-05-18T10:00:00Z", updatedAt: "2026-05-18T10:00:00Z", possibleDuplicate: false, isDeleted: false, description: "Test", originStats: null }
             ];
             expect(findDuplicates(candidate, existing)).toEqual([]);
         });
 
         it("should return ids of matching duplicates", () => {
             const existing: FinancialTransaction[] = [
-                { id: "1", ownerUserId: "user1", amount: 50.00, date: "2026-05-18T11:00:00Z", merchant: "starbucks", type: "EXPENSE", status: "DETECTED", currency: "USD", originalAmount: null, categoryId: null, institutionId: null, accountId: null, tags: [], notes: null, createdAt: "2026-05-18T10:00:00Z", updatedAt: "2026-05-18T10:00:00Z", possibleDuplicate: false, isDeleted: false, description: "Test", originStats: null },
-                { id: "2", ownerUserId: "user1", amount: 50.00, date: "2026-05-18T12:00:00Z", merchant: "STARBUCKS", type: "EXPENSE", status: "CONFIRMED", currency: "USD", originalAmount: null, categoryId: null, institutionId: null, accountId: null, tags: [], notes: null, createdAt: "2026-05-18T10:00:00Z", updatedAt: "2026-05-18T10:00:00Z", possibleDuplicate: false, isDeleted: false, description: "Test", originStats: null }
+                { id: "1", ownerUserId: "user1", amount: 50.00, date: "2026-05-18T11:00:00Z", merchant: "starbucks", type: "EXPENSE", status: "DETECTED", currency: "USD", originalAmount: null, categoryId: null, institutionId: null, tags: [], notes: null, createdAt: "2026-05-18T10:00:00Z", updatedAt: "2026-05-18T10:00:00Z", possibleDuplicate: false, isDeleted: false, description: "Test", originStats: null },
+                { id: "2", ownerUserId: "user1", amount: 50.00, date: "2026-05-18T12:00:00Z", merchant: "STARBUCKS", type: "EXPENSE", status: "CONFIRMED", currency: "USD", originalAmount: null, categoryId: null, institutionId: null, tags: [], notes: null, createdAt: "2026-05-18T10:00:00Z", updatedAt: "2026-05-18T10:00:00Z", possibleDuplicate: false, isDeleted: false, description: "Test", originStats: null }
             ];
             expect(findDuplicates(candidate, existing)).toEqual(["1", "2"]);
         });
 
         it("should ignore DELETED, REJECTED and DUPLICATE statuses", () => {
             const existing: FinancialTransaction[] = [
-                { id: "1", ownerUserId: "user1", amount: 50.00, date: "2026-05-18T11:00:00Z", merchant: "starbucks", type: "EXPENSE", status: "DELETED", currency: "USD", originalAmount: null, categoryId: null, institutionId: null, accountId: null, tags: [], notes: null, createdAt: "2026-05-18T10:00:00Z", updatedAt: "2026-05-18T10:00:00Z", possibleDuplicate: false, isDeleted: false, description: "Test", originStats: null },
-                { id: "2", ownerUserId: "user1", amount: 50.00, date: "2026-05-18T12:00:00Z", merchant: "STARBUCKS", type: "EXPENSE", status: "REJECTED", currency: "USD", originalAmount: null, categoryId: null, institutionId: null, accountId: null, tags: [], notes: null, createdAt: "2026-05-18T10:00:00Z", updatedAt: "2026-05-18T10:00:00Z", possibleDuplicate: false, isDeleted: false, description: "Test", originStats: null },
-                { id: "3", ownerUserId: "user1", amount: 50.00, date: "2026-05-18T12:00:00Z", merchant: "STARBUCKS", type: "EXPENSE", status: "DUPLICATE", currency: "USD", originalAmount: null, categoryId: null, institutionId: null, accountId: null, tags: [], notes: null, createdAt: "2026-05-18T10:00:00Z", updatedAt: "2026-05-18T10:00:00Z", possibleDuplicate: false, isDeleted: false, description: "Test", originStats: null }
+                { id: "1", ownerUserId: "user1", amount: 50.00, date: "2026-05-18T11:00:00Z", merchant: "starbucks", type: "EXPENSE", status: "DELETED", currency: "USD", originalAmount: null, categoryId: null, institutionId: null, tags: [], notes: null, createdAt: "2026-05-18T10:00:00Z", updatedAt: "2026-05-18T10:00:00Z", possibleDuplicate: false, isDeleted: false, description: "Test", originStats: null },
+                { id: "2", ownerUserId: "user1", amount: 50.00, date: "2026-05-18T12:00:00Z", merchant: "STARBUCKS", type: "EXPENSE", status: "REJECTED", currency: "USD", originalAmount: null, categoryId: null, institutionId: null, tags: [], notes: null, createdAt: "2026-05-18T10:00:00Z", updatedAt: "2026-05-18T10:00:00Z", possibleDuplicate: false, isDeleted: false, description: "Test", originStats: null },
+                { id: "3", ownerUserId: "user1", amount: 50.00, date: "2026-05-18T12:00:00Z", merchant: "STARBUCKS", type: "EXPENSE", status: "DUPLICATE", currency: "USD", originalAmount: null, categoryId: null, institutionId: null, tags: [], notes: null, createdAt: "2026-05-18T10:00:00Z", updatedAt: "2026-05-18T10:00:00Z", possibleDuplicate: false, isDeleted: false, description: "Test", originStats: null }
             ];
             expect(findDuplicates(candidate, existing)).toEqual([]);
         });

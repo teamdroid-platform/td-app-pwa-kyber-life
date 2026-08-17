@@ -65,7 +65,6 @@ function mapRowToTransaction(row: TransactionRow): FinancialTransaction {
         merchant: row.merchant,
         categoryId: row.category_id,
         institutionId: row.institution_id,
-        accountId: row.account_id,
         tags: row.tags,
         description: row.description,
         notes: row.notes,

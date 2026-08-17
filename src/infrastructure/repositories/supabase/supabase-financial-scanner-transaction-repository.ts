@@ -23,6 +23,7 @@ export class SupabaseFinancialScannerTransactionRepository implements IFinancial
             relatedTransactionHint: row.related_transaction_hint,
             originId: row.origin_id,
             originStats: row.origin_stats,
+            accounts: row.accounts ?? null,
             status: row.status,
             createdAt: row.created_at,
             updatedAt: row.updated_at,
@@ -47,6 +48,7 @@ export class SupabaseFinancialScannerTransactionRepository implements IFinancial
             related_transaction_hint: entity.relatedTransactionHint,
             origin_id: entity.originId,
             origin_stats: entity.originStats,
+            accounts: entity.accounts ?? null,
             status: entity.status,
         };
     }
@@ -106,6 +108,7 @@ export class SupabaseFinancialScannerTransactionRepository implements IFinancial
         if (entity.relatedTransactionHint !== undefined) rowData.related_transaction_hint = entity.relatedTransactionHint;
         if (entity.originId !== undefined) rowData.origin_id = entity.originId;
         if (entity.originStats !== undefined) rowData.origin_stats = entity.originStats;
+        if (entity.accounts !== undefined) rowData.accounts = entity.accounts;
         if (entity.status !== undefined) rowData.status = entity.status;
 
         const { data, error } = await supabase
@@ -140,6 +143,23 @@ export class SupabaseFinancialScannerTransactionRepository implements IFinancial
 
         if (error) {
             console.error("Error in findUnprocessedByOwnerId:", error);
+            throw error;
+        }
+        if (!data) return [];
+        return data.map(this.mapToEntity);
+    }
+
+    /** Todos los escaneos del usuario. Lo usa el re-ligado del historial. */
+    async findByOwnerId(userId: UUID): Promise<FinancialScannerTransaction[]> {
+        const supabase = await createClient();
+        const { data, error } = await supabase
+            .from(this.tableName)
+            .select("*")
+            .eq("owner_user_id", userId)
+            .order("date", { ascending: false });
+
+        if (error) {
+            console.error("Error in findByOwnerId:", error);
             throw error;
         }
         if (!data) return [];

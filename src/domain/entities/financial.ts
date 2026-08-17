@@ -20,15 +20,6 @@ export interface FinancialInstitution extends BaseEntity {
     institutionTypeObj?: FinancialInstitutionType | null;
 }
 
-export interface FinancialAccount extends BaseEntity {
-    ownerUserId: UUID;
-    institutionId?: UUID | null;
-    name: string;
-    accountType?: string | null;
-    lastFour?: string | null;
-    currency: string;
-}
-
 export interface FinancialCategory extends BaseEntity {
     ownerUserId?: UUID | null;
     name: string;
@@ -65,7 +56,18 @@ export interface FinancialTransaction extends BaseEntity {
     categoryColor?: string;
     institutionId?: UUID | null;
     institutionName?: string;
-    accountId?: UUID | null;
+    /** Cuenta de la que sale el dinero (gasto, transferencia saliente, retiro). */
+    bankSourceAccountId?: UUID | null;
+    /** Cuenta a la que entra (ingreso, transferencia entrante, efectivo de un retiro). */
+    bankDestinationAccountId?: UUID | null;
+    /** Tarjeta con la que se pagó. Con `paidWithCredit`, define un consumo diferido. */
+    bankCardId?: UUID | null;
+    /** Emisor por el que pasó el movimiento. Sobrevive aunque no se identifique la cuenta. */
+    bankInstitutionId?: UUID | null;
+    /** Presente solo en un pago de tarjeta: el estado de cuenta que salda. */
+    bankCardStatementId?: UUID | null;
+    /** Cuenta del otro lado cuando no es del usuario (beneficiario de una transferencia). */
+    bankCounterpartyObservationId?: UUID | null;
     tags?: string[] | null;
     description: string;
     notes?: string | null;
@@ -92,6 +94,12 @@ export interface FinancialScannerTransaction extends BaseEntity {
     relatedTransactionHint?: string | null;
     originId?: string | null;
     originStats?: Record<string, any> | null;
+    /**
+     * Cuentas origen y destino que el escáner extrajo del correo, enmascaradas
+     * tal como las escribió el banco. La identificación del módulo Bancos las
+     * parsea; aquí se conservan crudas como evidencia del origen.
+     */
+    accounts?: { type: string; account: string }[] | null;
     status: string;
 }
 

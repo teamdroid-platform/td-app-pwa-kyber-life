@@ -19,11 +19,13 @@ npx jest __tests__/services/purchase-service.test.ts
 # Filter by test name
 npm test -- -t "should create purchase"
 
-# Node-only unit config (babel-jest, no jsdom/next setup) — used for service tests
+# Node-only unit config (next/jest + node env, no jsdom) — runs every *.test.ts
 npx jest --config jest.unit.config.js
 ```
 
 Tests live in `__tests__/` (services, components, integration, validators, domain). `uuid` is mocked via `src/__mocks__/uuid.js` in both Jest configs.
+
+Both configs go through `next/jest` (SWC). There is deliberately **no `babel.config.js`** — adding one at the repo root disables Next's SWC compiler, which is why the old one is parked as `babel.config.js.bak`. `jest.unit.config.js` only picks up `*.test.ts`; component tests are `.tsx` and need the jsdom config.
 
 **Search tip:** scope searches to `src/` or `__tests__/` — repo-root searches can time out due to `node_modules/`, `.next/`, and `.agent/`.
 
@@ -67,10 +69,20 @@ SQL migrations live in `supabase/migrations/`. Tables use RLS scoped to the owne
 
 ## Project rules (from AGENTS.md)
 
-`AGENTS.md` maps task types to skills under `.agent/skills/skills/<name>/SKILL.md` — consult them when relevant. Non-negotiable rules:
+`AGENTS.md` maps task types to skills under `.agent/skills/skills/<name>/SKILL.md` — consult them when relevant. Section 9 of `AGENTS.md` covers the **Superpowers** plugin (`superpowers:*` skills): process skills run first (brainstorming, systematic-debugging, TDD, verification-before-completion), then the local domain skills. Superpowers specs go to `docs/superpowers/specs/`, plans to `docs/superpowers/plans/`, worktrees to `.worktrees/`; its push/PR/merge steps are suspended by the rule below. Non-negotiable rules:
 
-- **Never commit, push, open PRs, or deploy without explicit user permission.**
+- **Local commits are allowed** (Conventional Commits); **never push, open PRs, merge, or deploy without explicit user permission.**
 - Strict TypeScript — no `any` unless strictly necessary.
 - Mobile-first responsive design is mandatory; visual changes must preserve the existing premium aesthetic.
 - Temporary/debug/experiment files go in `scratch/` (gitignored), never scattered in the repo.
 - "Production readiness" checks must report failures (tests, build, env vars) without auto-fixing them.
+
+## graphify
+
+This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
+
+Rules:
+- For codebase questions, first run `graphify query "<question>"` when graphify-out/graph.json exists. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts. These return a scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output.
+- If graphify-out/wiki/index.md exists, use it for broad navigation instead of raw source browsing.
+- Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
+- After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).

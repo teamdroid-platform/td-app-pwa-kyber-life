@@ -17,8 +17,15 @@ export interface CreateFinancialTransactionDTO {
     categoryName?: string | null;
     institutionId?: UUID | null;
     institutionName?: string | null;
-    accountId?: UUID | null;
-    accountName?: string | null;
+    bankSourceAccountId?: UUID | null;
+    bankDestinationAccountId?: UUID | null;
+    bankCardId?: UUID | null;
+    bankInstitutionId?: UUID | null;
+    bankCardStatementId?: UUID | null;
+    /** Tipo de emisor declarado por el usuario al crear la institución. */
+    bankInstitutionKind?: 'BANK' | 'COOPERATIVE' | 'WALLET' | 'OTHER' | null;
+    /** Lo que el usuario corrigió sobre cada cuenta del escaneo. */
+    scannedOwnership?: Record<string, import("./bank-service").ScannedAccountDecision> | null;
     tags?: string[] | null;
     notes?: string | null;
     executionId?: UUID | null;
@@ -60,8 +67,9 @@ export class FinancialTransactionService {
         private transactionRepo: IFinancialTransactionRepository,
         private auditLogRepo: IFinancialTransactionAuditLogRepository,
         private institutionRepo?: import("../../domain/repositories/financial").IFinancialInstitutionRepository,
-        private accountRepo?: import("../../domain/repositories/financial").IFinancialAccountRepository,
-        private categoryRepo?: import("../../domain/repositories/financial").IFinancialCategoryRepository
+        private categoryRepo?: import("../../domain/repositories/financial").IFinancialCategoryRepository,
+        /** Opcional: sin él, capturar o editar no sincroniza el módulo Bancos. */
+        private bankService?: import("./bank-service").BankService
     ) {}
 
     // ── Create ───────────────────────────────────────────────
@@ -72,7 +80,6 @@ export class FinancialTransactionService {
         const hasDuplicate = duplicateIds.length > 0;
 
         let finalInstitutionId = dto.institutionId ?? null;
-        let finalAccountId = dto.accountId ?? null;
         let finalCategoryId = dto.categoryId ?? null;
         const now = new Date().toISOString();
 
@@ -89,19 +96,6 @@ export class FinancialTransactionService {
             }
         }
 
-        if (!finalAccountId && dto.accountName && this.accountRepo) {
-            const accounts = await this.accountRepo.findByOwnerId(dto.ownerUserId);
-            const existing = accounts.find(a => a.name.toLowerCase() === dto.accountName!.toLowerCase() && !a.isDeleted);
-            if (existing) {
-                finalAccountId = existing.id!;
-            } else {
-                const newAcc = await this.accountRepo.create({
-                    id: crypto.randomUUID(), ownerUserId: dto.ownerUserId, name: dto.accountName, accountType: 'CASH', currency: dto.currency, isDeleted: false, createdAt: now, updatedAt: now
-                });
-                finalAccountId = newAcc.id!;
-            }
-        }
-
         if (!finalCategoryId && dto.categoryName && this.categoryRepo) {
             const categories = await this.categoryRepo.findAllBaseAndUser(dto.ownerUserId);
             const existing = categories.find(c => c.name.toLowerCase() === dto.categoryName!.toLowerCase() && !c.isDeleted);
@@ -114,6 +108,23 @@ export class FinancialTransactionService {
                 finalCategoryId = newCat.id!;
             }
         }
+
+        // Todo lo que escribe una transacción pasa por el mismo punto: crea el
+        // emisor si hace falta y liga lo que ya se sepa. Los saldos no se tocan
+        // porque no se guardan: se derivan de estas mismas transacciones.
+        const bankLinks = this.bankService
+            ? await this.bankService.syncTransactionBankLinks(dto.ownerUserId, {
+                merchant: dto.merchant ?? dto.institutionName ?? null,
+                currency: dto.currency,
+                paidWithCredit: dto.paidWithCredit ?? false,
+                institutionKind: dto.bankInstitutionKind ?? null,
+                ownership: dto.scannedOwnership ?? null,
+                bankSourceAccountId: dto.bankSourceAccountId ?? null,
+                bankDestinationAccountId: dto.bankDestinationAccountId ?? null,
+                bankCardId: dto.bankCardId ?? null,
+                bankInstitutionId: dto.bankInstitutionId ?? null,
+            })
+            : null;
 
         const transaction: FinancialTransaction = {
             id: crypto.randomUUID(),
@@ -131,7 +142,11 @@ export class FinancialTransactionService {
             description: dto.description,
             categoryId: finalCategoryId,
             institutionId: finalInstitutionId,
-            accountId: finalAccountId,
+            bankSourceAccountId: bankLinks?.bankSourceAccountId ?? dto.bankSourceAccountId ?? null,
+            bankDestinationAccountId: bankLinks?.bankDestinationAccountId ?? dto.bankDestinationAccountId ?? null,
+            bankCardId: bankLinks?.bankCardId ?? dto.bankCardId ?? null,
+            bankInstitutionId: bankLinks?.bankInstitutionId ?? dto.bankInstitutionId ?? null,
+            bankCardStatementId: dto.bankCardStatementId ?? null,
             tags: dto.tags ?? null,
             notes: dto.notes ?? null,
             possibleDuplicate: hasDuplicate,
@@ -166,7 +181,6 @@ export class FinancialTransactionService {
         const previousState = { ...tx } as unknown as Record<string, unknown>;
 
         let finalInstitutionId = data.institutionId !== undefined ? data.institutionId : tx.institutionId;
-        let finalAccountId = data.accountId !== undefined ? data.accountId : tx.accountId;
         let finalCategoryId = data.categoryId !== undefined ? data.categoryId : tx.categoryId;
         const now = new Date().toISOString();
 
@@ -183,19 +197,6 @@ export class FinancialTransactionService {
             }
         }
 
-        if (!finalAccountId && data.accountName && this.accountRepo) {
-            const accounts = await this.accountRepo.findByOwnerId(userId);
-            const existing = accounts.find(a => a.name.toLowerCase() === data.accountName!.toLowerCase() && !a.isDeleted);
-            if (existing) {
-                finalAccountId = existing.id!;
-            } else {
-                const newAcc = await this.accountRepo.create({
-                    id: crypto.randomUUID(), ownerUserId: userId, name: data.accountName, accountType: 'CASH', currency: data.currency || tx.currency, isDeleted: false, createdAt: now, updatedAt: now
-                });
-                finalAccountId = newAcc.id!;
-            }
-        }
-
         if (!finalCategoryId && data.categoryName && this.categoryRepo) {
             const categories = await this.categoryRepo.findAllBaseAndUser(userId);
             const existing = categories.find(c => c.name.toLowerCase() === data.categoryName!.toLowerCase() && !c.isDeleted);
@@ -209,7 +210,25 @@ export class FinancialTransactionService {
             }
         }
 
-        const { categoryName, institutionName, accountName, ...restData } = data;
+        const { categoryName, institutionName, bankInstitutionKind, scannedOwnership, ...restData } = data;
+
+        // Editar también sincroniza: si el merchant pasó a ser un banco, el
+        // emisor nace aquí. Lo que el usuario haya elegido a mano no se pisa, y
+        // una edición nunca funda cuentas — sin números enmascarados no hay de
+        // dónde deducirlas.
+        const bankLinks = this.bankService
+            ? await this.bankService.syncTransactionBankLinks(userId, {
+                merchant: data.merchant ?? institutionName ?? tx.merchant ?? null,
+                currency: data.currency ?? tx.currency,
+                paidWithCredit: data.paidWithCredit ?? tx.paidWithCredit ?? false,
+                institutionKind: bankInstitutionKind ?? null,
+                ownership: scannedOwnership ?? null,
+                bankSourceAccountId: data.bankSourceAccountId ?? tx.bankSourceAccountId ?? null,
+                bankDestinationAccountId: data.bankDestinationAccountId ?? tx.bankDestinationAccountId ?? null,
+                bankCardId: data.bankCardId ?? tx.bankCardId ?? null,
+                bankInstitutionId: data.bankInstitutionId ?? tx.bankInstitutionId ?? null,
+            })
+            : null;
 
         const updatedTx: FinancialTransaction = {
             ...tx,
@@ -217,8 +236,11 @@ export class FinancialTransactionService {
             categoryName: categoryName === null ? undefined : (categoryName ?? tx.categoryName),
             institutionName: institutionName === null ? undefined : (institutionName ?? tx.institutionName),
             institutionId: finalInstitutionId,
-            accountId: finalAccountId,
             categoryId: finalCategoryId,
+            bankSourceAccountId: bankLinks?.bankSourceAccountId ?? tx.bankSourceAccountId ?? null,
+            bankDestinationAccountId: bankLinks?.bankDestinationAccountId ?? tx.bankDestinationAccountId ?? null,
+            bankCardId: bankLinks?.bankCardId ?? tx.bankCardId ?? null,
+            bankInstitutionId: bankLinks?.bankInstitutionId ?? tx.bankInstitutionId ?? null,
             updatedAt: now,
         };
 

@@ -13,6 +13,7 @@ import type { WizardValues } from "../../hooks/useTransactionWizard";
 import { normalizeTransactionType, SCANNER_TRANSACTION_TYPES } from "../../lib/transaction-type";
 import { InstitutionMatchHint, InstitutionMatchIcon } from "../InstitutionMatchBadge";
 import { ScanOriginalData } from "../ScanOriginalData";
+import type { ScannedAccountView } from "@/application/services/bank-service";
 import { TransactionWizard } from "./TransactionWizard";
 
 /**
@@ -42,6 +43,12 @@ export interface TransactionScanWizardProps {
     resolvedInstitutionName?: string;
     /** Confidence of the scanned merchant → existing institution identification. */
     institutionMatch?: InstitutionMatchInfo;
+    /**
+     * Las cuentas del escaneo ya identificadas contra las del usuario. Se
+     * resuelven en el servidor, como el nombre de la institución, para que la
+     * pantalla abra completa y sin un salto al llegar los datos.
+     */
+    scannedAccounts?: ScannedAccountView[];
 }
 
 /**
@@ -52,7 +59,9 @@ export interface TransactionScanWizardProps {
  * match confidence sits in the institution step, and the originally extracted
  * data stays consultable on the summary, right where the decision is made.
  */
-export function TransactionScanWizard({ initialData, resolvedInstitutionName, institutionMatch }: TransactionScanWizardProps) {
+export function TransactionScanWizard({
+    initialData, resolvedInstitutionName, institutionMatch, scannedAccounts = [],
+}: TransactionScanWizardProps) {
     const router = useRouter();
     const [isDismissing, setIsDismissing] = useState(false);
 
@@ -61,9 +70,12 @@ export function TransactionScanWizard({ initialData, resolvedInstitutionName, in
         amount: initialData.amount !== null && initialData.amount !== undefined ? String(initialData.amount) : "",
         description: initialData.description || "",
         institutionName: resolvedInstitutionName || initialData.merchant || "",
-        accountName: "",
+        bankInstitutionKind: null,
         categoryName: initialData.category || "",
         paidWithCredit: false,
+        bankSourceAccountId: null,
+        bankDestinationAccountId: null,
+        bankCardId: null,
         date: isoToWallClockInput(initialData.date) ?? "",
         notes: extractSummary(initialData),
         tags: [],
@@ -82,10 +94,14 @@ export function TransactionScanWizard({ initialData, resolvedInstitutionName, in
                 date: wallClockInputToISO(values.date) ?? null,
                 notes: values.notes || null,
                 institutionName: values.institutionName || null,
-                accountName: values.accountName || null,
+                bankInstitutionKind: values.bankInstitutionKind ?? null,
+                scannedOwnership: values.scannedOwnership ?? null,
                 categoryName: values.categoryName || null,
                 tags: values.tags,
                 paidWithCredit: values.type === "EXPENSE" ? values.paidWithCredit : null,
+                bankSourceAccountId: values.bankSourceAccountId ?? undefined,
+                bankDestinationAccountId: values.bankDestinationAccountId ?? undefined,
+                bankCardId: values.bankCardId ?? undefined,
             });
 
             if (!result.success) {
@@ -144,6 +160,9 @@ export function TransactionScanWizard({ initialData, resolvedInstitutionName, in
             )}
             // On the summary, the level shows beside the institution itself, so
             // whether it was identified is visible without opening anything.
+            // El escaneo dice de dónde salió y a dónde fue; el paso deja además
+            // declarar de quién es cada cuenta antes de confirmar.
+            scannedAccounts={scannedAccounts}
             decorateSummary={() => ({
                 fieldMarkers: institutionMatch ? { institutionName: <InstitutionMatchIcon info={institutionMatch} /> } : undefined,
                 extra: <ScanOriginalData transaction={initialData} />,

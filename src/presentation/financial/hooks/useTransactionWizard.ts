@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
+import type { BankInstitutionKind } from "@/domain/entities/bank";
+import type { ScannedAccountDecision } from "@/application/services/bank-service";
 import type { FinancialTransactionType } from "@/domain/entities/financial";
 
 /** Types for which "paid with credit card" is a meaningful, editable flag. */
@@ -16,9 +18,28 @@ export interface WizardValues {
     amount: string;
     description: string;
     institutionName: string;
-    accountName: string;
+    /**
+     * Qué clase de emisor es la institución, cuando el usuario lo declara.
+     *
+     * Solo pesa si la institución bancaria aún no existe: al fundarla, esto gana
+     * sobre lo que el nombre sugiera. Si ya existe, se ignora — el módulo Bancos
+     * es el sitio para reclasificarla, no una transacción de paso.
+     */
+    bankInstitutionKind?: BankInstitutionKind | null;
     categoryName: string;
     paidWithCredit: boolean;
+    /**
+     * De quién es cada cuenta del escaneo, cuando el usuario lo declaró,
+     * indexado por la cadena cruda del banco. Sin declarar, el servicio supone
+     * por el lado — y esa suposición falla entre cuentas propias.
+     */
+    scannedOwnership?: Record<string, ScannedAccountDecision>;
+    /** Cuenta de la que sale el dinero, cuando el usuario la eligió. */
+    bankSourceAccountId?: string | null;
+    /** Cuenta a la que entra, en un movimiento con dos lados propios. */
+    bankDestinationAccountId?: string | null;
+    /** Tarjeta usada. Con `paidWithCredit`, define un consumo diferido. */
+    bankCardId?: string | null;
     date: string;
     notes: string;
     tags: string[];
@@ -35,7 +56,6 @@ export interface WizardValues {
      */
     institutionId?: string | null;
     categoryId?: string | null;
-    accountId?: string | null;
 }
 
 export interface StepDefinition {
@@ -71,11 +91,14 @@ export const FIELD_STEP: Record<keyof WizardValues, WizardScreen> = {
     description: "amount",
     institutionName: "institution",
     institutionId: "institution",
+    bankInstitutionKind: "institution",
     categoryName: "category",
     categoryId: "category",
-    accountName: "payment",
-    accountId: "payment",
     paidWithCredit: "payment",
+    scannedOwnership: "payment",
+    bankSourceAccountId: "payment",
+    bankDestinationAccountId: "payment",
+    bankCardId: "payment",
     date: "date",
     notes: "summary",
     tags: "summary",
@@ -109,7 +132,12 @@ export function canLeaveStep(step: WizardStepId, values: WizardValues): boolean 
  * from the list clears its id, and counting that as an unsaved change would
  * inflate "N cambios" for an edit that never happened.
  */
-const DIFF_IGNORED: readonly (keyof WizardValues)[] = ["institutionId", "categoryId", "accountId"];
+const DIFF_IGNORED: readonly (keyof WizardValues)[] = [
+    "institutionId", "categoryId", "bankSourceAccountId", "bankDestinationAccountId", "bankCardId",
+    // Un objeto nunca es igual a otro por identidad, así que compararlo
+    // marcaría la fila como cambiada en cada render.
+    "scannedOwnership",
+];
 
 /** Fields whose value differs from the one the wizard opened with. */
 export function diffValues(initial: WizardValues, current: WizardValues): (keyof WizardValues)[] {

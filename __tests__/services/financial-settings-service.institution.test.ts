@@ -5,7 +5,6 @@ import {
 } from "@/infrastructure/repositories/implementations";
 import {
     IFinancialInstitutionTypeRepository,
-    IFinancialAccountRepository,
     IFinancialCategoryRepository,
 } from "@/domain/repositories/financial";
 import { FinancialInstitution, FinancialTransaction } from "@/domain/entities/financial";
@@ -14,7 +13,6 @@ const USER = "user-1";
 const OTHER_USER = "user-2";
 
 const stubType = {} as unknown as IFinancialInstitutionTypeRepository;
-const stubAcc = {} as unknown as IFinancialAccountRepository;
 const stubCat = {} as unknown as IFinancialCategoryRepository;
 
 function makeInst(over: Partial<FinancialInstitution> & { id: string; name: string }): FinancialInstitution {
@@ -50,7 +48,7 @@ async function setup() {
     const transactionRepo = new InMemoryFinancialTransactionRepository();
     await institutionRepo.create(makeInst({ id: "inst-a", name: "Uber Eats" }));
     await institutionRepo.create(makeInst({ id: "inst-b", name: "Uber" }));
-    const service = new FinancialSettingsService(stubType, institutionRepo, stubAcc, stubCat, transactionRepo);
+    const service = new FinancialSettingsService(stubType, institutionRepo, stubCat, transactionRepo);
     return { service, institutionRepo, transactionRepo };
 }
 

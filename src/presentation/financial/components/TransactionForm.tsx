@@ -22,7 +22,6 @@ import { InstitutionPicker, type PendingInstitutionEdit } from "./InstitutionPic
 import { CategoryPicker } from "./CategoryPicker";
 import { TransactionTypeChips } from "./TransactionTypeChips";
 import { AmountHeroInput } from "./AmountHeroInput";
-import { AccountSelect } from "./AccountSelect";
 import { StickyActionBar } from "@/components/ui/sticky-action-bar";
 import { toDateTimeLocalValue, isoToWallClockInput, wallClockInputToISO, roundToNearestFiveMinutes } from "@/lib/date-range";
 import { buildAutoNotes, formatNotesDateTime } from "../lib/transaction-notes";
@@ -68,7 +67,6 @@ export function LegacyTransactionForm() {
     const [notes, setNotes] = useState("");
     const [notesEdited, setNotesEdited] = useState(false);
     const [institutionName, setInstitutionName] = useState("");
-    const [accountName, setAccountName] = useState("");
     const [categoryName, setCategoryName] = useState("");
     const [paidWithCredit, setPaidWithCredit] = useState(false);
 
@@ -77,13 +75,11 @@ export function LegacyTransactionForm() {
     const {
         institutions,
         institutionTypes,
-        accounts,
         categories,
         error: optionsError,
         setInstitutions,
         setCategories,
     } = useTransactionFormOptions();
-    const accountsList = accounts.map(a => a.name);
 
     const [institutionQuery, setInstitutionQuery] = useState("");
     const [categoryQuery, setCategoryQuery] = useState("");
@@ -107,7 +103,6 @@ export function LegacyTransactionForm() {
                     const draftAmount = data.amount ? data.amount.toString() : "";
                     const draftDescription = data.description || "";
                     const draftInstitution = data.institutionName || "";
-                    const draftAccount = data.accountName || "";
                     const draftDate = isoToWallClockInput(data.date) ?? "";
 
                     if (data.type) setType(data.type);
@@ -115,7 +110,6 @@ export function LegacyTransactionForm() {
                     if (data.description) setDescription(draftDescription);
                     if (draftDate) setDate(draftDate);
                     if (data.institutionName) setInstitutionName(draftInstitution);
-                    if (data.accountName) setAccountName(draftAccount);
                     if (data.categoryName) setCategoryName(data.categoryName);
                     if (data.paidWithCredit) setPaidWithCredit(Boolean(data.paidWithCredit));
 
@@ -126,7 +120,6 @@ export function LegacyTransactionForm() {
                             institutionName: draftInstitution,
                             amount: draftAmount,
                             date: draftDate,
-                            accountName: draftAccount,
                         });
                         setNotes(data.notes);
                         setNotesEdited(data.notes.trim() !== draftAuto.trim());
@@ -158,7 +151,6 @@ export function LegacyTransactionForm() {
                         date: wallClockInputToISO(date),
                         notes,
                         institutionName,
-                        accountName,
                         categoryName,
                         paidWithCredit,
                         status: "MANUAL",
@@ -171,12 +163,12 @@ export function LegacyTransactionForm() {
 
         const timeoutId = setTimeout(saveDraft, 500);
         return () => clearTimeout(timeoutId);
-    }, [type, amount, currency, description, date, notes, institutionName, accountName, categoryName, paidWithCredit]);
+    }, [type, amount, currency, description, date, notes, institutionName, categoryName, paidWithCredit]);
 
     // Auto-generate the notes until the user customises them.
     const autoNotes = useMemo(
-        () => buildAutoNotes({ type, description, institutionName, amount, date, accountName }),
-        [type, description, institutionName, amount, date, accountName],
+        () => buildAutoNotes({ type, description, institutionName, amount, date }),
+        [type, description, institutionName, amount, date],
     );
 
     useEffect(() => {
@@ -222,7 +214,6 @@ export function LegacyTransactionForm() {
             date: wallClockInputToISO(date)!,
             notes: notes || undefined,
             institutionName: institutionName || undefined,
-            accountName: accountName || undefined,
             categoryName: categoryName || undefined,
             paidWithCredit: creditEligible ? paidWithCredit : undefined,
         };
@@ -281,10 +272,10 @@ export function LegacyTransactionForm() {
 
     // Collapsed previews
     const paidWithCreditActive = paidWithCredit && creditEligible;
-    const accountPreview = accountName
-        ? (paidWithCreditActive ? `${accountName} · Tarjeta de crédito` : accountName)
-        : (paidWithCreditActive ? "Tarjeta de crédito" : "Ej. Ahorros Múltiple, Tarjeta Visa");
-    const accountHasValue = !!accountName || paidWithCreditActive;
+    // El selector de cuenta o tarjeta llega con el módulo Bancos; por ahora
+    // este campo solo declara si el gasto se difirió a una tarjeta de crédito.
+    const accountPreview = paidWithCreditActive ? "Tarjeta de crédito" : "Efectivo o débito";
+    const accountHasValue = paidWithCreditActive;
     const datePreview = formatNotesDateTime(date) || "Selecciona fecha y hora";
 
     return (
@@ -341,18 +332,16 @@ export function LegacyTransactionForm() {
                     />
                 </AccordionField>
 
-                {/* Account (with paid-with-credit inside) */}
+                {/* Forma de pago */}
                 <AccordionField
                     icon={<Landmark className="h-4 w-4" />}
                     iconClass="bg-emerald-500/15 text-emerald-500"
-                    label="Cuenta"
+                    label="Forma de pago"
                     preview={accountPreview}
                     hasValue={accountHasValue}
                     expanded={expanded === "account"}
                     onToggle={() => toggle("account")}
                 >
-                    <AccountSelect id="accountName" accounts={accountsList} value={accountName} onChange={setAccountName} />
-
                     {creditEligible && (
                         <div className={cn(
                             "mt-3 flex items-center justify-between gap-3 rounded-xl border p-3 transition-colors",

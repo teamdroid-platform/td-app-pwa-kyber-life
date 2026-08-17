@@ -104,8 +104,10 @@ describe("TransactionScanWizard", () => {
         await summaryHeading();
         expect(screen.getAllByText("Compra semanal").length).toBeGreaterThan(0);
         expect(screen.getByText("Supermaxi")).toBeInTheDocument();
-        // Twice on purpose: the reviewed value, and the scan's original one.
-        expect(screen.getAllByText("Supermercado")).toHaveLength(2);
+        // Una sola vez: la fila de categoría del resumen. El bloque de datos
+        // originales dejó de mostrar "Categoría original" en a46358b, cuando se
+        // le hizo sitio al trigger source.
+        expect(screen.getAllByText("Supermercado")).toHaveLength(1);
     });
 
     it("opens a single field for editing and returns to the summary", async () => {

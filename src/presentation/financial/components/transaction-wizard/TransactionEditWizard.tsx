@@ -7,18 +7,21 @@ import { getTransactionDisplayTitle } from "@/lib/financial-utils";
 import { updateTransactionAction } from "@/app/actions/financial-transactions";
 import type { FinancialTransaction, FinancialTransactionType } from "@/domain/entities/financial";
 import type { WizardScreen, WizardValues } from "../../hooks/useTransactionWizard";
+import type { ScannedAccountView } from "@/application/services/bank-service";
 import { TransactionWizard } from "./TransactionWizard";
 
 export interface TransactionEditWizardProps {
     transaction: FinancialTransaction;
     /** Names already resolved from ids by the detail screen. */
-    displayNames: { institution: string; account: string; category: string };
+    displayNames: { institution: string; category: string };
     /** Notes/context as the detail screen resolved them (may come from a scan). */
     notes: string;
     onSaved: (updated: FinancialTransaction) => void;
     onCancel: () => void;
     /** Open straight on the field the user tapped on the detail screen. */
     initialFocus?: WizardScreen;
+    /** Origen y destino según el módulo Bancos, resueltos por la pantalla. */
+    bankAccounts?: ScannedAccountView[];
 }
 
 /**
@@ -32,6 +35,7 @@ export function TransactionEditWizard({
     onSaved,
     onCancel,
     initialFocus,
+    bankAccounts = [],
 }: TransactionEditWizardProps) {
     const initialValues = useMemo<WizardValues>(() => ({
         type: (transaction.type || "EXPENSE") as FinancialTransactionType,
@@ -40,9 +44,14 @@ export function TransactionEditWizard({
         // already shows for them so the required field starts answered.
         description: transaction.description?.trim() || getTransactionDisplayTitle(transaction),
         institutionName: displayNames.institution,
-        accountName: displayNames.account,
+        // Se declara al editar, no se arrastra: la transacción guarda el vínculo
+        // con el emisor, no la clasificación del emisor.
+        bankInstitutionKind: null,
         categoryName: displayNames.category,
         paidWithCredit: transaction.paidWithCredit ?? false,
+        bankSourceAccountId: transaction.bankSourceAccountId ?? null,
+        bankDestinationAccountId: transaction.bankDestinationAccountId ?? null,
+        bankCardId: transaction.bankCardId ?? null,
         date: isoToWallClockInput(transaction.date) ?? "",
         notes,
         tags: transaction.tags ?? [],
@@ -56,8 +65,9 @@ export function TransactionEditWizard({
                 merchant: values.institutionName || transaction.merchant,
                 institutionId: null, // Force the backend to resolve by name
                 institutionName: values.institutionName || undefined,
+                bankInstitutionKind: values.bankInstitutionKind ?? undefined,
+                scannedOwnership: values.scannedOwnership ?? undefined,
                 accountId: null,
-                accountName: values.accountName || undefined,
                 categoryId: null,
                 categoryName: values.categoryName || undefined,
                 type: values.type,
@@ -66,6 +76,9 @@ export function TransactionEditWizard({
                 notes: values.notes,
                 tags: values.tags,
                 paidWithCredit: values.type === "EXPENSE" ? values.paidWithCredit : undefined,
+                bankSourceAccountId: values.bankSourceAccountId ?? undefined,
+                bankDestinationAccountId: values.bankDestinationAccountId ?? undefined,
+                bankCardId: values.bankCardId ?? undefined,
             });
 
             if (res.success && res.data) {
@@ -90,6 +103,9 @@ export function TransactionEditWizard({
             onSubmit={handleSubmit}
             onClose={onCancel}
             initialFocus={initialFocus}
+            // Editar no debe perder de vista de dónde salió el dinero, ni la
+            // posibilidad de corregir de quién es cada cuenta.
+            scannedAccounts={bankAccounts}
         />
     );
 }

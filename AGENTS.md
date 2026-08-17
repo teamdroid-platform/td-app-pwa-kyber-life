@@ -5,6 +5,8 @@ Este archivo actúa como un orquestador para el asistente de IA (Antigravity). D
 ## 🧠 Instrucción Principal para la IA
 **A LA IA:** Antes de comenzar a escribir código o planificar una solución, DEBES identificar la categoría de la tarea en la tabla inferior y **leer los archivos `SKILL.md` correspondientes** usando tus herramientas. En este repositorio, los skills se encuentran dentro de `.agent/skills/skills/<skill-name>/SKILL.md`. Aplica estrictamente las convenciones, patrones y restricciones definidas en esos skills. Si tienes dudas, pregunta antes de codificar.
 
+**Orden de aplicación (obligatorio):** primero los **skills de proceso** de Superpowers (sección 9), que definen *cómo* se aborda la tarea (brainstorming, TDD, depuración sistemática, verificación); después los **skills de dominio** de este repositorio (secciones 0–8), que definen *con qué convenciones* se escribe el código. Ambos conjuntos son complementarios, no alternativos.
+
 ---
 
 ## 🛠️ Mapeo de Tareas a Skills
@@ -94,10 +96,64 @@ Debido a que este repositorio usa **Next.js 16, React 19, TypeScript, Tailwind, 
 - `.agent/skills/skills/progressive-web-app/SKILL.md`
 - `.agent/skills/skills/production-code-audit/SKILL.md`
 
+### 9. Superpowers (metodología de trabajo)
+Este repositorio usa el plugin **Superpowers** (`obra/superpowers`) como metodología de proceso. Sus skills **no** viven en `.agent/skills/`: los provee el plugin y se invocan por nombre con el prefijo `superpowers:` (por ejemplo `superpowers:brainstorming`).
+
+#### Instalación por herramienta
+
+Superpowers se instala por separado en **cada** harness que uses. Comandos verificados contra el README de la versión 6.3.0:
+
+| Herramienta | Instalación |
+|---|---|
+| Claude Code | `/plugin install superpowers@claude-plugins-official` |
+| Antigravity | `agy plugin install https://github.com/obra/superpowers` |
+| Codex CLI | `/plugins` → buscar `superpowers` → `Install Plugin` |
+| Codex App | barra lateral → *Plugins* → buscar Superpowers |
+| Cursor | `/add-plugin superpowers` en el chat del agente |
+| Gemini CLI | `gemini extensions install https://github.com/obra/superpowers` |
+| Kimi Code | `/plugins install https://github.com/obra/superpowers` |
+| OpenCode | seguir `.opencode/INSTALL.md` del repo de Superpowers |
+| Devin CLI | `devin plugins install obra/superpowers` |
+| Factory droid | `droid plugin marketplace add https://github.com/obra/superpowers` y luego `droid plugin install superpowers@superpowers` |
+
+Una integración real carga el bootstrap `using-superpowers` **al arrancar la sesión** — eso es lo que hace que los skills se disparen solos en el momento correcto. Copiar los archivos de skills a `.agent/skills/`, o envolverlos con un shim en tiempo de ejecución, los deja presentes en disco pero muertos.
+
+**Prueba de aceptación:** en una sesión limpia, el mensaje «Let's make a react todo list» debe disparar `superpowers:brainstorming` *antes* de que se escriba una línea de código. Si no ocurre, la instalación no está bien y hay que arreglarla antes de seguir.
+
+Si la herramienta en uso no tiene Superpowers instalado, el agente debe **decirlo** en vez de improvisar el flujo, y continuar solo con los skills locales de `.agent/skills/skills/`.
+
+#### Skills de proceso disponibles y cuándo se activan
+
+| Situación | Skill de Superpowers |
+|---|---|
+| “Construyamos X”, feature nueva, cambio de alcance no trivial | `superpowers:brainstorming` (**antes** de escribir código o entrar en modo plan) |
+| Diseño aprobado, hay que escribir el plan | `superpowers:writing-plans` |
+| Ejecutar un plan ya escrito | `superpowers:executing-plans` / `superpowers:subagent-driven-development` |
+| “Arregla este bug”, comportamiento inesperado | `superpowers:systematic-debugging` (**antes** de tocar código) |
+| Escribir o modificar lógica con tests | `superpowers:test-driven-development` (rojo → verde → refactor, con Jest) |
+| Trabajo paralelizable entre agentes | `superpowers:dispatching-parallel-agents` |
+| Aislar trabajo en una rama | `superpowers:using-git-worktrees` |
+| Pedir o recibir revisión de código | `superpowers:requesting-code-review` / `superpowers:receiving-code-review` |
+| Antes de declarar una tarea terminada | `superpowers:verification-before-completion` |
+| Cerrar una rama de desarrollo | `superpowers:finishing-a-development-branch` |
+| Crear o editar skills | `superpowers:writing-skills` |
+
+#### Reglas de este repositorio que se imponen sobre Superpowers
+Superpowers declara explícitamente que las instrucciones del usuario y de `AGENTS.md` tienen precedencia sobre sus skills. En caso de conflicto, mandan estas reglas:
+
+1. **Commits locales sí; push, PRs, merges y despliegues nunca automáticos.** `brainstorming` indica “write design doc and commit” —eso está permitido, y se queda ahí—, pero `finishing-a-development-branch` y `requesting-code-review` empujan además a pushear, abrir PR y mergear. En este repositorio esos pasos **se detienen y se piden al usuario**: el agente genera el archivo o el diff, lo muestra y espera permiso explícito (regla general 5). Los commits siguen Conventional Commits (regla general 10).
+2. **Artefactos de Superpowers en el repositorio.** Los specs van a `docs/superpowers/specs/YYYY-MM-DD-<tema>-design.md` y los planes a `docs/superpowers/plans/YYYY-MM-DD-<feature>.md`. Son documentación del proyecto y **no** van a `scratch/`; `scratch/` sigue reservado para archivos temporales de prueba y debugging (reglas generales 6 y 7).
+3. **Worktrees.** `superpowers:using-git-worktrees` debe usar `.worktrees/` en la raíz de este repositorio (ya está en `.gitignore`). Nunca crear worktrees ni clones dentro de `teamdroid-platform/` fuera de este repo: el workspace contiene junctions y una segunda copia rompe las búsquedas y el grafo de graphify.
+4. **TDD con el stack real.** `superpowers:test-driven-development` se ejecuta con Jest (`npm test`, `npx jest --config jest.unit.config.js` para servicios), no con otro runner, y respeta los patrones de `testing-patterns` y `javascript-testing-patterns` de la sección 5.
+5. **Verificación sin auto-reparación.** `superpowers:verification-before-completion` se combina con la regla general 8: si la verificación detecta fallos de tests, build o variables de entorno, se reportan con contexto y propuesta de solución, **no** se corrigen por iniciativa propia cuando lo pedido fue verificar.
+6. **Convivencia de skills.** Los skills de proceso de Superpowers definen el flujo; los skills de `.agent/skills/skills/` definen las convenciones de código. Ejecutar `superpowers:brainstorming` no exime de leer `clean-code`, `typescript-pro`, `ui-skills` ni los demás skills base de la sección 0.
+7. **graphify antes de leer archivos.** Los skills que exploran código (`brainstorming`, `systematic-debugging`, `executing-plans`) consultan primero el grafo de este repo (`graphify query`, `graphify explain`, `graphify path`) y solo después abren archivos completos; hay un hook `PreToolUse` que lo exige. Es también lo que evita que una búsqueda desde la raíz del repo se cuelgue con `node_modules/`, `.next/` y `.agent/`.
+
 ## ✅ Regla de Compatibilidad
 - Si una herramienta puede resolver skills por nombre, puede seguir usando el nombre corto del skill.
 - Si una herramienta no puede resolver skills por nombre, debe leer directamente las rutas locales listadas arriba.
 - En caso de discrepancia, la fuente de verdad para este repositorio es el contenido del archivo `SKILL.md` ubicado dentro de `.agent/skills/skills/`.
+- Los skills de Superpowers **no** se copian a `.agent/skills/`: se resuelven siempre por nombre a través del plugin. Si la herramienta en uso no tiene Superpowers instalado, debe decirlo en vez de improvisar el flujo, y continuar solo con los skills locales.
 
 ---
 
@@ -106,9 +162,9 @@ Debido a que este repositorio usa **Next.js 16, React 19, TypeScript, Tailwind, 
 2. **TypeScript Estricto**: Todo código nuevo debe estar debidamente tipado. Prohibido usar `any` a menos que sea estrictamente necesario.
 3. **Pragmatismo sin Sobre-Ingeniería**: Mantén el código lo más simple posible que resuelva de manera robusta el problema actual, siguiendo el espíritu de `clean-code`.
 4. **Diseño Responsivo Obligatorio (Mobile-First)**: Todo componente o vista que se modifique o cree debe verse y funcionar perfectamente en todos los tamaños de pantalla (móviles, tablets y escritorio) garantizando una experiencia fluida.
-5. **Nunca hacer commits ni despliegues sin permiso explícito**: La IA no debe crear commits, hacer push, abrir PRs, desplegar, publicar ni subir nada a producción a menos que el usuario lo pida de forma explícita e inequívoca.
+5. **Commits locales sí; nada sale del disco sin permiso explícito**: La IA puede crear **commits locales** por su cuenta, siempre en Conventional Commits (regla 10). Lo que **no** debe hacer sin que el usuario lo pida de forma explícita e inequívoca es `git push`, abrir PRs, mergear, desplegar, publicar o subir nada a producción. Esta regla anula los pasos de push/PR/merge que traen los skills de Superpowers (`requesting-code-review`, `finishing-a-development-branch`): ahí el flujo se pausa y se pide permiso; el «write design doc and commit» de `brainstorming` se queda en el commit local.
 6. **Archivos temporales de prueba en `scratch/`**: Siempre que la IA necesite crear archivos auxiliares para pruebas, debugging, scripts temporales o experimentos (por ejemplo `test_*.ts`, `run-test.ts`, `*.mjs` de validación manual, etc.), debe crearlos dentro de una carpeta raíz llamada `scratch/`. Esos archivos no forman parte del proyecto productivo y no deben dejarse dispersos por el repositorio.
 7. **`scratch/` debe quedar fuera de Git**: La carpeta `scratch/` debe estar excluida de control de versiones en `.gitignore` para evitar subir archivos temporales o descartables que no son necesarios para el proyecto.
 8. **Verificación de readiness para producción**: Cuando el usuario pida verificar que todo está listo para producción, la IA debe ejecutar una validación completa del estado actual del proyecto sin modificar código para “arreglar” problemas detectados. Debe, como mínimo: correr las pruebas unitarias e integración existentes; confirmar cuáles pasan y cuáles fallan; si alguna falla, NO intentar corregirla automáticamente y en su lugar generar un reporte con cada falla, su contexto y una posible solución; revisar que las variables de entorno necesarias estén definidas y documentadas tanto en `.env` como en `.env.example`; verificar que el build funcione correctamente; revisar la configuración y todo lo necesario para determinar si el proyecto, en su estado actual, puede desplegarse a producción de forma segura.
 9. **Credenciales reales para validaciones en navegador**: Siempre que la IA necesite probar el sistema en el navegador y esa validación requiera autenticación o datos de acceso, NO debe adivinar, asumir ni inferir credenciales. Debe pedirle directamente al usuario las credenciales del usuario de prueba antes de ejecutar cualquier validación manual o automatizada en el navegador.
-10. **Estándar de Commits (Semantic Commits)**: Cuando el usuario solicite explícitamente realizar un commit, este debe seguir estrictamente el estándar de commits semánticos (por ejemplo: `feat: ...`, `fix: ...`, `docs: ...`, `chore: ...`, `refactor: ...`, `style: ...`, `test: ...`).
+10. **Estándar de Commits (Semantic Commits)**: Todo commit —lo pida el usuario o lo cree la IA por su cuenta según la regla 5— debe seguir estrictamente el estándar de commits semánticos (por ejemplo: `feat: ...`, `fix: ...`, `docs: ...`, `chore: ...`, `refactor: ...`, `style: ...`, `test: ...`).

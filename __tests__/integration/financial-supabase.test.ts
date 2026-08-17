@@ -73,7 +73,6 @@ describe("SupabaseFinancialTransactionRepository", () => {
                 query: "test",
                 categoryId: "cat-1",
                 institutionId: "inst-1",
-                accountId: "acc-1",
                 amountMin: 10,
                 amountMax: 100,
                 dateFrom: "2026-05-01",
@@ -91,7 +90,6 @@ describe("SupabaseFinancialTransactionRepository", () => {
             expect(mockSupabaseClient.eq).toHaveBeenCalledWith("owner_user_id", mockUserId);
             expect(mockSupabaseClient.eq).toHaveBeenCalledWith("category_id", "cat-1");
             expect(mockSupabaseClient.eq).toHaveBeenCalledWith("institution_id", "inst-1");
-            expect(mockSupabaseClient.eq).toHaveBeenCalledWith("account_id", "acc-1");
             
             expect(mockSupabaseClient.gte).toHaveBeenCalledWith("amount", 10);
             expect(mockSupabaseClient.lte).toHaveBeenCalledWith("amount", 100);
@@ -146,7 +144,6 @@ describe("SupabaseFinancialTransactionRepository", () => {
                 isDeleted: false,
                 categoryId: null,
                 institutionId: null,
-                accountId: null,
                 merchant: null,
                 description: "Test description",
                 notes: null,

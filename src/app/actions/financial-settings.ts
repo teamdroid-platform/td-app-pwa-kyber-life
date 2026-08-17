@@ -1,7 +1,7 @@
 "use server";
 
-import { financialSettingsService } from "@/infrastructure/container";
-import { FinancialInstitution, FinancialAccount, FinancialCategory } from "@/domain/entities/financial";
+import { financialSettingsService, bankService } from "@/infrastructure/container";
+import { FinancialInstitution, FinancialCategory } from "@/domain/entities/financial";
 import { requireUserId } from "@/infrastructure/supabase/auth-user";
 import { revalidatePath } from "next/cache";
 import { UUID } from "@/domain/core";
@@ -76,31 +76,6 @@ export async function mergeInstitutionAction(sourceId: UUID, targetId: UUID) {
     return result;
 }
 
-export async function getAccountsAction() {
-    const user = await getRequiredUser();
-    return financialSettingsService.getAccounts(user.id);
-}
-
-export async function createAccountAction(data: Partial<FinancialAccount>) {
-    const user = await getRequiredUser();
-    const result = await financialSettingsService.createAccount(user.id, data);
-    revalidatePath("/financial/settings");
-    return result;
-}
-
-export async function updateAccountAction(id: UUID, data: Partial<FinancialAccount>) {
-    const user = await getRequiredUser();
-    const result = await financialSettingsService.updateAccount(user.id, id, data);
-    revalidatePath("/financial/settings");
-    return result;
-}
-
-export async function deleteAccountAction(id: UUID) {
-    const user = await getRequiredUser();
-    await financialSettingsService.deleteAccount(user.id, id);
-    revalidatePath("/financial/settings");
-}
-
 export async function getCategoriesAction() {
     const user = await getRequiredUser();
     return financialSettingsService.getCategories(user.id);
@@ -120,19 +95,33 @@ export async function getCategoriesAction() {
 export async function getTransactionFormOptionsAction() {
     try {
         const user = await getRequiredUser();
-        const [institutions, accounts, categories, institutionTypes] = await Promise.all([
+        const [institutions, categories, institutionTypes, bankOverview] = await Promise.all([
             financialSettingsService.getInstitutions(user.id),
-            financialSettingsService.getAccounts(user.id),
             financialSettingsService.getCategories(user.id),
             financialSettingsService.getInstitutionTypes(user.id),
+            // Las cuentas y tarjetas del módulo Bancos viajan en la misma
+            // llamada: el paso de pago las necesita y una request aparte
+            // costaría otro round-trip de auth, que es justo lo que este
+            // bundle existe para evitar.
+            bankService.getOverview(user.id),
         ]);
         return {
             success: true as const,
             data: {
                 institutions,
-                accounts,
-                categories: categories.filter(c => !c.isDeleted),
+                categories: categories.filter((c: FinancialCategory) => !c.isDeleted),
                 institutionTypes,
+                // Sin filtrar por «revisada»: una cuenta que detectó un escaneo
+                // existe y es del usuario, y esconderla dejaba el paso diciendo
+                // «todavía no registras cuentas» justo encima de la tarjeta que
+                // el propio movimiento acababa de identificar. Elegirla es la
+                // forma más directa de darla por buena.
+                bankAccounts: bankOverview.accounts,
+                bankCards: bankOverview.cards,
+                // Sin filtrar: el alta desde el paso de pago necesita ofrecer
+                // todos los emisores, incluidos los que nacieron de un escaneo
+                // y aún no se confirman.
+                bankInstitutions: bankOverview.institutions,
             },
         };
     } catch (error) {

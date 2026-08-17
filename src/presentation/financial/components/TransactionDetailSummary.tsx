@@ -6,6 +6,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import type { FinancialTransaction } from "@/domain/entities/financial";
 import type { WizardScreen } from "../hooks/useTransactionWizard";
+import type { ScannedAccountView } from "@/application/services/bank-service";
+import { AccountsTrail } from "@/presentation/bank/components/ScannedAccountsPanel";
 import { SummaryHero, SummaryRow } from "./transaction-wizard/steps/SummaryStep";
 
 /** Format a wall-clock `YYYY-MM-DDTHH:mm` as "DD/MM/YYYY HH:mm". */
@@ -27,6 +29,8 @@ export interface TransactionDetailSummaryProps {
     date: string;
     /** Open the editor on the step that owns the tapped field. */
     onEditField: (screen: WizardScreen) => void;
+    /** Origen y destino según el módulo Bancos, resueltos en el servidor. */
+    bankAccounts?: ScannedAccountView[];
 }
 
 /**
@@ -46,8 +50,12 @@ export function TransactionDetailSummary({
     notes,
     date,
     onEditField,
+    bankAccounts = [],
 }: TransactionDetailSummaryProps) {
     const institution = displayNames.institution || transaction.merchant || "";
+    // El editor rotula las notas según de dónde vienen; el detalle decía
+    // siempre «Notas · contexto» y las dos pantallas no coincidían.
+    const notesLabel = transaction.status === "CONFIRMED" ? "Notas · del correo" : "Notas";
     const showsCredit = transaction.type === "EXPENSE" && transaction.paidWithCredit;
 
     return (
@@ -105,7 +113,9 @@ export function TransactionDetailSummary({
                 <SummaryRow
                     icon={Landmark}
                     iconClass="bg-emerald-500/15 text-emerald-500"
-                    label="Cuenta"
+                    // El mismo rótulo que el editor: son la misma fila y una
+                    // corrección no debe parecer otro registro.
+                    label="Forma de pago"
                     onEdit={() => onEditField("payment")}
                     // Paying on credit is a property of how the account was
                     // used, so it belongs on this row rather than in a section
@@ -116,7 +126,12 @@ export function TransactionDetailSummary({
                         </Badge>
                     ) : undefined}
                 >
-                    {displayNames.account || <span className="text-text-tertiary">Sin cuenta</span>}
+                    {/* El recorrido del dinero es el valor de la fila, no un
+                        bloque aparte: la pregunta «¿qué cuenta?» se responde
+                        aquí o no se responde. */}
+                    {bankAccounts.length > 0
+                        ? <AccountsTrail accounts={bankAccounts} />
+                        : displayNames.account || <span className="text-text-tertiary">Sin cuenta</span>}
                 </SummaryRow>
 
                 <SummaryRow
@@ -136,7 +151,7 @@ export function TransactionDetailSummary({
                 >
                     {transaction.tags?.length
                         ? transaction.tags.join(" · ")
-                        : <span className="text-text-tertiary">Sin etiquetas</span>}
+                        : <span className="text-text-tertiary">Añadir etiquetas</span>}
                 </SummaryRow>
 
                 {/* Notes get their own block rather than a one-line row: unlike
@@ -145,7 +160,7 @@ export function TransactionDetailSummary({
                 <SummaryRow
                     icon={MessageSquare}
                     iconClass="bg-accent-primary/15 text-accent-primary"
-                    label="Notas · contexto"
+                    label={notesLabel}
                     onEdit={() => onEditField("summary")}
                 >
                     {notes.trim() ? "Ver abajo" : <span className="text-text-tertiary">Sin notas</span>}

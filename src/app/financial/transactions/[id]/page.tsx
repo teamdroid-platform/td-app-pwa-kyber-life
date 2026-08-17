@@ -1,4 +1,5 @@
 import { getTransactionByIdAction } from "@/app/actions/financial-transactions";
+import { getTransactionAccountsAction } from "@/app/actions/bank";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
@@ -19,6 +20,10 @@ export default async function TransactionDetailPage({
 
     const transaction = result.data;
 
+    // Se resuelven aquí, en el servidor, para que la pantalla abra completa —
+    // igual que hace el detalle del escaneo con las suyas.
+    const bankAccounts = await getTransactionAccountsAction(id);
+
     return (
         <div className="flex flex-col gap-6 max-w-5xl mx-auto w-full">
             {/* ── Page Header ──────────────────────────────── */}
@@ -36,7 +41,10 @@ export default async function TransactionDetailPage({
                 </div>
             </div>
 
-            <TransactionDetailClient initialTransaction={transaction} />
+            <TransactionDetailClient
+                initialTransaction={transaction}
+                bankAccounts={bankAccounts.success ? bankAccounts.data : []}
+            />
         </div>
     );
 }

@@ -54,8 +54,28 @@ supabase/.temp/
 # Temporary agent scratch files
 /scratch/
 
+# Git worktrees aislados (superpowers:using-git-worktrees)
+/.worktrees/
+
 # SWC compiler cache
 .swc/
 
 # Sentry Config File
 .env.sentry-build-plugin
+
+# graphify: el grafo SÍ se versiona, así que al clonar ya viene construido.
+# Solo se ignora el cache de extracción: es interno y se rehace solo.
+graphify-out/cache/
+graphify-out/cost.json
+graphify-out/.graphify_root
+# manifest.json cambia (mtimes/hashes) en cada rebuild aunque el grafo no cambie:
+# versionarlo deja el arbol sucio justo despues de cada commit.
+graphify-out/manifest.json
+
+# El gitignore global de la máquina ignora .mcp.json y .claude/; acá SÍ los versionamos
+# (config MCP y hooks del proyecto), salvo lo personal de cada máquina.
+!.mcp.json
+!.claude/
+.claude/settings.local.json
+.claude/**/*.local.*
+CLAUDE.local.md

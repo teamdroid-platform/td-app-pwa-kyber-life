@@ -17,11 +17,19 @@ import {
     InMemoryFinancialScanExecutionRepository,
     InMemoryFinancialInstitutionRepository,
     InMemoryFinancialInstitutionTypeRepository,
-    InMemoryFinancialAccountRepository,
     InMemoryFinancialCategoryRepository,
     InMemoryNotificationRepository,
     InMemoryPushSubscriptionRepository
 } from "./repositories/implementations";
+import {
+    InMemoryBankInstitutionRepository,
+    InMemoryBankAccountRepository,
+    InMemoryBankCardRepository,
+    InMemoryBankAccountBalanceSnapshotRepository,
+    InMemoryBankCardStatementRepository,
+    InMemoryBankMovementRepository,
+    InMemoryBankNumberObservationRepository
+} from "./repositories/bank-in-memory";
 import { seedRepositories } from "./seed/seed-data";
 import { randomUUID } from "crypto";
 
@@ -44,10 +52,16 @@ import {
     SupabaseFinancialScanExecutionRepository,
     SupabaseInstitutionTypeRepository,
     SupabaseFinancialInstitutionRepository,
-    SupabaseFinancialAccountRepository,
     SupabaseFinancialCategoryRepository,
     SupabaseNotificationRepository,
-    SupabasePushSubscriptionRepository
+    SupabasePushSubscriptionRepository,
+    SupabaseBankInstitutionRepository,
+    SupabaseBankAccountRepository,
+    SupabaseBankCardRepository,
+    SupabaseBankAccountBalanceSnapshotRepository,
+    SupabaseBankCardStatementRepository,
+    SupabaseBankMovementRepository,
+    SupabaseBankNumberObservationRepository
 } from "./repositories/supabase"; // Need to create this index or import individually
 
 // ... Previous imports ...
@@ -102,8 +116,22 @@ export const financialScanExecutionRepository = singleton("financialScanExecutio
 
 export const financialInstitutionTypeRepository = singleton("financialInstitutionTypeRepo_v4", () => isSupabase ? new SupabaseInstitutionTypeRepository() : new InMemoryFinancialInstitutionTypeRepository());
 export const financialInstitutionRepository = singleton("financialInstitutionRepo_v4", () => isSupabase ? new SupabaseFinancialInstitutionRepository() : new InMemoryFinancialInstitutionRepository());
-export const financialAccountRepository = singleton("financialAccountRepo_v4", () => isSupabase ? new SupabaseFinancialAccountRepository() : new InMemoryFinancialAccountRepository());
 export const financialCategoryRepository = singleton("financialCategoryRepo_v4", () => isSupabase ? new SupabaseFinancialCategoryRepository() : new InMemoryFinancialCategoryRepository());
+
+// Módulo Bancos
+export const bankInstitutionRepository = singleton("bankInstitutionRepo", () => isSupabase ? new SupabaseBankInstitutionRepository() : new InMemoryBankInstitutionRepository());
+export const bankAccountRepository = singleton("bankAccountRepo", () => isSupabase ? new SupabaseBankAccountRepository() : new InMemoryBankAccountRepository());
+export const bankCardRepository = singleton("bankCardRepo", () => isSupabase ? new SupabaseBankCardRepository() : new InMemoryBankCardRepository());
+export const bankSnapshotRepository = singleton("bankSnapshotRepo", () => isSupabase ? new SupabaseBankAccountBalanceSnapshotRepository() : new InMemoryBankAccountBalanceSnapshotRepository());
+export const bankStatementRepository = singleton("bankStatementRepo", () => isSupabase ? new SupabaseBankCardStatementRepository() : new InMemoryBankCardStatementRepository());
+export const bankMovementRepository = singleton("bankMovementRepo", () => isSupabase
+    ? new SupabaseBankMovementRepository()
+    // La versión in-memory deriva los movimientos de las transacciones, así que
+    // necesita los tres repos de los que la vista SQL hace JOIN.
+    : new InMemoryBankMovementRepository(financialTransactionRepository, bankCardRepository, bankStatementRepository));
+export const bankObservationRepository = singleton("bankObservationRepo", () => isSupabase
+    ? new SupabaseBankNumberObservationRepository()
+    : new InMemoryBankNumberObservationRepository());
 
 export const notificationRepository = singleton("notificationRepo", () => isSupabase ? new SupabaseNotificationRepository() : new InMemoryNotificationRepository());
 export const pushSubscriptionRepository = singleton("pushSubscriptionRepo", () => isSupabase ? new SupabasePushSubscriptionRepository() : new InMemoryPushSubscriptionRepository());
@@ -120,28 +148,48 @@ import { FinancialTransactionService } from "@/application/services/financial-tr
 import { FinancialInboxService } from "@/application/services/financial-inbox-service";
 import { FinancialDashboardService } from "@/application/services/financial-dashboard-service";
 import { FinancialSettingsService } from "@/application/services/financial-settings-service";
+import { BankService } from "@/application/services/bank-service";
+import { BankIdentificationService } from "@/application/services/bank-identification-service";
 import { NotificationService } from "@/application/services/notification-service";
 import { PushSubscriptionService } from "@/application/services/push-subscription-service";
 
 export const authService = new AuthService(userRepository, passwordResetTokenRepository);
 export const userService = new UserService(userRepository);
+// Bancos va primero: transacciones e inbox sincronizan contra el.
+export const bankIdentificationService = new BankIdentificationService(
+    bankObservationRepository,
+    bankAccountRepository,
+    bankCardRepository,
+    bankInstitutionRepository,
+);
+export const bankService = new BankService(
+    bankInstitutionRepository,
+    bankAccountRepository,
+    bankCardRepository,
+    bankSnapshotRepository,
+    bankStatementRepository,
+    bankMovementRepository,
+    financialTransactionRepository,
+    bankIdentificationService,
+    financialScannerTransactionRepository,
+);
 export const financialTransactionService = new FinancialTransactionService(
     financialTransactionRepository, 
     financialTransactionAuditLogRepository,
     financialInstitutionRepository,
-    financialAccountRepository,
-    financialCategoryRepository
+    financialCategoryRepository,
+    bankService,
 );
 export const financialInboxService = new FinancialInboxService(
-    financialScannerTransactionRepository, 
-    financialTransactionRepository, 
-    financialTransactionAuditLogRepository, 
+    financialScannerTransactionRepository,
+    financialTransactionRepository,
+    financialTransactionAuditLogRepository,
     financialInstitutionRepository,
-    financialAccountRepository,
-    financialCategoryRepository
+    financialCategoryRepository,
+    bankService,
 );
 export const financialDashboardService = new FinancialDashboardService(financialTransactionRepository, financialCategoryRepository, financialInstitutionRepository, financialScannerTransactionRepository);
-export const financialSettingsService = new FinancialSettingsService(financialInstitutionTypeRepository, financialInstitutionRepository, financialAccountRepository, financialCategoryRepository, financialTransactionRepository);
+export const financialSettingsService = new FinancialSettingsService(financialInstitutionTypeRepository, financialInstitutionRepository, financialCategoryRepository, financialTransactionRepository);
 export const notificationService = new NotificationService(notificationRepository);
 export const pushSubscriptionService = new PushSubscriptionService(pushSubscriptionRepository);
 export const masterDataService = new MasterDataService(supermarketRepository, categoryRepository, unitRepository);

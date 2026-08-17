@@ -144,13 +144,12 @@ describe("FinancialTransactionService", () => {
             );
         });
 
-        it("should implicitly create institution, account and category if they don't exist", async () => {
+        it("should implicitly create institution and category if they don't exist", async () => {
             const institutionRepoMock = { findByOwnerId: jest.fn().mockResolvedValue([]), create: jest.fn().mockResolvedValue({ id: "new-inst" }) };
-            const accountRepoMock = { findByOwnerId: jest.fn().mockResolvedValue([]), create: jest.fn().mockResolvedValue({ id: "new-acc" }) };
             const categoryRepoMock = { findAllBaseAndUser: jest.fn().mockResolvedValue([]), create: jest.fn().mockResolvedValue({ id: "new-cat" }) };
             
             const serviceWithRepos = new FinancialTransactionService(
-                transactionRepoMock, auditLogRepoMock, institutionRepoMock as any, accountRepoMock as any, categoryRepoMock as any
+                transactionRepoMock, auditLogRepoMock, institutionRepoMock as any, categoryRepoMock as any
             );
 
             transactionRepoMock.findByOwnerId.mockResolvedValue([]);
@@ -159,26 +158,23 @@ describe("FinancialTransactionService", () => {
 
             const dto: CreateFinancialTransactionDTO = {
                 ownerUserId: mockUserId, type: "EXPENSE", amount: 100, currency: "USD", date: "2026-05-18T10:00:00Z",
-                institutionName: "New Institution", accountName: "New Account", categoryName: "New Category", description: "Test"
+                institutionName: "New Institution", categoryName: "New Category", description: "Test"
             };
 
             const result = await serviceWithRepos.createTransaction(dto);
 
             expect(result.institutionId).toBe("new-inst");
-            expect(result.accountId).toBe("new-acc");
             expect(result.categoryId).toBe("new-cat");
             expect(institutionRepoMock.create).toHaveBeenCalled();
-            expect(accountRepoMock.create).toHaveBeenCalled();
             expect(categoryRepoMock.create).toHaveBeenCalled();
         });
 
-        it("should use existing institution, account and category if they exist by name", async () => {
+        it("should use existing institution and category if they exist by name", async () => {
             const institutionRepoMock = { findByOwnerId: jest.fn().mockResolvedValue([{ id: "exist-inst", name: "Existing Inst" }]), create: jest.fn() };
-            const accountRepoMock = { findByOwnerId: jest.fn().mockResolvedValue([{ id: "exist-acc", name: "Existing Acc" }]), create: jest.fn() };
             const categoryRepoMock = { findAllBaseAndUser: jest.fn().mockResolvedValue([{ id: "exist-cat", name: "Existing Cat" }]), create: jest.fn() };
             
             const serviceWithRepos = new FinancialTransactionService(
-                transactionRepoMock, auditLogRepoMock, institutionRepoMock as any, accountRepoMock as any, categoryRepoMock as any
+                transactionRepoMock, auditLogRepoMock, institutionRepoMock as any, categoryRepoMock as any
             );
 
             transactionRepoMock.findByOwnerId.mockResolvedValue([]);
@@ -187,16 +183,14 @@ describe("FinancialTransactionService", () => {
 
             const dto: CreateFinancialTransactionDTO = {
                 ownerUserId: mockUserId, type: "EXPENSE", amount: 100, currency: "USD", date: "2026-05-18T10:00:00Z",
-                institutionName: "existing inst", accountName: "EXISTING ACC", categoryName: "Existing Cat", description: "Test"
+                institutionName: "existing inst", categoryName: "Existing Cat", description: "Test"
             };
 
             const result = await serviceWithRepos.createTransaction(dto);
 
             expect(result.institutionId).toBe("exist-inst");
-            expect(result.accountId).toBe("exist-acc");
             expect(result.categoryId).toBe("exist-cat");
             expect(institutionRepoMock.create).not.toHaveBeenCalled();
-            expect(accountRepoMock.create).not.toHaveBeenCalled();
             expect(categoryRepoMock.create).not.toHaveBeenCalled();
         });
     });
@@ -215,7 +209,6 @@ describe("FinancialTransactionService", () => {
                 transactionRepoMock,
                 auditLogRepoMock,
                 institutionRepoMock as any,
-                undefined,
                 categoryRepoMock as any,
             );
 
@@ -266,13 +259,12 @@ describe("FinancialTransactionService", () => {
             await expect(service.updateTransaction(mockTransactionId, mockUserId, { amount: 200 }))
                 .rejects.toThrow("Transaction not found or unauthorized");
         });
-        it("should implicitly create institution, account and category if they don't exist on update", async () => {
+        it("should implicitly create institution and category if they don't exist on update", async () => {
             const institutionRepoMock = { findByOwnerId: jest.fn().mockResolvedValue([]), create: jest.fn().mockResolvedValue({ id: "new-inst" }) };
-            const accountRepoMock = { findByOwnerId: jest.fn().mockResolvedValue([]), create: jest.fn().mockResolvedValue({ id: "new-acc" }) };
             const categoryRepoMock = { findAllBaseAndUser: jest.fn().mockResolvedValue([]), create: jest.fn().mockResolvedValue({ id: "new-cat" }) };
             
             const serviceWithRepos = new FinancialTransactionService(
-                transactionRepoMock, auditLogRepoMock, institutionRepoMock as any, accountRepoMock as any, categoryRepoMock as any
+                transactionRepoMock, auditLogRepoMock, institutionRepoMock as any, categoryRepoMock as any
             );
 
             const existingTx = { id: mockTransactionId, ownerUserId: mockUserId, type: "EXPENSE", amount: 100 };
@@ -281,11 +273,10 @@ describe("FinancialTransactionService", () => {
             auditLogRepoMock.create.mockResolvedValue({} as any);
 
             const result = await serviceWithRepos.updateTransaction(mockTransactionId, mockUserId, {
-                institutionName: "New Institution", accountName: "New Account", categoryName: "New Category"
+                institutionName: "New Institution", categoryName: "New Category"
             });
 
             expect(result.institutionId).toBe("new-inst");
-            expect(result.accountId).toBe("new-acc");
             expect(result.categoryId).toBe("new-cat");
         });
     });
@@ -450,7 +441,7 @@ describe("FinancialTransactionService", () => {
             const institutionRepoMock = { findByOwnerId: jest.fn().mockResolvedValue([{ id: "inst1", name: "query inst" }]) };
             
             const serviceWithRepos = new FinancialTransactionService(
-                transactionRepoMock, auditLogRepoMock, institutionRepoMock as any, undefined, categoryRepoMock as any
+                transactionRepoMock, auditLogRepoMock, institutionRepoMock as any, categoryRepoMock as any
             );
             
             const result = await serviceWithRepos.searchAllFiltered(mockUserId, filters);

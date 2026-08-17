@@ -1,9 +1,8 @@
 import { UUID } from "@/domain/core";
-import { FinancialInstitution, FinancialAccount, FinancialCategory } from "@/domain/entities/financial";
+import { FinancialInstitution, FinancialCategory } from "@/domain/entities/financial";
 import {
     IFinancialInstitutionRepository,
     IFinancialInstitutionTypeRepository,
-    IFinancialAccountRepository,
     IFinancialCategoryRepository,
     IFinancialTransactionRepository
 } from "@/domain/repositories/financial";
@@ -31,7 +30,6 @@ export class FinancialSettingsService {
     constructor(
         private institutionTypeRepo: IFinancialInstitutionTypeRepository,
         private institutionRepo: IFinancialInstitutionRepository,
-        private accountRepo: IFinancialAccountRepository,
         private categoryRepo: IFinancialCategoryRepository,
         private transactionRepo: IFinancialTransactionRepository
     ) {}
@@ -137,79 +135,6 @@ export class FinancialSettingsService {
         const reassignedCount = await this.transactionRepo.reassignInstitution(userId, sourceId, targetId);
         await this.institutionRepo.delete(sourceId);
         return { reassignedCount };
-    }
-
-    // --- Accounts ---
-
-    async getAccounts(userId: UUID): Promise<FinancialAccount[]> {
-        return this.accountRepo.findByOwnerId(userId);
-    }
-
-    async createAccount(userId: UUID, data: Partial<FinancialAccount>): Promise<FinancialAccount> {
-        // Validate institution exists and belongs to user
-        if (data.institutionId) {
-            const institution = await this.institutionRepo.findById(data.institutionId);
-            if (!institution || institution.ownerUserId !== userId || institution.isDeleted) {
-                 throw new Error("Invalid institution");
-            }
-            if (institution.institutionTypeObj && !['FINANCIAL', 'DIGITAL_WALLET'].includes(institution.institutionTypeObj.code)) {
-                 throw new Error("Accounts can only be associated with FINANCIAL or DIGITAL_WALLET institutions");
-            }
-        }
-
-        const account: FinancialAccount = {
-            id: randomUUID(),
-            ownerUserId: userId,
-            institutionId: data.institutionId || null,
-            name: data.name!,
-            accountType: data.accountType || 'CHECKING',
-            lastFour: data.lastFour || null,
-            currency: data.currency || 'USD',
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            isDeleted: false
-        };
-        return this.accountRepo.create(account);
-    }
-
-    async updateAccount(userId: UUID, accountId: UUID, data: Partial<FinancialAccount>): Promise<FinancialAccount> {
-        const existing = await this.accountRepo.findById(accountId);
-        if (!existing || existing.ownerUserId !== userId || existing.isDeleted) {
-            throw new Error("Account not found or access denied");
-        }
-
-        if (data.institutionId && data.institutionId !== existing.institutionId) {
-            const institution = await this.institutionRepo.findById(data.institutionId);
-            if (!institution || institution.ownerUserId !== userId || institution.isDeleted) {
-                 throw new Error("Invalid institution");
-            }
-            if (institution.institutionTypeObj && !['FINANCIAL', 'DIGITAL_WALLET'].includes(institution.institutionTypeObj.code)) {
-                 throw new Error("Accounts can only be associated with FINANCIAL or DIGITAL_WALLET institutions");
-            }
-        }
-        
-        const updated: FinancialAccount = {
-            ...existing,
-            ...data,
-            updatedAt: new Date().toISOString()
-        };
-        
-        return this.accountRepo.update(updated);
-    }
-
-    async deleteAccount(userId: UUID, accountId: UUID): Promise<void> {
-        const existing = await this.accountRepo.findById(accountId);
-        if (!existing || existing.ownerUserId !== userId) {
-            throw new Error("Account not found or access denied");
-        }
-        
-        // Soft delete
-        const updated: FinancialAccount = {
-            ...existing,
-            isDeleted: true,
-            updatedAt: new Date().toISOString()
-        };
-        await this.accountRepo.update(updated);
     }
 
     // --- Categories ---
