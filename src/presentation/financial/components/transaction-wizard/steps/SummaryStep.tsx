@@ -10,11 +10,12 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { TagInput } from "@/components/ui/tag-input";
 import { resolveTransactionTypeOption } from "../../TransactionTypeChips";
-import { describePaymentSource, isGenericPaymentLabel } from "../../../lib/payment-summary";
+import { describePaymentSource } from "../../../lib/payment-summary";
 import type { MissingField, WizardMode, WizardScreen, WizardValues } from "../../../hooks/useTransactionWizard";
 import type { BankAccount, BankCard } from "@/domain/entities/bank";
 import type { ScannedAccountView } from "@/application/services/bank-service";
 import { AccountsTrail } from "@/presentation/bank/components/ScannedAccountsPanel";
+import { PaymentIdentityLine } from "@/presentation/bank/components/PaymentIdentityLine";
 
 const MAX_NOTES = 200;
 
@@ -299,9 +300,15 @@ export function SummaryStep({
                         significa que no hay nada atado. */}
                     {bankAccounts.length > 0
                         ? <AccountsTrail accounts={bankAccounts} />
-                        : isGenericPaymentLabel(paymentLabel)
-                            ? <span className="text-text-tertiary">{paymentLabel}</span>
-                            : paymentLabel}
+                        : (
+                            <PaymentIdentityLine
+                                accountId={values.bankSourceAccountId}
+                                cardId={values.bankCardId}
+                                accounts={accounts}
+                                cards={cards}
+                                fallback={<span className="text-text-tertiary">{paymentLabel}</span>}
+                            />
+                        )}
                 </SummaryRow>
 
                 <SummaryRow

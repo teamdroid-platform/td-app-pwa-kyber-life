@@ -84,20 +84,24 @@ describe("PaymentStep — el paso cabe en dos filas", () => {
         // Todo el saturado de antes —opciones, altas, avisos— vive en la hoja.
         renderStep();
 
-        expect(screen.queryByText(/Ahorros ••••0814/)).not.toBeInTheDocument();
+        expect(screen.queryByText("····0814")).not.toBeInTheDocument();
         expect(screen.queryByRole("button", { name: /Nueva cuenta/ })).not.toBeInTheDocument();
     });
 
     it("enseña lo que leyó el escaneo mientras no se elija otra cosa", () => {
         renderStep({ scannedAccounts: [scanned("SOURCE", "••••0814")] });
 
-        expect(screen.getByText(/••••0814 · sin registrar/)).toBeInTheDocument();
+        // Sin identificar, el badge lo dice en tres letras y el número se
+        // reduce a sus cuatro últimos.
+        expect(screen.getByTitle(/Tipo desconocido/)).toHaveTextContent("DES");
+        expect(screen.getByText("····0814")).toBeInTheDocument();
+        expect(screen.getByText("sin registrar")).toBeInTheDocument();
     });
 
     it("y lo elegido cuando ya hay elección", () => {
         renderStep({ value: { accountId: "a1", paidWithCredit: false } });
 
-        expect(screen.getByText("Ahorros ••••0814")).toBeInTheDocument();
+        expect(screen.getByText("····0814")).toBeInTheDocument();
     });
 });
 
@@ -108,15 +112,15 @@ describe("PaymentStep — elegir desde la hoja", () => {
         fireEvent.click(screen.getByText("Origen"));
 
         expect(screen.getByLabelText("Buscar")).toBeInTheDocument();
-        expect(screen.getByText("Ahorros ••••0814")).toBeInTheDocument();
-        expect(screen.getByText("Mastercard XXXX8361")).toBeInTheDocument();
+        expect(screen.getByText("····0814")).toBeInTheDocument();
+        expect(screen.getByText("····8361")).toBeInTheDocument();
     });
 
     it("elegir una cuenta la ata como origen", () => {
         const { onChange } = renderStep();
 
         fireEvent.click(screen.getByText("Origen"));
-        fireEvent.click(screen.getByText("Ahorros ••••0814"));
+        fireEvent.click(screen.getByText("····0814"));
 
         expect(onChange).toHaveBeenCalledWith({ accountId: "a1", paidWithCredit: false });
     });
@@ -125,7 +129,7 @@ describe("PaymentStep — elegir desde la hoja", () => {
         const { onChange } = renderStep();
 
         fireEvent.click(screen.getByText("Origen"));
-        fireEvent.click(screen.getByText("Mastercard XXXX8361"));
+        fireEvent.click(screen.getByText("····8361"));
 
         expect(onChange).toHaveBeenCalledWith({
             cardId: "c1", accountId: undefined, paidWithCredit: true,
@@ -137,8 +141,8 @@ describe("PaymentStep — elegir desde la hoja", () => {
 
         fireEvent.click(screen.getByText("Destino"));
 
-        expect(screen.getByText("Ahorros ••••0814")).toBeInTheDocument();
-        expect(screen.queryByText("Mastercard XXXX8361")).not.toBeInTheDocument();
+        expect(screen.getByText("····0814")).toBeInTheDocument();
+        expect(screen.queryByText("····8361")).not.toBeInTheDocument();
     });
 
     it("elegir el destino lo informa hacia arriba", () => {
@@ -147,7 +151,7 @@ describe("PaymentStep — elegir desde la hoja", () => {
         });
 
         fireEvent.click(screen.getByText("Destino"));
-        fireEvent.click(screen.getByText("Corriente ••••9511"));
+        fireEvent.click(screen.getByText("····9511"));
 
         expect(onDestinationChange).toHaveBeenCalledWith("a2");
     });
@@ -157,7 +161,7 @@ describe("PaymentStep — elegir desde la hoja", () => {
 
         fireEvent.click(screen.getByText("Origen"));
 
-        expect(screen.queryByText("Mastercard XXXX8361")).not.toBeInTheDocument();
+        expect(screen.queryByText("····8361")).not.toBeInTheDocument();
     });
 
     it("el buscador filtra entre lo que hay", () => {
@@ -166,8 +170,8 @@ describe("PaymentStep — elegir desde la hoja", () => {
         fireEvent.click(screen.getByText("Origen"));
         fireEvent.change(screen.getByLabelText("Buscar"), { target: { value: "corriente" } });
 
-        expect(screen.getByText("Corriente ••••9511")).toBeInTheDocument();
-        expect(screen.queryByText("Ahorros ••••0814")).not.toBeInTheDocument();
+        expect(screen.getByText("····9511")).toBeInTheDocument();
+        expect(screen.queryByText("····0814")).not.toBeInTheDocument();
     });
 });
 
@@ -177,16 +181,20 @@ describe("PaymentStep — cada opción dice de qué banco es", () => {
 
         fireEvent.click(screen.getByText("Origen"));
 
-        expect(screen.getByText("Banco del Austro")).toBeInTheDocument();
+        // La cuenta de ahorros y la tarjeta comparten emisor, así que aparece
+        // una vez por cada una.
+        expect(screen.getAllByText("Banco del Austro").length).toBeGreaterThan(0);
         expect(screen.getByText("Banco Pichincha")).toBeInTheDocument();
     });
 
-    it("la tarjeta enseña su emisor junto al tipo", () => {
+    it("la tarjeta dice qué es en tres letras, sin repetirlo en el emisor", () => {
         renderStep();
 
         fireEvent.click(screen.getByText("Origen"));
 
-        expect(screen.getByText("Crédito · Banco del Austro")).toBeInTheDocument();
+        expect(screen.getByTitle("Tarjeta de crédito")).toHaveTextContent("TCR");
+        // El tipo vive en el acrónimo; el subtítulo es solo el emisor.
+        expect(screen.queryByText("Crédito · Banco del Austro")).not.toBeInTheDocument();
     });
 
     it("una cuenta sin banco lo dice, en vez de callar", () => {
@@ -205,8 +213,8 @@ describe("PaymentStep — cada opción dice de qué banco es", () => {
         fireEvent.click(screen.getByText("Origen"));
         fireEvent.change(screen.getByLabelText("Buscar"), { target: { value: "pichincha" } });
 
-        expect(screen.getByText("Corriente ••••9511")).toBeInTheDocument();
-        expect(screen.queryByText("Ahorros ••••0814")).not.toBeInTheDocument();
+        expect(screen.getByText("····9511")).toBeInTheDocument();
+        expect(screen.queryByText("····0814")).not.toBeInTheDocument();
     });
 });
 
@@ -219,7 +227,10 @@ describe("PaymentStep — lo elegido responde de quién es", () => {
         });
 
         fireEvent.click(screen.getByText("Origen"));
-        fireEvent.click(screen.getByText("Ahorros ••••0814"));
+        // El número aparece dos veces: en la fila del origen y en la opción de
+        // la hoja. La que se pulsa es la de la hoja.
+        const options = screen.getAllByText("····0814");
+        fireEvent.click(options[options.length - 1]);
 
         expect(onScannedDecision).toHaveBeenCalledWith("••••0814", { ownership: "MINE" });
     });

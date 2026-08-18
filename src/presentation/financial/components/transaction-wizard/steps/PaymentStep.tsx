@@ -7,7 +7,12 @@ import { cn } from "@/lib/utils";
 import { StepHeading } from "../WizardShell";
 import { PaymentSourceSheet, type PaymentPick } from "@/presentation/bank/components/PaymentSourceSheet";
 import { type PaymentSource } from "@/presentation/bank/components/PaymentSourcePicker";
-import { accountLabel, cardLabel } from "@/lib/bank-identity-label";
+import {
+    ACCOUNT_TYPE_ACRONYM, ACCOUNT_TYPE_LABEL, CARD_TYPE_ACRONYM, CARD_TYPE_LABEL,
+    UNKNOWN_TYPE_ACRONYM, cardLabel,
+} from "@/lib/bank-identity-label";
+import { formatLastFour, lastFourOfDisplay } from "@/lib/format-bank-number";
+import { IdentityBadge } from "@/presentation/bank/components/IdentityBadge";
 import type { BankAccount, BankCard, BankInstitution } from "@/domain/entities/bank";
 import type { ScannedAccountDecision, ScannedAccountView } from "@/application/services/bank-service";
 
@@ -241,7 +246,8 @@ function SideRow({
 }: {
     role: "SOURCE" | "DESTINATION";
     label: string;
-    text: string;
+    /** El acrónimo, el número y el emisor ya compuestos. */
+    text: React.ReactNode;
     onEdit: () => void;
 }) {
     const isSource = role === "SOURCE";
@@ -261,7 +267,7 @@ function SideRow({
             </span>
             <span className="min-w-0 flex-1">
                 <span className="block text-[10px] uppercase tracking-[0.1em] text-text-tertiary">{label}</span>
-                <span className="block truncate text-sm text-text-primary">{text}</span>
+                <span className="block text-sm text-text-primary">{text}</span>
             </span>
             <ChevronRight className="h-4 w-4 shrink-0 text-text-tertiary" />
         </button>
@@ -271,25 +277,79 @@ function SideRow({
 /**
  * Qué poner en la fila: lo elegido, y si no hay nada elegido, lo que el escaneo
  * leyó — que es información aunque no sea una cuenta registrada.
+ *
+ * Se compone con las mismas piezas que el selector y que el resumen: acrónimo
+ * de tres letras, los cuatro últimos dígitos y el emisor debajo. La misma
+ * pregunta contestada de tres maneras distintas era lo que hacía difícil
+ * reconocer de un vistazo con qué se pagó.
  */
 function describe(
     pick: PaymentPick,
     accounts: BankAccount[],
     cards: BankCard[],
     scanned?: ScannedAccountView,
-): string {
+): React.ReactNode {
+    const nothing = <span className="text-text-tertiary">Sin elegir</span>;
+
     if (pick.kind === "CARD") {
         const card = cards.find(c => c.id === pick.cardId);
-        return card ? cardLabel(card) : "Sin elegir";
+        if (!card) return nothing;
+        return (
+            <IdentityLine
+                acronym={CARD_TYPE_ACRONYM[card.cardType]}
+                meaning={`Tarjeta de ${CARD_TYPE_LABEL[card.cardType].toLowerCase()}`}
+                number={formatLastFour(card)}
+                sub={[card.brand?.trim(), card.institutionName?.trim()].filter(Boolean).join(" · ")}
+            />
+        );
     }
+
     if (pick.kind === "ACCOUNT") {
         const account = accounts.find(a => a.id === pick.accountId);
-        return account ? accountLabel(account) : "Sin elegir";
+        if (!account) return nothing;
+        return (
+            <IdentityLine
+                acronym={ACCOUNT_TYPE_ACRONYM[account.accountType]}
+                meaning={ACCOUNT_TYPE_LABEL[account.accountType]}
+                number={formatLastFour(account)}
+                sub={account.institutionName?.trim() ?? ""}
+            />
+        );
     }
+
     if (scanned) {
-        return scanned.match
-            ? `${scanned.display} · ${scanned.match.typeLabel}`
-            : `${scanned.display} · sin registrar`;
+        const matched = scanned.match;
+        return (
+            <IdentityLine
+                acronym={matched ? matched.typeAcronym : UNKNOWN_TYPE_ACRONYM}
+                meaning={matched ? matched.typeLabel : "Tipo desconocido: aún sin registrar"}
+                number={lastFourOfDisplay(scanned.display)}
+                sub={matched ? (matched.institutionName ?? matched.typeLabel) : "sin registrar"}
+                title={scanned.raw}
+            />
+        );
     }
-    return "Sin elegir";
+
+    return nothing;
+}
+
+/** El acrónimo y el número arriba, el emisor debajo. */
+function IdentityLine({
+    acronym, meaning, number, sub, title,
+}: {
+    acronym: string;
+    meaning: string;
+    number: string;
+    sub: string;
+    title?: string;
+}) {
+    return (
+        <span className="flex min-w-0 flex-col" title={title}>
+            <span className="flex items-center gap-1.5">
+                <IdentityBadge acronym={acronym} title={meaning} />
+                <span className="font-mono">{number}</span>
+            </span>
+            {sub && <span className="truncate text-[11px] text-text-tertiary">{sub}</span>}
+        </span>
+    );
 }

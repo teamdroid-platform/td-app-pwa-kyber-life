@@ -5,7 +5,12 @@ import { CreditCard, Landmark, PiggyBank, Search, TrendingUp, UserX, Wallet, Che
 import { cn } from "@/lib/utils";
 import { FormSheet } from "@/components/ui/form-sheet";
 import { Input } from "@/components/ui/input";
-import { accountLabel, cardLabel } from "@/lib/bank-identity-label";
+import {
+    ACCOUNT_TYPE_ACRONYM, ACCOUNT_TYPE_LABEL, CARD_TYPE_ACRONYM, CARD_TYPE_LABEL,
+    accountLabel, cardLabel,
+} from "@/lib/bank-identity-label";
+import { formatLastFour } from "@/lib/format-bank-number";
+import { IdentityBadge } from "./IdentityBadge";
 import { normalizeForMatch } from "@/lib/institution-match";
 import { AccountFormSheet } from "./AccountFormSheet";
 import { CardFormSheet } from "./CardFormSheet";
@@ -105,7 +110,17 @@ export function PaymentSourceSheet({
                                 onClick={() => choose({ kind: "ACCOUNT", accountId: account.id })}
                                 icon={<Icon className="h-4 w-4" />}
                                 iconClass="bg-emerald-500/15 text-emerald-500"
-                                title={accountLabel(account)}
+                                // El tipo delante y solo los cuatro últimos: un
+                                // «Ahorros 493176••••2780» parecía una tarjeta.
+                                title={(
+                                    <>
+                                        <IdentityBadge
+                                            acronym={ACCOUNT_TYPE_ACRONYM[account.accountType]}
+                                            title={ACCOUNT_TYPE_LABEL[account.accountType]}
+                                        />
+                                        <span className="font-mono">{formatLastFour(account)}</span>
+                                    </>
+                                )}
                                 subtitle={[
                                     issuerOf(account),
                                     account.isUnconfirmed ? "sin revisar" : null,
@@ -124,9 +139,21 @@ export function PaymentSourceSheet({
                             iconClass={card.cardType === "CREDIT"
                                 ? "bg-rose-500/15 text-rose-500"
                                 : "bg-slate-500/15 text-slate-500"}
-                            title={cardLabel(card)}
+                            title={(
+                                <>
+                                    <IdentityBadge
+                                        acronym={CARD_TYPE_ACRONYM[card.cardType]}
+                                        title={`Tarjeta de ${CARD_TYPE_LABEL[card.cardType].toLowerCase()}`}
+                                    />
+                                    <span className="font-mono">{formatLastFour(card)}</span>
+                                    {card.brand?.trim() && (
+                                        <span className="truncate text-xs font-normal text-text-tertiary">
+                                            {card.brand.trim()}
+                                        </span>
+                                    )}
+                                </>
+                            )}
                             subtitle={[
-                                card.cardType === "CREDIT" ? "Crédito" : "Débito",
                                 issuerOf(card),
                                 card.isUnconfirmed ? "sin revisar" : null,
                             ].filter(Boolean).join(" · ")}
@@ -197,7 +224,8 @@ interface OptionProps {
     onClick: () => void;
     icon: React.ReactNode;
     iconClass: string;
-    title: string;
+    /** Texto, o el acrónimo y el número compuestos como nodo. */
+    title: React.ReactNode;
     subtitle?: string;
 }
 
@@ -218,7 +246,7 @@ function Option({ selected, onClick, icon, iconClass, title, subtitle }: OptionP
                 {icon}
             </span>
             <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-medium text-text-primary">{title}</span>
+                <span className="flex items-center gap-2 truncate text-sm font-medium text-text-primary">{title}</span>
                 {subtitle && (
                     <span className="block truncate text-[11px] text-text-tertiary">{subtitle}</span>
                 )}
