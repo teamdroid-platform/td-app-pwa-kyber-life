@@ -254,3 +254,43 @@ describe("PaymentStep — lo elegido responde de quién es", () => {
         expect(screen.getByRole("button", { name: /Nueva cuenta/ })).toBeInTheDocument();
     });
 });
+
+/**
+ * Quién responde «¿fue con tarjeta de crédito?» depende de si hay una tarjeta
+ * elegida. Con una, la responde ella; sin ninguna, el usuario — que es el caso
+ * de quien no lleva sus cuentas en Bancos.
+ */
+describe("PaymentStep — pagado con tarjeta de crédito", () => {
+    it("deja decidir al usuario cuando no hay tarjeta elegida", () => {
+        const { onChange } = renderStep({ value: {} });
+
+        const toggle = screen.getByRole("switch", { name: /Pagado con tarjeta de crédito/i });
+        expect(toggle).toBeInTheDocument();
+
+        fireEvent.click(toggle);
+
+        expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ paidWithCredit: true }));
+    });
+
+    it("conserva la cuenta elegida al marcarlo a mano", () => {
+        const { onChange } = renderStep({ value: { accountId: "a1", paidWithCredit: false } });
+
+        fireEvent.click(screen.getByRole("switch", { name: /Pagado con tarjeta de crédito/i }));
+
+        expect(onChange).toHaveBeenCalledWith({ accountId: "a1", paidWithCredit: true });
+    });
+
+    it("lo da por hecho y no editable cuando el origen es una tarjeta de crédito", () => {
+        renderStep({ value: { cardId: "c1", paidWithCredit: true } });
+
+        // Ya no hay nada que decidir: lo dice la tarjeta.
+        expect(screen.queryByRole("switch", { name: /Pagado con tarjeta de crédito/i })).not.toBeInTheDocument();
+        expect(screen.getByText(/Lo define/)).toHaveTextContent("Mastercard");
+    });
+
+    it("no pregunta por el crédito en un tipo que no lo admite", () => {
+        renderStep({ creditEligible: false, value: {} });
+
+        expect(screen.queryByText(/Pagado con tarjeta de crédito/i)).not.toBeInTheDocument();
+    });
+});
