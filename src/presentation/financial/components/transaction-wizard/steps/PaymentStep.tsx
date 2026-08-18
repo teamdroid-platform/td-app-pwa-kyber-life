@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowDownLeft, ArrowUpRight, ChevronRight } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, ChevronRight, CreditCard } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { StepHeading } from "../WizardShell";
 import { PaymentSourceSheet, type PaymentPick } from "@/presentation/bank/components/PaymentSourceSheet";
@@ -52,6 +53,12 @@ export function PaymentStep({
     const selectableCards = creditEligible ? cards : cards.filter(c => c.cardType === "DEBIT");
 
     const [editing, setEditing] = useState<"SOURCE" | "DESTINATION" | null>(null);
+
+    // La tarjeta de crédito elegida como origen, si la hay: es lo que decide si
+    // el crédito se deriva o lo declara el usuario.
+    const creditCard = value.cardId
+        ? cards.find(c => c.id === value.cardId && c.cardType === "CREDIT") ?? null
+        : null;
 
     const scanned = (role: "SOURCE" | "DESTINATION") =>
         scannedAccounts.find(a => a.role === role);
@@ -128,6 +135,14 @@ export function PaymentStep({
                 )}
             </div>
 
+            {creditEligible && (
+                <CreditRow
+                    checked={!!value.paidWithCredit}
+                    lockedByCard={creditCard ? cardLabel(creditCard) : null}
+                    onChange={(paidWithCredit) => onChange({ ...value, paidWithCredit })}
+                />
+            )}
+
             <PaymentSourceSheet
                 open={editing === "SOURCE"}
                 onOpenChange={open => setEditing(open ? "SOURCE" : null)}
@@ -159,6 +174,65 @@ export function PaymentStep({
                 onAccountCreated={onAccountCreated}
             />
         </>
+    );
+}
+
+/**
+ * «Pagado con tarjeta de crédito», de las dos maneras en que puede saberse.
+ *
+ * Si el origen ya es una tarjeta de crédito registrada en Bancos, la respuesta
+ * está dada: se muestra marcada y sin editar, porque cambiarla contradiría la
+ * tarjeta elegida. Si no hay tarjeta —el caso de quien no lleva sus cuentas en
+ * Bancos— la pregunta vuelve a ser suya, que es como funcionaba antes.
+ *
+ * Importa acertar: un gasto a crédito no baja el saldo hoy, lo hace cuando se
+ * paga la tarjeta.
+ */
+function CreditRow({
+    checked, lockedByCard, onChange,
+}: {
+    checked: boolean;
+    /** Nombre de la tarjeta que ya lo decide, o null si lo decide el usuario. */
+    lockedByCard: string | null;
+    onChange: (checked: boolean) => void;
+}) {
+    const isOn = lockedByCard ? true : checked;
+
+    return (
+        <div className={cn(
+            "mt-1 flex items-center justify-between gap-3 rounded-xl border p-3 transition-colors",
+            isOn ? "border-accent-primary/50 bg-accent-primary/5" : "border-border/40 bg-bg-secondary/40",
+        )}>
+            <div className="flex min-w-0 items-center gap-2.5">
+                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-accent-primary/15 text-accent-primary">
+                    <CreditCard className="h-4 w-4" />
+                </span>
+                <span className="min-w-0">
+                    <span className="block text-sm leading-tight text-text-primary">
+                        Pagado con tarjeta de crédito
+                    </span>
+                    <span className="block truncate text-[11px] text-text-tertiary">
+                        {lockedByCard
+                            ? `Lo define ${lockedByCard}`
+                            : isOn
+                                ? "No baja el saldo hasta pagar la tarjeta"
+                                : "Actívalo si no registras la tarjeta en Bancos"}
+                    </span>
+                </span>
+            </div>
+
+            {lockedByCard ? (
+                <span className="shrink-0 rounded-full border border-accent-primary/40 bg-accent-primary/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-accent-primary">
+                    Sí
+                </span>
+            ) : (
+                <Switch
+                    checked={checked}
+                    onChange={onChange}
+                    label="Pagado con tarjeta de crédito"
+                />
+            )}
+        </div>
     );
 }
 
