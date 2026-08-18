@@ -1,20 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { Landmark, Wallet, PiggyBank, TrendingUp } from "lucide-react";
-import { formatBankNumber } from "@/lib/format-bank-number";
-import { accountLabel } from "@/lib/bank-identity-label";
+import { ChevronRight, Landmark, Wallet, PiggyBank, TrendingUp } from "lucide-react";
+import { formatLastFour } from "@/lib/format-bank-number";
+import { ACCOUNT_TYPE_ACRONYM, ACCOUNT_TYPE_LABEL } from "@/lib/bank-identity-label";
+import { IdentityBadge } from "./IdentityBadge";
 import { money, shortDate } from "../lib/format-money";
 import { cn } from "@/lib/utils";
 import type { BankAccountWithBalance } from "@/application/services/bank-service";
-import type { BankAccountType } from "@/domain/entities/bank";
-
-const TYPE_LABEL: Record<BankAccountType, string> = {
-    CHECKING: "Corriente",
-    SAVINGS: "Ahorros",
-    CASH: "Efectivo",
-    INVESTMENT: "Inversión",
-};
 
 const TYPE_ICON = {
     CHECKING: Landmark,
@@ -25,32 +18,43 @@ const TYPE_ICON = {
 
 interface AccountRowProps {
     account: BankAccountWithBalance;
-    /**
-     * Acción de mantenimiento a la derecha. Va fuera del enlace: anidar un
-     * botón dentro de un `<a>` deja la fila sin saber qué hacer al tocarla.
-     */
-    action?: React.ReactNode;
 }
 
-export function AccountRow({ account, action }: AccountRowProps) {
-    const number = formatBankNumber(account, "ACCOUNT");
+/**
+ * Una cuenta dentro del grupo de su emisor.
+ *
+ * Cada dato una sola vez: el título decía «Ahorros ••••0814» y el subtítulo
+ * repetía «Ahorros · ••••0814» — el mismo texto dos veces, cortado arriba y
+ * entero abajo. Ahora el acrónimo dice qué es, el número dice cuál, y la
+ * segunda línea guarda lo que ninguno de los dos cuenta.
+ *
+ * Sin botón de editar: iba fuera de la tarjeta, así que ninguna fila medía
+ * igual. Tocar la fila lleva al detalle, donde editar ya vive.
+ */
+export function AccountRow({ account }: AccountRowProps) {
     const Icon = TYPE_ICON[account.accountType];
     const negative = account.balance < 0;
+    const number = formatLastFour(account);
 
-    const row = (
+    return (
         <Link
             href={`/financial/banks/accounts/${account.id}`}
-            className="flex flex-1 items-center gap-3 rounded-2xl border bg-card p-3 transition-colors hover:border-primary/50"
+            className="flex items-center gap-3 px-3 py-2.5 transition-colors hover:bg-muted/40"
         >
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-500">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-500/12 text-emerald-500">
                 <Icon className="h-4 w-4" />
             </span>
 
             <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-semibold">{accountLabel(account)}</span>
-                <span className="block truncate text-xs text-muted-foreground">
-                    {TYPE_LABEL[account.accountType]}
-                    {number && ` · ${number}`}
+                <span className="flex items-center gap-1.5">
+                    <IdentityBadge
+                        acronym={ACCOUNT_TYPE_ACRONYM[account.accountType]}
+                        title={ACCOUNT_TYPE_LABEL[account.accountType]}
+                    />
+                    {number && <span className="font-mono text-sm font-semibold">{number}</span>}
+                </span>
+                <span className="block truncate text-[11px] text-muted-foreground">
+                    {ACCOUNT_TYPE_LABEL[account.accountType]}
                     {/* Una detectada por un escaneo no entra a los saldos hasta
                         que el usuario la revisa. */}
                     {account.isUnconfirmed && (
@@ -72,10 +76,8 @@ export function AccountRow({ account, action }: AccountRowProps) {
                     </span>
                 )}
             </span>
+
+            <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
         </Link>
     );
-
-    if (!action) return row;
-
-    return <div className="flex items-center gap-2">{row}{action}</div>;
 }

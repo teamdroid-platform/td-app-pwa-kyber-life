@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { CreditCard } from "lucide-react";
-import { formatBankNumber } from "@/lib/format-bank-number";
-import { cardLabel } from "@/lib/bank-identity-label";
+import { ChevronRight, CreditCard } from "lucide-react";
+import { formatLastFour } from "@/lib/format-bank-number";
+import { CARD_TYPE_ACRONYM, CARD_TYPE_LABEL } from "@/lib/bank-identity-label";
+import { IdentityBadge } from "./IdentityBadge";
 import { money } from "../lib/format-money";
 import { cn } from "@/lib/utils";
 import type { BankCardWithDebt } from "@/application/services/bank-service";
@@ -12,53 +13,62 @@ interface CardRowProps {
     card: BankCardWithDebt;
     /** Nombre de la cuenta atada, solo para tarjetas de débito. */
     accountName?: string;
-    /**
-     * Acción de mantenimiento a la derecha. Va fuera del enlace: anidar un
-     * botón dentro de un `<a>` deja la fila sin saber qué hacer al tocarla.
-     */
-    action?: React.ReactNode;
 }
 
-export function CardRow({ card, accountName, action }: CardRowProps) {
+/**
+ * Una tarjeta dentro del grupo de su emisor. Mismo trato que {@link AccountRow}:
+ * acrónimo, número, y en la segunda línea solo lo que aporta —la marca, el
+ * corte, la cuenta de la que descuenta un débito—.
+ */
+export function CardRow({ card, accountName }: CardRowProps) {
     const isCredit = card.cardType === "CREDIT";
-    const number = formatBankNumber(card, "CARD");
+    const number = formatLastFour(card);
 
-    const row = (
+    // Sin deuda es cero, no «menos cero»: el rojo se reserva para lo que de
+    // verdad se debe, o dejaría de significar nada.
+    const owes = isCredit && card.debt > 0;
+
+    const context = [
+        card.brand?.trim() || CARD_TYPE_LABEL[card.cardType],
+        isCredit && card.statementDay ? `corte ${card.statementDay}` : null,
+        !isCredit && accountName ? `→ ${accountName}` : null,
+    ].filter(Boolean).join(" · ");
+
+    return (
         <Link
             href={`/financial/banks/cards/${card.id}`}
-            className="flex flex-1 items-center gap-3 rounded-2xl border bg-card p-3 transition-colors hover:border-primary/50"
+            className="flex items-center gap-3 px-3 py-2.5 transition-colors hover:bg-muted/40"
         >
             <span className={cn(
                 "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl",
-                isCredit ? "bg-rose-500/15 text-rose-500" : "bg-slate-500/15 text-slate-500",
+                isCredit ? "bg-amber-500/12 text-amber-500" : "bg-blue-500/12 text-blue-500",
             )}>
                 <CreditCard className="h-4 w-4" />
             </span>
 
             <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-semibold">{cardLabel(card)}</span>
-                <span className="block truncate text-xs text-muted-foreground">
-                    {isCredit ? "Crédito" : "Débito"}
-                    {number && ` · ${number}`}
-                    {isCredit && card.statementDay && ` · corte ${card.statementDay}`}
-                    {!isCredit && accountName && ` → ${accountName}`}
-                    {/* Una detectada por un escaneo no entra a los saldos hasta
-                        que el usuario la revisa; decirlo aquí evita que parezca
-                        que las cuentas no cuadran. */}
-                    {card.isUnconfirmed && (
-                        <span className="text-amber-500"> · sin revisar</span>
-                    )}
-                    {!isCredit && !card.accountId && (
-                        <span className="text-amber-500"> · sin cuenta</span>
-                    )}
+                <span className="flex items-center gap-1.5">
+                    <IdentityBadge
+                        acronym={CARD_TYPE_ACRONYM[card.cardType]}
+                        title={`Tarjeta de ${CARD_TYPE_LABEL[card.cardType].toLowerCase()}`}
+                    />
+                    {number && <span className="font-mono text-sm font-semibold">{number}</span>}
+                </span>
+                <span className="block truncate text-[11px] text-muted-foreground">
+                    {context}
+                    {card.isUnconfirmed && <span className="text-amber-500"> · sin revisar</span>}
+                    {!isCredit && !card.accountId && <span className="text-amber-500"> · sin cuenta</span>}
                 </span>
             </span>
 
             <span className="shrink-0 text-right tabular-nums">
                 {isCredit ? (
                     <>
-                        <span className="block text-sm font-semibold text-rose-500">
-                            −{money(card.debt)}
+                        <span className={cn(
+                            "block text-sm font-semibold",
+                            owes ? "text-rose-500" : "text-muted-foreground",
+                        )}>
+                            {owes ? `−${money(card.debt)}` : "Sin deuda"}
                         </span>
                         {card.creditLimit != null && (
                             <span className="block text-[10px] text-muted-foreground">
@@ -73,10 +83,8 @@ export function CardRow({ card, accountName, action }: CardRowProps) {
                     </span>
                 )}
             </span>
+
+            <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
         </Link>
     );
-
-    if (!action) return row;
-
-    return <div className="flex items-center gap-2">{row}{action}</div>;
 }
