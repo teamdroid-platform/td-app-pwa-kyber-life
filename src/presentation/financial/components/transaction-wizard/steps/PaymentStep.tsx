@@ -158,6 +158,7 @@ export function PaymentStep({
                 value={sourcePick}
                 onPick={applySource}
                 scannedNumber={scanned("SOURCE")?.display}
+                scannedKind={scanned("SOURCE")?.kind}
                 onAccountCreated={onAccountCreated}
                 onCardCreated={onCardCreated}
             />
@@ -172,6 +173,7 @@ export function PaymentStep({
                 institutions={institutions}
                 value={destinationPick}
                 scannedNumber={scanned("DESTINATION")?.display}
+                scannedKind={scanned("DESTINATION")?.kind}
                 onPick={pick => {
                     declare("DESTINATION", pick);
                     onDestinationChange?.(pick.kind === "ACCOUNT" ? pick.accountId : null);
