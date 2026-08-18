@@ -65,3 +65,55 @@ export function identityTypeLabel(
     }
     return ACCOUNT_TYPE_LABEL[(entity as BankAccount).accountType];
 }
+
+/**
+ * El tipo en tres letras, para leerlo antes que el número.
+ *
+ * Siempre tres: puestas una debajo de otra, cualquier largo distinto rompe la
+ * alineación y el ojo deja de encontrarlas en el mismo sitio.
+ */
+export const ACCOUNT_TYPE_ACRONYM: Record<BankAccountType, string> = {
+    SAVINGS: "AHO",
+    CHECKING: "CTE",
+    CASH: "EFE",
+    INVESTMENT: "INV",
+};
+
+export const CARD_TYPE_ACRONYM: Record<BankCardType, string> = {
+    CREDIT: "TCR",
+    DEBIT: "TDE",
+};
+
+/** De un tercero: no es que falte el dato, es que la cuenta no es suya. */
+export const THIRD_PARTY_ACRONYM = "TER";
+
+/** Suyo, pero sin registrar en Bancos: del tipo no se sabe nada todavía. */
+export const UNKNOWN_TYPE_ACRONYM = "DES";
+
+export function identityAcronym(
+    entity: BankAccount | BankCard, kind: "ACCOUNT" | "CARD",
+): string {
+    return kind === "CARD"
+        ? CARD_TYPE_ACRONYM[(entity as BankCard).cardType]
+        : ACCOUNT_TYPE_ACRONYM[(entity as BankAccount).accountType];
+}
+
+/**
+ * La familia a la que pertenece un acrónimo, para colorearlo.
+ *
+ * El color hace de atajo: se distingue una tarjeta de crédito de una cuenta de
+ * ahorros sin llegar a leer las letras.
+ */
+export type IdentityTone = "savings" | "checking" | "credit" | "debit" | "muted";
+
+export function acronymTone(acronym: string): IdentityTone {
+    switch (acronym) {
+        case "AHO": return "savings";
+        case "CTE":
+        case "EFE":
+        case "INV": return "checking";
+        case "TCR": return "credit";
+        case "TDE": return "debit";
+        default: return "muted";
+    }
+}

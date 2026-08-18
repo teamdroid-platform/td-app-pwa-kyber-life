@@ -1,11 +1,16 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { CreditCard, Landmark, PiggyBank, Search, TrendingUp, UserX, Wallet, Check } from "lucide-react";
+import { CreditCard, Landmark, PiggyBank, Plus, Search, TrendingUp, UserX, Wallet, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { FormSheet } from "@/components/ui/form-sheet";
 import { Input } from "@/components/ui/input";
-import { accountLabel, cardLabel } from "@/lib/bank-identity-label";
+import {
+    ACCOUNT_TYPE_ACRONYM, ACCOUNT_TYPE_LABEL, CARD_TYPE_ACRONYM, CARD_TYPE_LABEL,
+    accountLabel, cardLabel,
+} from "@/lib/bank-identity-label";
+import { formatLastFour, lastFourOfDisplay } from "@/lib/format-bank-number";
+import { IdentityBadge } from "./IdentityBadge";
 import { normalizeForMatch } from "@/lib/institution-match";
 import { AccountFormSheet } from "./AccountFormSheet";
 import { CardFormSheet } from "./CardFormSheet";
@@ -45,6 +50,12 @@ interface PaymentSourceSheetProps {
      * puesto: registrar lo que el movimiento trae es el caso más frecuente.
      */
     scannedNumber?: string;
+    /**
+     * Qué leyó el escaneo que era ese número. El propio escaneo lo distingue
+     * —enmascara las tarjetas con equis y las cuentas con puntos—, así que
+     * sirve para preseleccionar el tipo en vez de suponerlo.
+     */
+    scannedKind?: "ACCOUNT" | "CARD";
 }
 
 /**
@@ -56,9 +67,18 @@ interface PaymentSourceSheetProps {
  */
 export function PaymentSourceSheet({
     open, onOpenChange, title, accounts, cards, institutions,
-    value, onPick, onAccountCreated, onCardCreated, allowExternal = true, scannedNumber,
+    value, onPick, onAccountCreated, onCardCreated, allowExternal = true,
+    scannedNumber, scannedKind,
 }: PaymentSourceSheetProps) {
     const [query, setQuery] = useState("");
+    /**
+     * Registrar el número leído es el caso frecuente, pero no el único: desde
+     * aquí también se puede dar de alta algo que no tiene nada que ver con el
+     * movimiento. Sin número leído solo existe ese segundo caso.
+     */
+    const [creatingOther, setCreatingOther] = useState(false);
+    const registersScanned = !!scannedNumber && !creatingOther;
+    const prefill = registersScanned ? scannedNumber : undefined;
 
     const matches = useMemo(() => {
         const q = normalizeForMatch(query);
@@ -78,6 +98,45 @@ export function PaymentSourceSheet({
     };
 
     const isEmpty = accounts.length === 0 && cards.length === 0;
+
+    const accountTrigger = (
+        <AccountFormSheet
+            institutions={institutions}
+            defaultNumber={prefill}
+            onCreated={created => {
+                onAccountCreated?.(created);
+                choose({ kind: "ACCOUNT", accountId: created.account.id });
+            }}
+            trigger={(
+                <CreateButton
+                    label="Cuenta"
+                    hint="Ahorros, corriente…"
+                    icon={<Landmark className="h-4 w-4" />}
+                    iconClass="bg-emerald-500/15 text-emerald-500"
+                />
+            )}
+        />
+    );
+
+    const cardTrigger = (
+        <CardFormSheet
+            institutions={institutions}
+            accounts={accounts}
+            defaultNumber={prefill}
+            onCreated={created => {
+                onCardCreated?.(created);
+                choose({ kind: "CARD", cardId: created.card.id });
+            }}
+            trigger={(
+                <CreateButton
+                    label="Tarjeta"
+                    hint="Crédito o débito"
+                    icon={<CreditCard className="h-4 w-4" />}
+                    iconClass="bg-amber-500/15 text-amber-500"
+                />
+            )}
+        />
+    );
 
     return (
         <FormSheet open={open} onOpenChange={onOpenChange} title={title} bodyClassName="space-y-3 py-3">
@@ -105,7 +164,17 @@ export function PaymentSourceSheet({
                                 onClick={() => choose({ kind: "ACCOUNT", accountId: account.id })}
                                 icon={<Icon className="h-4 w-4" />}
                                 iconClass="bg-emerald-500/15 text-emerald-500"
-                                title={accountLabel(account)}
+                                // El tipo delante y solo los cuatro últimos: un
+                                // «Ahorros 493176••••2780» parecía una tarjeta.
+                                title={(
+                                    <>
+                                        <IdentityBadge
+                                            acronym={ACCOUNT_TYPE_ACRONYM[account.accountType]}
+                                            title={ACCOUNT_TYPE_LABEL[account.accountType]}
+                                        />
+                                        <span className="font-mono">{formatLastFour(account)}</span>
+                                    </>
+                                )}
                                 subtitle={[
                                     issuerOf(account),
                                     account.isUnconfirmed ? "sin revisar" : null,
@@ -124,9 +193,21 @@ export function PaymentSourceSheet({
                             iconClass={card.cardType === "CREDIT"
                                 ? "bg-rose-500/15 text-rose-500"
                                 : "bg-slate-500/15 text-slate-500"}
-                            title={cardLabel(card)}
+                            title={(
+                                <>
+                                    <IdentityBadge
+                                        acronym={CARD_TYPE_ACRONYM[card.cardType]}
+                                        title={`Tarjeta de ${CARD_TYPE_LABEL[card.cardType].toLowerCase()}`}
+                                    />
+                                    <span className="font-mono">{formatLastFour(card)}</span>
+                                    {card.brand?.trim() && (
+                                        <span className="truncate text-xs font-normal text-text-tertiary">
+                                            {card.brand.trim()}
+                                        </span>
+                                    )}
+                                </>
+                            )}
                             subtitle={[
-                                card.cardType === "CREDIT" ? "Crédito" : "Débito",
                                 issuerOf(card),
                                 card.isUnconfirmed ? "sin revisar" : null,
                             ].filter(Boolean).join(" · ")}
@@ -152,32 +233,58 @@ export function PaymentSourceSheet({
                 />
             )}
 
-            <div className="grid grid-cols-2 gap-2 pt-1">
-                <AccountFormSheet
-                    institutions={institutions}
-                    defaultNumber={scannedNumber}
-                    onCreated={created => {
-                        onAccountCreated?.(created);
-                        choose({ kind: "ACCOUNT", accountId: created.account.id });
-                    }}
-                    trigger={(
-                        <CreateButton
-                            label={scannedNumber ? `Registrar ${scannedNumber}` : "Nueva cuenta"}
-                            icon={<Landmark className="h-4 w-4" />}
-                        />
+            {/* Registrar lo que falta: una sola acción, y el tipo después.
+                Antes eran dos botones sueltos donde solo el de cuenta ofrecía
+                registrar el número leído — aunque el escaneo hubiera leído una
+                tarjeta, que es lo que pasa la mitad de las veces. */}
+            <div className="mt-1 border-t border-border/40 pt-3">
+                <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-text-tertiary">
+                    ¿No está en la lista?
+                </p>
+
+                <div className="mb-2 flex items-center gap-2.5 rounded-xl border border-accent-primary/45 bg-accent-primary/10 p-2.5">
+                    <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-accent-primary/20 text-accent-primary">
+                        <Plus className="h-4 w-4" />
+                    </span>
+                    <span className="min-w-0">
+                        <span className="block truncate text-[13px] font-semibold text-text-primary">
+                            {registersScanned
+                                ? <>Registrar <span className="font-mono">{lastFourOfDisplay(scannedNumber!)}</span></>
+                                : "Nueva cuenta o tarjeta"}
+                        </span>
+                        <span className="block text-[11px] text-text-tertiary">
+                            Elige qué es y lo damos de alta
+                        </span>
+                    </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                    {/* La detectada va primera: es la respuesta más probable,
+                        pero la otra queda a un toque porque se equivoca. */}
+                    {scannedKind === "CARD" ? (
+                        <>
+                            {cardTrigger}
+                            {accountTrigger}
+                        </>
+                    ) : (
+                        <>
+                            {accountTrigger}
+                            {cardTrigger}
+                        </>
                     )}
-                />
-                <CardFormSheet
-                    institutions={institutions}
-                    accounts={accounts}
-                    defaultNumber={scannedNumber}
-                    onCreated={created => {
-                        onCardCreated?.(created);
-                        choose({ kind: "CARD", cardId: created.card.id });
-                    }}
-                    trigger={<CreateButton label="Nueva tarjeta" icon={<CreditCard className="h-4 w-4" />} />}
-                />
+                </div>
+
+                {registersScanned && (
+                    <button
+                        type="button"
+                        onClick={() => setCreatingOther(true)}
+                        className="mt-2 w-full text-center text-[11px] text-text-tertiary underline underline-offset-2 hover:text-text-secondary"
+                    >
+                        Crear otra cuenta o tarjeta
+                    </button>
+                )}
             </div>
+
         </FormSheet>
     );
 }
@@ -197,7 +304,8 @@ interface OptionProps {
     onClick: () => void;
     icon: React.ReactNode;
     iconClass: string;
-    title: string;
+    /** Texto, o el acrónimo y el número compuestos como nodo. */
+    title: React.ReactNode;
     subtitle?: string;
 }
 
@@ -218,7 +326,7 @@ function Option({ selected, onClick, icon, iconClass, title, subtitle }: OptionP
                 {icon}
             </span>
             <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-medium text-text-primary">{title}</span>
+                <span className="flex items-center gap-2 truncate text-sm font-medium text-text-primary">{title}</span>
                 {subtitle && (
                     <span className="block truncate text-[11px] text-text-tertiary">{subtitle}</span>
                 )}
@@ -234,19 +342,34 @@ function Option({ selected, onClick, icon, iconClass, title, subtitle }: OptionP
  * como prop y un componente que la descarte se pinta pero no abre nada.
  */
 function CreateButton({
-    label, icon, className, ...props
-}: { label: string; icon: React.ReactNode } & React.ComponentProps<"button">) {
+    label, hint, icon, iconClass, className, ...props
+}: {
+    label: string;
+    /** Qué cabe dentro, para no tener que abrir el formulario y averiguarlo. */
+    hint: string;
+    icon: React.ReactNode;
+    iconClass: string;
+} & React.ComponentProps<"button">) {
     return (
         <button
             type="button"
             {...props}
             className={cn(
-                "flex items-center justify-center gap-1.5 rounded-xl border border-dashed border-border/60 p-2.5 text-xs font-medium text-text-tertiary transition-colors hover:border-accent-primary hover:text-text-primary",
+                // La misma forma que las opciones de arriba —icono, título,
+                // subtítulo— para que se lean como algo elegible. Antes eran
+                // cajas punteadas con texto atenuado del tamaño de un pie de
+                // página, y parecían desactivadas.
+                "flex w-full items-center gap-2.5 rounded-xl border border-dashed border-border/60 p-2.5 text-left transition-colors hover:border-accent-primary hover:bg-accent-primary/5",
                 className,
             )}
         >
-            {icon}
-            {label}
+            <span className={cn("grid h-8 w-8 shrink-0 place-items-center rounded-lg", iconClass)}>
+                {icon}
+            </span>
+            <span className="min-w-0">
+                <span className="block truncate text-[13px] font-medium text-text-primary">{label}</span>
+                <span className="block truncate text-[10px] text-text-tertiary">{hint}</span>
+            </span>
         </button>
     );
 }

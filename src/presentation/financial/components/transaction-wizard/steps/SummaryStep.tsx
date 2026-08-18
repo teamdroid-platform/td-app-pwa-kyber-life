@@ -3,17 +3,19 @@
 import { useState, type ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
-    Building2, Calendar, DollarSign, FileText, Landmark, MessageSquare, Pencil, Tag, Tags,
+    Building2, Calendar, CreditCard, DollarSign, FileText, Landmark, MessageSquare, Pencil, Tag, Tags,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { TagInput } from "@/components/ui/tag-input";
 import { resolveTransactionTypeOption } from "../../TransactionTypeChips";
-import { describePaymentSource, isGenericPaymentLabel } from "../../../lib/payment-summary";
+import { describePaymentSource } from "../../../lib/payment-summary";
 import type { MissingField, WizardMode, WizardScreen, WizardValues } from "../../../hooks/useTransactionWizard";
 import type { BankAccount, BankCard } from "@/domain/entities/bank";
 import type { ScannedAccountView } from "@/application/services/bank-service";
 import { AccountsTrail } from "@/presentation/bank/components/ScannedAccountsPanel";
+import { PaymentIdentityLine } from "@/presentation/bank/components/PaymentIdentityLine";
 
 const MAX_NOTES = 200;
 
@@ -284,6 +286,13 @@ export function SummaryStep({
                     label="Forma de pago"
                     onEdit={() => onEdit("payment")}
                     changed={didChange("paidWithCredit")}
+                    // El crédito cambia cuándo pesa el gasto, así que se ve en
+                    // el resumen y no solo dentro del paso.
+                    marker={values.paidWithCredit ? (
+                        <Badge variant="outline" className="shrink-0 gap-1 rounded-full px-2 py-0 text-[10px]">
+                            <CreditCard className="h-3 w-3" /> Crédito
+                        </Badge>
+                    ) : undefined}
                 >
                     {/* El recorrido del dinero manda cuando el escaneo lo trae:
                         responde a la misma pregunta con más detalle. Si no, la
@@ -291,9 +300,15 @@ export function SummaryStep({
                         significa que no hay nada atado. */}
                     {bankAccounts.length > 0
                         ? <AccountsTrail accounts={bankAccounts} />
-                        : isGenericPaymentLabel(paymentLabel)
-                            ? <span className="text-text-tertiary">{paymentLabel}</span>
-                            : paymentLabel}
+                        : (
+                            <PaymentIdentityLine
+                                accountId={values.bankSourceAccountId}
+                                cardId={values.bankCardId}
+                                accounts={accounts}
+                                cards={cards}
+                                fallback={<span className="text-text-tertiary">{paymentLabel}</span>}
+                            />
+                        )}
                 </SummaryRow>
 
                 <SummaryRow

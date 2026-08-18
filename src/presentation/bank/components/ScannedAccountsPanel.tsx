@@ -10,6 +10,9 @@ import { Input } from "@/components/ui/input";
 import { Field } from "@/components/ui/field";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { InstitutionCombo, EMPTY_INSTITUTION_CHOICE, type InstitutionChoice } from "./InstitutionCombo";
+import { IdentityBadge } from "./IdentityBadge";
+import { THIRD_PARTY_ACRONYM, UNKNOWN_TYPE_ACRONYM } from "@/lib/bank-identity-label";
+import { lastFourOfDisplay } from "@/lib/format-bank-number";
 import type { BankInstitution } from "@/domain/entities/bank";
 
 
@@ -105,7 +108,10 @@ function ScannedAccountRow({
                     className={cn("h-3.5 w-3.5 shrink-0", isSource ? "text-rose-500" : "text-emerald-500")}
                     aria-label={isSource ? "Origen" : "Destino"}
                 />
-                <span className="shrink-0 font-mono text-text-primary">{account.display}</span>
+                {/* El mismo vocabulario que el resumen y el selector: tres
+                    letras delante, cuatro dígitos, y de quién es al lado. */}
+                <IdentityBadge {...trailAcronymProps(account)} />
+                <span className="shrink-0 font-mono text-text-primary">{lastFourOfDisplay(account.display)}</span>
                 <span className="truncate text-text-tertiary">{attribution(account)}</span>
             </span>
 
@@ -312,26 +318,43 @@ function OwnershipChoice({
  * la fila «Cuenta», donde compite con el resto del resumen y no puede permitirse
  * un bloque propio.
  */
+/**
+ * Por dónde pasó el dinero, en el valor de una fila.
+ *
+ * Dos líneas por lado: qué y cuál arriba —acrónimo y los cuatro últimos
+ * dígitos—, de quién es debajo. El tipo iba antes sin aparecer por ninguna
+ * parte, así que «••••0814» no decía si era una cuenta de ahorros o una
+ * tarjeta; y el número largo empujaba al banco fuera de la fila hasta cortarlo.
+ */
 export function AccountsTrail({ accounts }: { accounts: ScannedAccountView[] }) {
     if (accounts.length === 0) return null;
 
     return (
-        <span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+        <span className="flex flex-col gap-1.5">
             {accounts.map((account, index) => {
                 const isSource = account.role === "SOURCE";
                 const Icon = isSource ? ArrowUpRight : ArrowDownLeft;
+                const { acronym, meaning } = trailAcronym(account);
+
                 return (
                     <span
                         key={`${account.role}-${account.raw}-${index}`}
-                        className="inline-flex items-center gap-1"
+                        className="flex min-w-0 flex-col"
                         title={[account.raw, attribution(account)].filter(Boolean).join(" · ")}
                     >
-                        <Icon
-                            className={cn("h-3.5 w-3.5 shrink-0", isSource ? "text-rose-500" : "text-emerald-500")}
-                            aria-label={isSource ? "Origen" : "Destino"}
-                        />
-                        <span className="font-mono text-sm">{account.display}</span>
-                        <span className="text-xs text-text-tertiary">{attribution(account)}</span>
+                        <span className="flex items-center gap-1.5">
+                            <Icon
+                                className={cn("h-3.5 w-3.5 shrink-0", isSource ? "text-rose-500" : "text-emerald-500")}
+                                aria-label={isSource ? "Origen" : "Destino"}
+                            />
+                            <IdentityBadge acronym={acronym} title={meaning} />
+                            <span className="font-mono text-sm">{lastFourOfDisplay(account.display)}</span>
+                        </span>
+                        {/* El banco cabe entero aquí: en la línea de arriba
+                            competía con el número y acababa cortado. */}
+                        <span className="ml-[22px] truncate text-[11px] text-text-tertiary">
+                            {attribution(account)}
+                        </span>
                     </span>
                 );
             })}
@@ -339,12 +362,39 @@ export function AccountsTrail({ accounts }: { accounts: ScannedAccountView[] }) 
     );
 }
 
+/**
+ * Las tres letras de un número del escaneo.
+ *
+ * Si corresponde a una cuenta o tarjeta registrada, las suyas. Si no, «TER»
+ * cuando se sabe que es de otra persona —eso no es un dato que falte, es una
+ * clasificación— y «DES» cuando sencillamente no se conoce el tipo todavía.
+ */
+function trailAcronymProps(account: ScannedAccountView): { acronym: string; title: string } {
+    const { acronym, meaning } = trailAcronym(account);
+    return { acronym, title: meaning };
+}
+
+function trailAcronym(account: ScannedAccountView): { acronym: string; meaning: string } {
+    if (account.match) {
+        return { acronym: account.match.typeAcronym, meaning: account.match.typeLabel };
+    }
+
+    const isThirdParty = account.ownership
+        ? account.ownership === "EXTERNAL"
+        : account.role === "DESTINATION";
+
+    return isThirdParty
+        ? { acronym: THIRD_PARTY_ACRONYM, meaning: "De un tercero" }
+        : { acronym: UNKNOWN_TYPE_ACRONYM, meaning: "Tipo desconocido: aún sin registrar" };
+}
+
 
 /** A quién pertenece el número, en las palabras que el sistema puede sostener. */
 function attribution(account: ScannedAccountView): string {
+    // El tipo ya lo dice el acrónimo de al lado; repetirlo sería decir dos
+    // veces lo mismo en la misma fila.
     if (account.match) {
-        return [account.match.typeLabel, account.match.institutionName]
-            .filter(Boolean).join(" · ");
+        return account.match.institutionName || account.match.typeLabel;
     }
 
     // Lo que el usuario declaró manda sobre cualquier suposición: decir «de un

@@ -148,6 +148,7 @@ describe("previewScannedAccounts — a qué cuenta corresponde", () => {
         expect(vista.match).toEqual({
             id: cuenta.id,
             typeLabel: "Ahorros",
+            typeAcronym: "AHO",
             institutionName: "Banco del Austro",
         });
         expect(vista.resolution).toBe("EXACT");

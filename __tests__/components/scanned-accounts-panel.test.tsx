@@ -10,7 +10,7 @@ function view(overrides: Partial<ScannedAccountView> = {}): ScannedAccountView {
         display: "••••0814",
         kind: "ACCOUNT",
         resolution: "EXACT",
-        match: { id: "acc-1", typeLabel: "Ahorros", institutionName: "Banco del Austro" },
+        match: { id: "acc-1", typeLabel: "Ahorros", typeAcronym: "AHO", institutionName: "Banco del Austro" },
         institutionHint: null,
         ownership: null,
         decision: null,
@@ -34,8 +34,10 @@ describe("ScannedAccountsPanel", () => {
 
         const filas = screen.getAllByRole("listitem");
         expect(filas).toHaveLength(2);
-        expect(filas[0]).toHaveTextContent("••••0814Ahorros · Banco del Austro");
-        expect(filas[1]).toHaveTextContent("••••1582De un tercero");
+        // Tres letras, cuatro dígitos y de quién es. El tipo ya no se repite
+        // en el texto: lo dice el acrónimo.
+        expect(filas[0]).toHaveTextContent("AHO····0814Banco del Austro");
+        expect(filas[1]).toHaveTextContent("TER····1582De un tercero");
     });
 
     it("distingue los lados sin gastar una línea en decirlo", () => {
@@ -197,15 +199,16 @@ describe("AccountsTrail", () => {
             ]} />,
         );
 
-        expect(screen.getByText("••••0814")).toBeInTheDocument();
-        expect(screen.getByText("••••1582")).toBeInTheDocument();
+        expect(screen.getByText("····0814")).toBeInTheDocument();
+        expect(screen.getByText("····1582")).toBeInTheDocument();
         expect(screen.getByLabelText("Origen")).toBeInTheDocument();
         expect(screen.getByLabelText("Destino")).toBeInTheDocument();
     });
 
     it("nombra la cuenta cuando se sabe cuál es", () => {
         render(<AccountsTrail accounts={[view()]} />);
-        expect(screen.getByText(/Ahorros · Banco del Austro/)).toBeInTheDocument();
+        expect(screen.getByTitle("Ahorros")).toHaveTextContent("AHO");
+        expect(screen.getByText("Banco del Austro")).toBeInTheDocument();
     });
 
     it("dice qué es la cuenta, sin repetir el número que ya se ve", () => {
@@ -213,10 +216,17 @@ describe("AccountsTrail", () => {
         // qué es y de quién.
         render(<AccountsTrail accounts={[view({
             display: "25••••10",
-            match: { id: "a1", typeLabel: "Ahorros", institutionName: "COAC Jardín Azuayo" },
+            match: { id: "a1", typeLabel: "Ahorros", typeAcronym: "AHO", institutionName: "COAC Jardín Azuayo" },
         })]} />);
 
-        expect(screen.getByText("Ahorros · COAC Jardín Azuayo")).toBeInTheDocument();
+        // El acrónimo dice qué es; el texto de al lado, de quién. Repetir el
+        // tipo en ambos sería decir dos veces lo mismo.
+        expect(screen.getByTitle("Ahorros")).toHaveTextContent("AHO");
+        expect(screen.getByText("COAC Jardín Azuayo")).toBeInTheDocument();
+        // Y el número se queda en su cola conocida: aquí el banco solo escribió
+        // dos dígitos después de la máscara, así que se muestran dos. Rellenar
+        // hasta cuatro inventaría un número que nadie escribió.
+        expect(screen.getByText("····10")).toBeInTheDocument();
     });
 
     it("dice a quién pertenece lo que no es tuyo", () => {

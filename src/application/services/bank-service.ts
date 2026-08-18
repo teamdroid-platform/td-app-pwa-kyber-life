@@ -24,7 +24,7 @@ import { ISSUER_NAME, inferInstitutionKind } from "@/lib/bank-institution-kind";
 import { parseBankNumber } from "@/lib/bank-number-fingerprint";
 import { resolveFingerprint, type Resolution } from "@/lib/bank-number-match";
 import { formatBankNumber } from "@/lib/format-bank-number";
-import { cardLabel, identityTypeLabel } from "@/lib/bank-identity-label";
+import { cardLabel, identityAcronym, identityTypeLabel } from "@/lib/bank-identity-label";
 import { BankIdentificationService } from "./bank-identification-service";
 
 function round2(value: number): number {
@@ -245,6 +245,8 @@ export interface ScannedAccountView {
          * la fila ya muestra al lado. No hay ningún nombre guardado.
          */
         typeLabel: string;
+        /** El mismo tipo en tres letras: «AHO», «TCR». Lo que se lee primero. */
+        typeAcronym: string;
         institutionName: string | null;
     } | null;
     /** El emisor que el propio texto nombra, cuando no hay identidad que consultar. */
@@ -422,6 +424,7 @@ export class BankService {
                     ? {
                         id: matched.id,
                         typeLabel: identityTypeLabel(matched, kind),
+                        typeAcronym: identityAcronym(matched, kind),
                         institutionName: institutionName(matched.institutionId),
                     }
                     : null,
@@ -467,6 +470,7 @@ export class BankService {
                 match: {
                     id: entity.id,
                     typeLabel: identityTypeLabel(entity, kind),
+                    typeAcronym: identityAcronym(entity, kind),
                     institutionName: institutionName(entity.institutionId),
                 },
                 institutionHint: null,
