@@ -2,21 +2,45 @@
 
 import { Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { money } from "../lib/format-money";
+import { money, shortDate } from "../lib/format-money";
 
 interface BankBalanceHeroProps {
     totalAvailable: number;
     totalDebt: number;
     totalAvailableCredit: number;
+    /**
+     * Efectivo del usuario. Ausente en el detalle de una cuenta, donde la fila
+     * de apoyo no aplica: ahí la cifra grande ya es toda la respuesta.
+     */
+    cashBalance?: number;
+    nextDueDate?: string | null;
+}
+
+/** Un dato de apoyo bajo la cifra grande. */
+function Fact({ label, value, tone }: { label: string; value: string; tone?: "muted" | "warn" }) {
+    return (
+        <div className="min-w-0 flex-1">
+            <p className="text-[9.5px] font-semibold uppercase tracking-[0.1em] text-white/45">{label}</p>
+            <p className={cn(
+                "mt-0.5 truncate text-[13px] font-semibold tabular-nums",
+                tone === "muted" ? "text-white/55" : tone === "warn" ? "text-amber-300" : "text-white/90",
+            )}>
+                {value}
+            </p>
+        </div>
+    );
 }
 
 /**
- * Panel de cabecera del resumen. Sigue el patrón de `BalanceHeroCard` del
- * módulo financiero: gradiente oscuro que vira a rojo cuando el disponible es
- * negativo, con la cifra en grande y el contexto en píldoras.
+ * La respuesta de la pantalla: cuánto hay disponible, y el contexto que la
+ * matiza.
+ *
+ * El efectivo y el próximo pago vivían en dos tarjetas sueltas debajo. Son de
+ * esta misma pregunta —cuánto tengo y qué debo— y separadas costaban su propio
+ * borde, su propio fondo y setenta píxeles de alto para dos cifras.
  */
 export function BankBalanceHero({
-    totalAvailable, totalDebt, totalAvailableCredit,
+    totalAvailable, totalDebt, totalAvailableCredit, cashBalance, nextDueDate,
 }: BankBalanceHeroProps) {
     const negative = totalAvailable < 0;
 
@@ -24,8 +48,8 @@ export function BankBalanceHero({
         <div className={cn(
             "relative overflow-hidden rounded-3xl px-5 py-4 shadow-lg shadow-black/30",
             negative
-                ? "bg-gradient-to-r from-[#0d101d] from-45% to-[#26101c]"
-                : "bg-gradient-to-r from-[#0d101d] from-45% to-[#0e2620]",
+                ? "bg-gradient-to-br from-[#0d101d] from-40% to-[#26101c]"
+                : "bg-gradient-to-br from-[#0d101d] from-40% to-[#0e2620]",
         )}>
             <div
                 aria-hidden="true"
@@ -37,28 +61,46 @@ export function BankBalanceHero({
             <Sparkles aria-hidden="true" className="pointer-events-none absolute right-10 top-4 h-3 w-3 text-white/30" />
             <Sparkles aria-hidden="true" className="pointer-events-none absolute right-20 bottom-5 h-2 w-2 text-white/20" />
 
-            <div className="relative flex flex-col gap-2.5">
-                <p className="text-sm font-medium text-white/85">Disponible en cuentas</p>
+            <div className="relative flex flex-col gap-3">
+                <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/60">
+                        Disponible en cuentas
+                    </p>
+                    <h2 className={cn(
+                        "mt-1.5 text-[2rem] font-bold leading-none tracking-tight tabular-nums",
+                        negative ? "text-rose-400" : "text-emerald-400",
+                    )}>
+                        {negative && "−"}{money(totalAvailable)}
+                    </h2>
+                </div>
 
-                <h2 className={cn(
-                    "text-[2rem] font-bold leading-none tracking-tight tabular-nums",
-                    negative ? "text-rose-400" : "text-emerald-400",
-                )}>
-                    {negative && "−"}{money(totalAvailable)}
-                </h2>
-
-                <div className="flex flex-wrap gap-2">
-                    {totalDebt > 0 && (
+                {totalDebt > 0 && (
+                    <div className="flex">
                         <span className="rounded-full border border-rose-500/30 bg-rose-500/15 px-2.5 py-0.5 text-[11px] text-rose-200">
                             Debes {money(totalDebt)} en tarjetas
                         </span>
-                    )}
-                    {totalAvailableCredit > 0 && (
-                        <span className="rounded-full border border-white/10 bg-white/10 px-2.5 py-0.5 text-[11px] text-white/80">
-                            Cupo libre {money(totalAvailableCredit)}
-                        </span>
-                    )}
-                </div>
+                    </div>
+                )}
+
+                {cashBalance !== undefined && (
+                    <div className="flex gap-3 border-t border-white/10 pt-2.5">
+                        <Fact
+                            label="Cupo libre"
+                            value={totalAvailableCredit > 0 ? money(totalAvailableCredit) : "—"}
+                            tone={totalAvailableCredit > 0 ? undefined : "muted"}
+                        />
+                        <Fact
+                            label="Efectivo"
+                            value={money(cashBalance)}
+                            tone={cashBalance > 0 ? undefined : "muted"}
+                        />
+                        <Fact
+                            label="Próximo pago"
+                            value={nextDueDate ? shortDate(nextDueDate) : "Ninguno"}
+                            tone={nextDueDate ? "warn" : "muted"}
+                        />
+                    </div>
+                )}
             </div>
         </div>
     );
