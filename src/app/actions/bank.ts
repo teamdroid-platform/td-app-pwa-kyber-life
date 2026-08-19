@@ -13,6 +13,7 @@ import {
     createAccountSchema, updateAccountSchema,
     createCardSchema, updateCardSchema,
     balanceSnapshotSchema, statementTotalSchema, payStatementSchema,
+    mergeInstitutionsSchema,
 } from "@/lib/validators/bank-schemas";
 
 const idSchema = z.string().uuid();
@@ -122,6 +123,20 @@ export async function deleteBankInstitutionAction(id: string) {
         await bankService.deleteInstitution(userId, idSchema.parse(id));
         revalidateBanks();
         return true;
+    });
+}
+
+/**
+ * Unifica emisores duplicados en uno. Devuelve cuántas cuentas y tarjetas se
+ * movieron para poder decirlo en el aviso: «se movieron 2 cuentas» es una
+ * confirmación, «listo» no lo es.
+ */
+export async function mergeBankInstitutionsAction(input: unknown) {
+    return run("mergeBankInstitutions", async userId => {
+        const { sourceIds, targetId } = mergeInstitutionsSchema.parse(input);
+        const result = await bankService.mergeInstitutions(userId, sourceIds, targetId);
+        revalidateBanks();
+        return result;
     });
 }
 

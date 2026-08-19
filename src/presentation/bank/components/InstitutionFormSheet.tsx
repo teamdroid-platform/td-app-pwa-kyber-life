@@ -9,10 +9,16 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { createBankInstitutionAction } from "@/app/actions/bank";
-import type { BankInstitutionKind } from "@/domain/entities/bank";
+import type { BankInstitution, BankInstitutionKind } from "@/domain/entities/bank";
 import { INSTITUTION_KINDS } from "@/lib/bank-institution-kind";
 
-export function InstitutionFormSheet({ trigger }: { trigger: React.ReactNode }) {
+interface InstitutionFormSheetProps {
+    trigger: React.ReactNode;
+    /** Avisa al contenedor —el selector de alta— para que también se cierre. */
+    onCreated?: (created: BankInstitution) => void;
+}
+
+export function InstitutionFormSheet({ trigger, onCreated }: InstitutionFormSheetProps) {
     const router = useRouter();
     const [open, setOpen] = useState(false);
     const [name, setName] = useState("");
@@ -37,6 +43,7 @@ export function InstitutionFormSheet({ trigger }: { trigger: React.ReactNode }) 
         toast.success("Institución creada");
         setName("");
         setOpen(false);
+        onCreated?.(result.data);
         router.refresh();
     }
 

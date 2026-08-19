@@ -96,6 +96,19 @@ export class SupabaseBankAccountRepository implements IBankAccountRepository {
         return mapToEntity(data);
     }
 
+    /** Un solo UPDATE: mover diez cuentas no debe costar diez viajes. */
+    async reassignInstitution(userId: UUID, from: UUID, to: UUID): Promise<number> {
+        const supabase = await createClient();
+        const { data, error } = await supabase
+            .from("bank_accounts")
+            .update({ institution_id: to, updated_at: new Date().toISOString() })
+            .eq("owner_user_id", userId).eq("institution_id", from).eq("is_deleted", false)
+            .select("id");
+
+        if (error) throw new Error(`Error reassigning bank accounts: ${error.message}`);
+        return (data ?? []).length;
+    }
+
     async update(entity: BankAccount): Promise<BankAccount> {
         const supabase = await createClient();
         const { data, error } = await supabase
