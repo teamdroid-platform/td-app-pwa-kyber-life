@@ -2,7 +2,7 @@ import {
     ACCOUNT_TYPE_ACRONYM, CARD_TYPE_ACRONYM, THIRD_PARTY_ACRONYM, UNKNOWN_TYPE_ACRONYM,
     acronymTone, identityAcronym,
 } from "@/lib/bank-identity-label";
-import { formatLastFour, lastFourOfDisplay } from "@/lib/format-bank-number";
+import { formatIdentityNumber, identityNumberFromDisplay } from "@/lib/format-bank-number";
 import type { BankAccount, BankCard } from "@/domain/entities/bank";
 
 /**
@@ -61,24 +61,25 @@ describe("acrónimos de identidad bancaria", () => {
     });
 });
 
-describe("el número se reduce a su cola", () => {
-    it("deja solo los cuatro últimos de una identidad registrada", () => {
-        expect(formatLastFour({ lastFour: "0814", prefixDigits: "493176" })).toBe("····0814");
+describe("el número se muestra con largo fijo", () => {
+    it("un prefijo de seis no cabe con el sufijo: cede el principio", () => {
+        expect(formatIdentityNumber({ lastFour: "0814", prefixDigits: "493176" })).toBe("XXXX0814");
     });
 
     it("no muestra nada cuando no hay cola que mostrar", () => {
-        expect(formatLastFour({ lastFour: null, prefixDigits: "493176" })).toBe("");
+        expect(formatIdentityNumber({ lastFour: null, prefixDigits: "493176" })).toBe("");
     });
 
-    it("recorta un número ya enmascarado, venga como venga del banco", () => {
-        expect(lastFourOfDisplay("493176XXXX2780")).toBe("····2780");
-        expect(lastFourOfDisplay("••••0814")).toBe("····0814");
-        expect(lastFourOfDisplay("XXXX8361")).toBe("····8361");
+    it("normaliza un número ya enmascarado, venga como venga del banco", () => {
+        expect(identityNumberFromDisplay("493176XXXX2780")).toBe("XXXX2780");
+        expect(identityNumberFromDisplay("••••0814")).toBe("XXXX0814");
+        expect(identityNumberFromDisplay("XXXX8361")).toBe("XXXX8361");
     });
 
     it("no inventa dígitos que el banco nunca escribió", () => {
-        // En «25••••10» el «25» es prefijo: la cola conocida son dos dígitos.
-        // Devolver «····2510» mezclaría principio y final en un número falso.
-        expect(lastFourOfDisplay("25••••10")).toBe("····10");
+        // En «25••••10» el «25» es prefijo y la cola conocida son dos dígitos.
+        // Se muestran los dos y el prefijo, que cabe: nunca un «2510» falso.
+        expect(identityNumberFromDisplay("25••••10")).toBe("25XXXX10");
+        expect(identityNumberFromDisplay("25••••10")).not.toContain("2510");
     });
 });

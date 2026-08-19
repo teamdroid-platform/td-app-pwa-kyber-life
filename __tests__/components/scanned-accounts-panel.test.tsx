@@ -7,7 +7,7 @@ function view(overrides: Partial<ScannedAccountView> = {}): ScannedAccountView {
     return {
         role: "SOURCE",
         raw: "AHO - XXXXXX0814",
-        display: "••••0814",
+        display: "XXXX0814",
         kind: "ACCOUNT",
         resolution: "EXACT",
         match: { id: "acc-1", typeLabel: "Ahorros", typeAcronym: "AHO", institutionName: "Banco del Austro" },
@@ -28,7 +28,7 @@ describe("ScannedAccountsPanel", () => {
         render(
             <ScannedAccountsPanel accounts={[
                 view(),
-                view({ role: "DESTINATION", raw: "XXXXXX1582", display: "••••1582", match: null, resolution: "PENDING" }),
+                view({ role: "DESTINATION", raw: "XXXXXX1582", display: "XXXX1582", match: null, resolution: "PENDING" }),
             ]} />,
         );
 
@@ -36,8 +36,8 @@ describe("ScannedAccountsPanel", () => {
         expect(filas).toHaveLength(2);
         // Tres letras, cuatro dígitos y de quién es. El tipo ya no se repite
         // en el texto: lo dice el acrónimo.
-        expect(filas[0]).toHaveTextContent("AHO····0814Banco del Austro");
-        expect(filas[1]).toHaveTextContent("TER····1582De un tercero");
+        expect(filas[0]).toHaveTextContent("AHOXXXX0814Banco del Austro");
+        expect(filas[1]).toHaveTextContent("TERXXXX1582De un tercero");
     });
 
     it("distingue los lados sin gastar una línea en decirlo", () => {
@@ -171,7 +171,7 @@ describe("declarar de quién es cada cuenta", () => {
 
     it("y también en el recorrido de la fila", () => {
         render(<AccountsTrail accounts={[view({
-            role: "DESTINATION", display: "10••••11", match: null,
+            role: "DESTINATION", display: "10XXXXXX11", match: null,
             resolution: "PENDING", ownership: "MINE",
         })]} />);
 
@@ -194,13 +194,13 @@ describe("AccountsTrail", () => {
     it("resume el recorrido para caber dentro de otra fila", () => {
         render(
             <AccountsTrail accounts={[
-                view({ display: "••••0814" }),
-                view({ role: "DESTINATION", display: "••••1582", match: null, raw: "XXXXXX1582" }),
+                view({ display: "XXXX0814" }),
+                view({ role: "DESTINATION", display: "XXXX1582", match: null, raw: "XXXXXX1582" }),
             ]} />,
         );
 
-        expect(screen.getByText("····0814")).toBeInTheDocument();
-        expect(screen.getByText("····1582")).toBeInTheDocument();
+        expect(screen.getByText("XXXX0814")).toBeInTheDocument();
+        expect(screen.getByText("XXXX1582")).toBeInTheDocument();
         expect(screen.getByLabelText("Origen")).toBeInTheDocument();
         expect(screen.getByLabelText("Destino")).toBeInTheDocument();
     });
@@ -215,7 +215,7 @@ describe("AccountsTrail", () => {
         // Las cuentas no tienen nombre: la fila muestra el número y, al lado,
         // qué es y de quién.
         render(<AccountsTrail accounts={[view({
-            display: "25••••10",
+            display: "25XXXXXX10",
             match: { id: "a1", typeLabel: "Ahorros", typeAcronym: "AHO", institutionName: "COAC Jardín Azuayo" },
         })]} />);
 
@@ -223,15 +223,15 @@ describe("AccountsTrail", () => {
         // tipo en ambos sería decir dos veces lo mismo.
         expect(screen.getByTitle("Ahorros")).toHaveTextContent("AHO");
         expect(screen.getByText("COAC Jardín Azuayo")).toBeInTheDocument();
-        // Y el número se queda en su cola conocida: aquí el banco solo escribió
-        // dos dígitos después de la máscara, así que se muestran dos. Rellenar
-        // hasta cuatro inventaría un número que nadie escribió.
-        expect(screen.getByText("····10")).toBeInTheDocument();
+        // El banco solo escribió dos dígitos después de la máscara, así que se
+        // muestran dos: rellenar hasta cuatro inventaría un número que nadie
+        // escribió. El «25» del principio sí se conoce y cabe en los ocho.
+        expect(screen.getByText("25XXXX10")).toBeInTheDocument();
     });
 
     it("dice a quién pertenece lo que no es tuyo", () => {
         render(<AccountsTrail accounts={[view({
-            role: "DESTINATION", display: "••••1582", match: null, resolution: "PENDING",
+            role: "DESTINATION", display: "XXXX1582", match: null, resolution: "PENDING",
         })]} />);
 
         expect(screen.getByText("De un tercero")).toBeInTheDocument();

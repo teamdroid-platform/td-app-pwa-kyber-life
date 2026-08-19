@@ -58,9 +58,9 @@ describe("BankOverviewClient", () => {
         expect(screen.getByTitle("Tarjeta de crédito")).toHaveTextContent("TCR");
         expect(screen.getByTitle("Tarjeta de débito")).toHaveTextContent("TDE");
 
-        expect(screen.getByText("····0814")).toBeInTheDocument();
-        expect(screen.getByText("····8361")).toBeInTheDocument();
-        expect(screen.getByText("····2780")).toBeInTheDocument();
+        expect(screen.getByText("XXXX0814")).toBeInTheDocument();
+        expect(screen.getByText("XXXX8361")).toBeInTheDocument();
+        expect(screen.getByText("XXXX2780")).toBeInTheDocument();
     });
 
     it("muestra el disponible, la deuda y el efectivo", () => {
@@ -81,7 +81,7 @@ describe("BankOverviewClient", () => {
     it("la tarjeta de débito dice de qué cuenta come, no un saldo propio", () => {
         render(<BankOverviewClient initialData={overview} />);
         // La fila del débito nombra la cuenta de la que descuenta.
-        expect(screen.getByText(/→ Ahorros ••••0814/)).toBeInTheDocument();
+        expect(screen.getByText(/→ Ahorros XXXX0814/)).toBeInTheDocument();
         expect(screen.getByText(/usa el saldo de la cuenta/i)).toBeInTheDocument();
         // La de débito no muestra deuda ni cupo.
         expect(screen.queryByText(/^−\$0,00$/)).not.toBeInTheDocument();
@@ -103,13 +103,13 @@ describe("BankOverviewClient", () => {
 
         const header = screen.getByRole("button", { name: /Banco del Austro/i });
         expect(header).toHaveAttribute("aria-expanded", "true");
-        expect(screen.getByText("····0814")).toBeInTheDocument();
+        expect(screen.getByText("XXXX0814")).toBeInTheDocument();
 
         act(() => { fireEvent.click(header); });
 
         expect(header).toHaveAttribute("aria-expanded", "false");
         // Plegado esconde las filas, no el total: el saldo del grupo sigue a la vista.
-        expect(screen.queryByText("····0814")).not.toBeInTheDocument();
+        expect(screen.queryByText("XXXX0814")).not.toBeInTheDocument();
         expect(screen.getAllByText("$2.104,18").length).toBeGreaterThan(0);
     });
 
@@ -152,7 +152,7 @@ describe("BankOverviewClient", () => {
     it("el lápiz suelto se va: editar vive en el menú de la fila", () => {
         render(<BankOverviewClient initialData={overview} />);
 
-        act(() => { fireEvent.click(screen.getByRole("button", { name: /Acciones de AHO ····0814/i })); });
+        act(() => { fireEvent.click(screen.getByRole("button", { name: /Acciones de AHO XXXX0814/i })); });
 
         expect(screen.getByText("Editar")).toBeInTheDocument();
         expect(screen.getByText("Registrar saldo")).toBeInTheDocument();
@@ -163,7 +163,7 @@ describe("BankOverviewClient", () => {
     it("una tarjeta no ofrece registrar saldo: no tiene saldo propio", () => {
         render(<BankOverviewClient initialData={overview} />);
 
-        act(() => { fireEvent.click(screen.getByRole("button", { name: /Acciones de TCR ····8361/i })); });
+        act(() => { fireEvent.click(screen.getByRole("button", { name: /Acciones de TCR XXXX8361/i })); });
 
         expect(screen.getByText("Archivar tarjeta")).toBeInTheDocument();
         expect(screen.queryByText("Registrar saldo")).not.toBeInTheDocument();

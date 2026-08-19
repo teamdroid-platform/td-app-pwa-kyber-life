@@ -97,7 +97,7 @@ describe("previewScannedAccounts — qué muestra", () => {
             { type: "destino", account: "Mastercard-8361" },
         ]);
 
-        expect(cuenta.display).toBe("••••0814");
+        expect(cuenta.display).toBe("XXXX0814");
         expect(cuenta.kind).toBe("ACCOUNT");
         expect(tarjeta.display).toBe("XXXX8361");
         expect(tarjeta.kind).toBe("CARD");
@@ -123,7 +123,7 @@ describe("previewScannedAccounts — qué muestra", () => {
         ]);
 
         expect(vista.kind).toBe("ACCOUNT");
-        expect(vista.display).toBe("••••1582");
+        expect(vista.display).toBe("XXXX1582");
     });
 
     it("guarda intacta la cadena del banco como evidencia", async () => {
@@ -198,7 +198,7 @@ describe("transactionAccounts — lo mismo, ya confirmado", () => {
 
         expect(vista).toMatchObject({
             role: "SOURCE",
-            display: "••••0814",
+            display: "XXXX0814",
             kind: "ACCOUNT",
             resolution: "EXACT",
             match: { id: cuenta.id, typeLabel: "Ahorros", institutionName: "Banco del Austro" },
@@ -240,7 +240,7 @@ describe("transactionAccounts — lo mismo, ya confirmado", () => {
             bankDestinationAccountId: otra.id,
         });
 
-        expect(vistas[0]).toMatchObject({ role: "DESTINATION", display: "••••9511" });
+        expect(vistas[0]).toMatchObject({ role: "DESTINATION", display: "XXXX9511" });
     });
 
     it("la contraparte de un tercero conserva la cadena del banco", async () => {
@@ -254,7 +254,7 @@ describe("transactionAccounts — lo mismo, ya confirmado", () => {
         expect(vista).toMatchObject({
             role: "DESTINATION",
             raw: "XXXXXX1582",
-            display: "••••1582",
+            display: "XXXX1582",
             match: null,
         });
     });
@@ -297,7 +297,7 @@ describe("previewScannedAccounts — bordes", () => {
             { type: "origen", account: "AHO - XXXXXX0814" },
         ]);
 
-        expect(vista.display).toBe("••••0814");
+        expect(vista.display).toBe("XXXX0814");
         expect(vista.match).toBeNull();
     });
 });

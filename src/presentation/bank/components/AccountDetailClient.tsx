@@ -36,7 +36,7 @@ function groupByDay(movements: BankMovement[], running: number[]) {
 
 export function AccountDetailClient({ initialData }: { initialData: BankAccountDetail }) {
     const { account, snapshots, movements, running } = initialData;
-    const number = formatBankNumber(account, "ACCOUNT");
+    const number = formatBankNumber(account);
     const latestSnapshot = snapshots[0];
 
     const days = useMemo(() => groupByDay(movements, running), [movements, running]);

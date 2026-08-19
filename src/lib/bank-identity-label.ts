@@ -24,7 +24,7 @@ export const CARD_TYPE_LABEL: Record<BankCardType, string> = {
 export function accountLabel(
     account: Pick<BankAccount, "accountType" | "lastFour" | "prefixDigits">,
 ): string {
-    const number = formatBankNumber(account, "ACCOUNT");
+    const number = formatBankNumber(account);
     const type = ACCOUNT_TYPE_LABEL[account.accountType];
     return number ? `${type} ${number}` : type;
 }
@@ -36,7 +36,7 @@ export function accountLabel(
 export function cardLabel(
     card: Pick<BankCard, "cardType" | "brand" | "lastFour" | "prefixDigits">,
 ): string {
-    const number = formatBankNumber(card, "CARD");
+    const number = formatBankNumber(card);
     const head = card.brand?.trim() || CARD_TYPE_LABEL[card.cardType];
     return number ? `${head} ${number}` : head;
 }

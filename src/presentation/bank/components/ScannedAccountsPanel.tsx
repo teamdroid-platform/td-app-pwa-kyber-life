@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { InstitutionCombo, EMPTY_INSTITUTION_CHOICE, type InstitutionChoice } from "./InstitutionCombo";
 import { IdentityBadge } from "./IdentityBadge";
 import { THIRD_PARTY_ACRONYM, UNKNOWN_TYPE_ACRONYM } from "@/lib/bank-identity-label";
-import { lastFourOfDisplay } from "@/lib/format-bank-number";
+import { identityNumberFromDisplay } from "@/lib/format-bank-number";
 import type { BankInstitution } from "@/domain/entities/bank";
 
 
@@ -111,7 +111,7 @@ function ScannedAccountRow({
                 {/* El mismo vocabulario que el resumen y el selector: tres
                     letras delante, cuatro dígitos, y de quién es al lado. */}
                 <IdentityBadge {...trailAcronymProps(account)} />
-                <span className="shrink-0 font-mono text-text-primary">{lastFourOfDisplay(account.display)}</span>
+                <span className="shrink-0 font-mono text-text-primary">{identityNumberFromDisplay(account.display)}</span>
                 <span className="truncate text-text-tertiary">{attribution(account)}</span>
             </span>
 
@@ -348,7 +348,7 @@ export function AccountsTrail({ accounts }: { accounts: ScannedAccountView[] }) 
                                 aria-label={isSource ? "Origen" : "Destino"}
                             />
                             <IdentityBadge acronym={acronym} title={meaning} />
-                            <span className="font-mono text-sm">{lastFourOfDisplay(account.display)}</span>
+                            <span className="font-mono text-sm">{identityNumberFromDisplay(account.display)}</span>
                         </span>
                         {/* El banco cabe entero aquí: en la línea de arriba
                             competía con el número y acababa cortado. */}

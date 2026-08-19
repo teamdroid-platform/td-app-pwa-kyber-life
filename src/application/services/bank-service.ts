@@ -416,7 +416,6 @@ export class BankService {
                 raw,
                 display: formatBankNumber(
                     { prefixDigits: fingerprint.prefixDigits, lastFour: fingerprint.suffixDigits },
-                    kind,
                 ) || raw,
                 kind,
                 resolution,
@@ -464,7 +463,7 @@ export class BankService {
             return {
                 role,
                 raw: "",
-                display: formatBankNumber(entity, kind),
+                display: formatBankNumber(entity),
                 kind,
                 resolution: "EXACT",
                 match: {
@@ -504,7 +503,6 @@ export class BankService {
                     raw: observation.raw,
                     display: formatBankNumber(
                         { prefixDigits: fingerprint.prefixDigits, lastFour: fingerprint.suffixDigits },
-                        kind,
                     ) || observation.raw,
                     kind,
                     resolution: "PENDING",

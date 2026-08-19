@@ -42,7 +42,7 @@ describe("PaymentSourcePicker", () => {
     it("elegir una cuenta no marca pago con crédito", () => {
         const onChange = jest.fn();
         render(<PaymentSourcePicker accounts={accounts} cards={cards} value={{}} onChange={onChange} />);
-        fireEvent.click(screen.getByText("Ahorros ••••0814"));
+        fireEvent.click(screen.getByText("Ahorros XXXX0814"));
 
         expect(onChange).toHaveBeenCalledWith({ accountId: "a1", paidWithCredit: false });
     });
@@ -74,7 +74,7 @@ describe("PaymentSourcePicker", () => {
                 onChange={onChange}
             />,
         );
-        fireEvent.click(screen.getByText("Ahorros ••••0814"));
+        fireEvent.click(screen.getByText("Ahorros XXXX0814"));
 
         expect(onChange).toHaveBeenCalledWith({ paidWithCredit: false });
     });
@@ -221,7 +221,7 @@ describe("PaymentSourcePicker — una sola lista", () => {
         render(<PaymentSourcePicker accounts={accounts} cards={cards} value={{}} onChange={jest.fn()} />);
 
         // El título ya lleva el número; el subtítulo repetía lo mismo debajo.
-        expect(screen.getAllByText(/••••0814/)).toHaveLength(1);
+        expect(screen.getAllByText(/XXXX0814/)).toHaveLength(1);
         expect(screen.getAllByText(/XXXX8361/)).toHaveLength(1);
     });
 

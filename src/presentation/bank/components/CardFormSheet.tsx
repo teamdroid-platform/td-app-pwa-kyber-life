@@ -84,7 +84,7 @@ export function CardFormSheet({
     const [brand, setBrand] = useState(card?.brand ?? "");
     // Un solo campo para el número, como en el alta de cuenta: lo que el banco
     // muestra —`493176XXXXXX2780`— trae principio y final a la vez.
-    const [number, setNumber] = useState(card ? formatBankNumber(card, "CARD") : defaultNumber);
+    const [number, setNumber] = useState(card ? formatBankNumber(card) : defaultNumber);
     const [creditLimit, setCreditLimit] = useState(card?.creditLimit != null ? String(card.creditLimit) : "");
     const [statementDay, setStatementDay] = useState(card?.statementDay != null ? String(card.statementDay) : "");
     const [dueDay, setDueDay] = useState(card?.dueDay != null ? String(card.dueDay) : "");
