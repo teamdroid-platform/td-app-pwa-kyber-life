@@ -19,7 +19,7 @@ function daysUntil(date: string): number {
 
 export function CardDetailClient({ initialData }: { initialData: BankCardDetail }) {
     const { card, statements, periodMovements, payableAccounts } = initialData;
-    const number = formatBankNumber(card, "CARD");
+    const number = formatBankNumber(card);
     const open = card.openStatement;
     const isCredit = card.cardType === "CREDIT";
 

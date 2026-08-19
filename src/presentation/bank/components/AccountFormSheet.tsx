@@ -86,7 +86,7 @@ export function AccountFormSheet({
     // descomponerlo a mano y perdía los dígitos del principio, que son los que
     // distinguen una cuenta de cooperativa de otra.
     const [number, setNumber] = useState(
-        account ? formatBankNumber(account, "ACCOUNT") : defaultNumber,
+        account ? formatBankNumber(account) : defaultNumber,
     );
     const [saving, setSaving] = useState(false);
 

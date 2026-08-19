@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ArrowUpRight, CreditCard, Pencil, Trash2 } from "lucide-react";
-import { formatLastFour } from "@/lib/format-bank-number";
+import { formatIdentityNumber } from "@/lib/format-bank-number";
 import { CARD_TYPE_ACRONYM, CARD_TYPE_LABEL } from "@/lib/bank-identity-label";
 import { deleteBankCardAction } from "@/app/actions/bank";
 import { IdentityBadge } from "./IdentityBadge";
@@ -32,7 +32,7 @@ interface CardRowProps {
 export function CardRow({ card, accountName, institutions, accounts }: CardRowProps) {
     const router = useRouter();
     const isCredit = card.cardType === "CREDIT";
-    const number = formatLastFour(card);
+    const number = formatIdentityNumber(card);
     const acronym = CARD_TYPE_ACRONYM[card.cardType];
 
     const [menuOpen, setMenuOpen] = useState(false);

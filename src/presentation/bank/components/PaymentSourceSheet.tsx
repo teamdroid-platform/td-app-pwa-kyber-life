@@ -9,7 +9,7 @@ import {
     ACCOUNT_TYPE_ACRONYM, ACCOUNT_TYPE_LABEL, CARD_TYPE_ACRONYM, CARD_TYPE_LABEL,
     accountLabel, cardLabel,
 } from "@/lib/bank-identity-label";
-import { formatLastFour, lastFourOfDisplay } from "@/lib/format-bank-number";
+import { formatIdentityNumber, identityNumberFromDisplay } from "@/lib/format-bank-number";
 import { IdentityBadge } from "./IdentityBadge";
 import { normalizeForMatch } from "@/lib/institution-match";
 import { AccountFormSheet } from "./AccountFormSheet";
@@ -138,8 +138,72 @@ export function PaymentSourceSheet({
         />
     );
 
+    /*
+     * El alta va anclada al pie, no al final de la lista.
+     *
+     * Era el último hijo del cuerpo scrolleable, así que se alejaba un poco más
+     * con cada cuenta registrada: con siete identidades ya caía fuera de la
+     * vista y nada indicaba que hubiera algo debajo. Anclada, está a la misma
+     * distancia con una cuenta o con veinte.
+     */
+    const createFooter = (
+        <div className="w-full">
+            <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-text-tertiary">
+                ¿No está en la lista?
+            </p>
+
+            <div className="mb-2 flex items-center gap-2.5 rounded-xl border border-accent-primary/45 bg-accent-primary/10 p-2.5">
+                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-accent-primary/20 text-accent-primary">
+                    <Plus className="h-4 w-4" />
+                </span>
+                <span className="min-w-0">
+                    <span className="block truncate text-[13px] font-semibold text-text-primary">
+                        {registersScanned
+                            ? <>Registrar <span className="font-mono">{identityNumberFromDisplay(scannedNumber!)}</span></>
+                            : "Nueva cuenta o tarjeta"}
+                    </span>
+                    <span className="block text-[11px] text-text-tertiary">
+                        Elige qué es y lo damos de alta
+                    </span>
+                </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+                {/* La detectada va primera: es la respuesta más probable,
+                    pero la otra queda a un toque porque se equivoca. */}
+                {scannedKind === "CARD" ? (
+                    <>
+                        {cardTrigger}
+                        {accountTrigger}
+                    </>
+                ) : (
+                    <>
+                        {accountTrigger}
+                        {cardTrigger}
+                    </>
+                )}
+            </div>
+
+            {registersScanned && (
+                <button
+                    type="button"
+                    onClick={() => setCreatingOther(true)}
+                    className="mt-2 w-full text-center text-[11px] text-text-tertiary underline underline-offset-2 hover:text-text-secondary"
+                >
+                    Crear otra cuenta o tarjeta
+                </button>
+            )}
+        </div>
+    );
+
     return (
-        <FormSheet open={open} onOpenChange={onOpenChange} title={title} bodyClassName="space-y-3 py-3">
+        <FormSheet
+            open={open}
+            onOpenChange={onOpenChange}
+            title={title}
+            bodyClassName="space-y-3 py-3"
+            footer={createFooter}
+        >
             {!isEmpty && (
                 <div className="relative">
                     <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-tertiary" />
@@ -172,7 +236,7 @@ export function PaymentSourceSheet({
                                             acronym={ACCOUNT_TYPE_ACRONYM[account.accountType]}
                                             title={ACCOUNT_TYPE_LABEL[account.accountType]}
                                         />
-                                        <span className="font-mono">{formatLastFour(account)}</span>
+                                        <span className="font-mono">{formatIdentityNumber(account)}</span>
                                     </>
                                 )}
                                 subtitle={[
@@ -199,7 +263,7 @@ export function PaymentSourceSheet({
                                         acronym={CARD_TYPE_ACRONYM[card.cardType]}
                                         title={`Tarjeta de ${CARD_TYPE_LABEL[card.cardType].toLowerCase()}`}
                                     />
-                                    <span className="font-mono">{formatLastFour(card)}</span>
+                                    <span className="font-mono">{formatIdentityNumber(card)}</span>
                                     {card.brand?.trim() && (
                                         <span className="truncate text-xs font-normal text-text-tertiary">
                                             {card.brand.trim()}
@@ -232,58 +296,6 @@ export function PaymentSourceSheet({
                     subtitle="De otra persona o de un comercio"
                 />
             )}
-
-            {/* Registrar lo que falta: una sola acción, y el tipo después.
-                Antes eran dos botones sueltos donde solo el de cuenta ofrecía
-                registrar el número leído — aunque el escaneo hubiera leído una
-                tarjeta, que es lo que pasa la mitad de las veces. */}
-            <div className="mt-1 border-t border-border/40 pt-3">
-                <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-text-tertiary">
-                    ¿No está en la lista?
-                </p>
-
-                <div className="mb-2 flex items-center gap-2.5 rounded-xl border border-accent-primary/45 bg-accent-primary/10 p-2.5">
-                    <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-accent-primary/20 text-accent-primary">
-                        <Plus className="h-4 w-4" />
-                    </span>
-                    <span className="min-w-0">
-                        <span className="block truncate text-[13px] font-semibold text-text-primary">
-                            {registersScanned
-                                ? <>Registrar <span className="font-mono">{lastFourOfDisplay(scannedNumber!)}</span></>
-                                : "Nueva cuenta o tarjeta"}
-                        </span>
-                        <span className="block text-[11px] text-text-tertiary">
-                            Elige qué es y lo damos de alta
-                        </span>
-                    </span>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                    {/* La detectada va primera: es la respuesta más probable,
-                        pero la otra queda a un toque porque se equivoca. */}
-                    {scannedKind === "CARD" ? (
-                        <>
-                            {cardTrigger}
-                            {accountTrigger}
-                        </>
-                    ) : (
-                        <>
-                            {accountTrigger}
-                            {cardTrigger}
-                        </>
-                    )}
-                </div>
-
-                {registersScanned && (
-                    <button
-                        type="button"
-                        onClick={() => setCreatingOther(true)}
-                        className="mt-2 w-full text-center text-[11px] text-text-tertiary underline underline-offset-2 hover:text-text-secondary"
-                    >
-                        Crear otra cuenta o tarjeta
-                    </button>
-                )}
-            </div>
 
         </FormSheet>
     );

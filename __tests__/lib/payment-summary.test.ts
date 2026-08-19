@@ -30,7 +30,7 @@ const cards = [credito, debito];
 describe("describePaymentSource", () => {
     it("nombra la cuenta con su número al estándar", () => {
         expect(describePaymentSource({ accountId: "a1" }, accounts, cards))
-            .toBe("Ahorros ••••0814");
+            .toBe("Ahorros XXXX0814");
     });
 
     it("nombra la tarjeta con equis, no con puntos", () => {
@@ -73,6 +73,6 @@ describe("isGenericPaymentLabel", () => {
     });
 
     it("una cuenta concreta no es genérica", () => {
-        expect(isGenericPaymentLabel("Ahorros ••••0814")).toBe(false);
+        expect(isGenericPaymentLabel("Ahorros XXXX0814")).toBe(false);
     });
 });

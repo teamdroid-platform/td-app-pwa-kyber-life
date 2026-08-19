@@ -4,7 +4,7 @@ import type { BankAccount, BankCard } from "@/domain/entities/bank";
 import {
     ACCOUNT_TYPE_ACRONYM, ACCOUNT_TYPE_LABEL, CARD_TYPE_ACRONYM, CARD_TYPE_LABEL,
 } from "@/lib/bank-identity-label";
-import { formatLastFour } from "@/lib/format-bank-number";
+import { formatIdentityNumber } from "@/lib/format-bank-number";
 import { IdentityBadge } from "./IdentityBadge";
 
 export interface PaymentIdentityLineProps {
@@ -48,7 +48,7 @@ export function PaymentIdentityLine({
         <span className="flex min-w-0 flex-col">
             <span className="flex items-center gap-1.5">
                 <IdentityBadge acronym={acronym} title={meaning} />
-                <span className="font-mono text-sm">{formatLastFour(card ?? account!)}</span>
+                <span className="font-mono text-sm">{formatIdentityNumber(card ?? account!)}</span>
             </span>
             {(brand || issuer) && (
                 <span className="truncate text-[11px] text-text-tertiary">
