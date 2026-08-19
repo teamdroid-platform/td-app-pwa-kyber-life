@@ -30,6 +30,18 @@ export interface PendingGroup {
     cardId: UUID | null;
 }
 
+/** Identidades agrupadas por tipo; lo que la confirmación aparta o toca. */
+export interface MissingIssuer {
+    accounts: BankAccount[];
+    cards: BankCard[];
+}
+
+export interface ConfirmResult {
+    confirmed: number;
+    /** Apartadas por no tener emisor. Sin esto el usuario no sabría que faltan. */
+    skipped: number;
+}
+
 /** Las decisiones del usuario; nunca las pisa una re-resolución automática. */
 const USER_DECIDED = ["MANUAL", "EXTERNAL"] as const;
 
@@ -280,28 +292,64 @@ export class BankIdentificationService {
      * observación resuelta. Hasta ese momento no suman a ningún saldo; después
      * de confirmarlas, sí.
      */
-    async confirmResolvedIdentities(userId: UUID): Promise<number> {
+    async confirmResolvedIdentities(userId: UUID): Promise<ConfirmResult> {
+        const { ready, blocked } = await this.splitConfirmable(userId);
+        let confirmed = 0;
+
+        for (const account of ready.accounts) {
+            await this.accounts.update({ ...account, isUnconfirmed: false });
+            confirmed++;
+        }
+        for (const card of ready.cards) {
+            await this.cards.update({ ...card, isUnconfirmed: false });
+            confirmed++;
+        }
+
+        return { confirmed, skipped: blocked.accounts.length + blocked.cards.length };
+    }
+
+    /**
+     * Las identidades que la confirmación dejaría fuera por no tener emisor.
+     *
+     * La pantalla las pide antes de confirmar. Se calcula con el mismo reparto
+     * que usa {@link confirmResolvedIdentities}, para que lo que avisa y lo que
+     * hace no puedan discrepar.
+     */
+    async identitiesMissingIssuer(userId: UUID): Promise<MissingIssuer> {
+        return (await this.splitConfirmable(userId)).blocked;
+    }
+
+    /**
+     * Reparte lo confirmable de lo que no lo es.
+     *
+     * Una identidad sin emisor solo puede existir mientras está sin revisar: la
+     * tabla lo exige. Confirmarla lanzaría, y como el bucle guarda una por una,
+     * las anteriores ya estarían escritas — la conciliación quedaba a medias sin
+     * decir por qué. Aquí se aparta antes de tocar nada.
+     */
+    private async splitConfirmable(userId: UUID): Promise<{ ready: MissingIssuer; blocked: MissingIssuer }> {
         const resolved = await this.observations.findResolved(userId);
         const accountIds = new Set(resolved.map(o => o.accountId).filter(Boolean) as UUID[]);
         const cardIds = new Set(resolved.map(o => o.cardId).filter(Boolean) as UUID[]);
-        let confirmed = 0;
+
+        const ready: MissingIssuer = { accounts: [], cards: [] };
+        const blocked: MissingIssuer = { accounts: [], cards: [] };
 
         for (const id of accountIds) {
             const account = await this.accounts.findById(id);
-            if (account?.isUnconfirmed) {
-                await this.accounts.update({ ...account, isUnconfirmed: false });
-                confirmed++;
-            }
+            if (!account?.isUnconfirmed) continue;
+            // El efectivo es la excepción escrita en la propia tabla: no cuelga
+            // de ningún banco y aun así se confirma.
+            const needsIssuer = account.accountType !== "CASH" && !account.institutionId;
+            (needsIssuer ? blocked : ready).accounts.push(account);
         }
         for (const id of cardIds) {
             const card = await this.cards.findById(id);
-            if (card?.isUnconfirmed) {
-                await this.cards.update({ ...card, isUnconfirmed: false });
-                confirmed++;
-            }
+            if (!card?.isUnconfirmed) continue;
+            (card.institutionId ? ready : blocked).cards.push(card);
         }
 
-        return confirmed;
+        return { ready, blocked };
     }
 
     // ─── Privados ────────────────────────────────────────────
