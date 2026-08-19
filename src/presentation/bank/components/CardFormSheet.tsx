@@ -31,7 +31,8 @@ const BRANDS = ["Visa", "Mastercard", "American Express", "Diners Club"];
 interface CardFormSheetProps {
     institutions: BankInstitution[];
     accounts: BankAccount[];
-    trigger: React.ReactNode;
+    /** Opcional: quien lo abre desde un menú controla `open` y no monta disparador. */
+    trigger?: React.ReactNode;
     open?: boolean;
     onOpenChange?: (open: boolean) => void;
     /**

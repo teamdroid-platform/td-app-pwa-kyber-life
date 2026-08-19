@@ -101,6 +101,19 @@ export class SupabaseBankCardRepository implements IBankCardRepository {
         return (data ?? []).map(mapToEntity);
     }
 
+    /** Un solo UPDATE: mover diez tarjetas no debe costar diez viajes. */
+    async reassignInstitution(userId: UUID, from: UUID, to: UUID): Promise<number> {
+        const supabase = await createClient();
+        const { data, error } = await supabase
+            .from("bank_cards")
+            .update({ institution_id: to, updated_at: new Date().toISOString() })
+            .eq("owner_user_id", userId).eq("institution_id", from).eq("is_deleted", false)
+            .select("id");
+
+        if (error) throw new Error(`Error reassigning bank cards: ${error.message}`);
+        return (data ?? []).length;
+    }
+
     async update(entity: BankCard): Promise<BankCard> {
         const supabase = await createClient();
         const { data, error } = await supabase

@@ -12,7 +12,10 @@ import type { UUID } from "@/domain/core";
 
 interface BalanceSnapshotSheetProps {
     accountId: UUID;
-    trigger: React.ReactNode;
+    /** Opcional: quien lo abre desde un menú controla `open` y no monta disparador. */
+    trigger?: React.ReactNode;
+    open?: boolean;
+    onOpenChange?: (open: boolean) => void;
 }
 
 /** Fecha de hoy en el formato que espera `<input type="date">`. */
@@ -25,9 +28,13 @@ function todayInput(): string {
  * saldo se recalcula sumando solo los movimientos posteriores — corregirlo no
  * exige reescribir historia.
  */
-export function BalanceSnapshotSheet({ accountId, trigger }: BalanceSnapshotSheetProps) {
+export function BalanceSnapshotSheet({
+    accountId, trigger, open: controlledOpen, onOpenChange,
+}: BalanceSnapshotSheetProps) {
     const router = useRouter();
-    const [open, setOpen] = useState(false);
+    const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
+    const open = controlledOpen ?? uncontrolledOpen;
+    const setOpen = onOpenChange ?? setUncontrolledOpen;
     const [balance, setBalance] = useState("");
     const [asOf, setAsOf] = useState(todayInput);
     const [saving, setSaving] = useState(false);

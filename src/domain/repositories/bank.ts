@@ -16,11 +16,18 @@ export interface IBankAccountRepository extends IRepository<BankAccount> {
     findByInstitutionId(userId: UUID, institutionId: UUID): Promise<BankAccount[]>;
     /** La cuenta de efectivo del usuario, o null si aún no existe. */
     findCashAccount(userId: UUID): Promise<BankAccount | null>;
+    /**
+     * Mueve todas las cuentas del usuario de un emisor a otro. Devuelve cuántas
+     * se movieron. Lo usa la unificación de instituciones duplicadas.
+     */
+    reassignInstitution(userId: UUID, fromInstitutionId: UUID, toInstitutionId: UUID): Promise<number>;
 }
 
 export interface IBankCardRepository extends IRepository<BankCard> {
     findByOwnerId(userId: UUID): Promise<BankCard[]>;
     findByAccountId(userId: UUID, accountId: UUID): Promise<BankCard[]>;
+    /** El equivalente para tarjetas; ver {@link IBankAccountRepository.reassignInstitution}. */
+    reassignInstitution(userId: UUID, fromInstitutionId: UUID, toInstitutionId: UUID): Promise<number>;
 }
 
 export interface IBankAccountBalanceSnapshotRepository extends IRepository<BankAccountBalanceSnapshot> {

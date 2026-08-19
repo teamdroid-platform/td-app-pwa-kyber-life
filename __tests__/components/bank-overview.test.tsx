@@ -36,6 +36,18 @@ const overview: BankOverview = {
     cashBalance: 185, nextDueDate: "2026-08-28", unconfirmedCount: 0,
 };
 
+const VACIA: BankOverview["institutions"][number] = {
+    id: "i8", ownerUserId: "u", name: "Cooperativa JEP", kind: "COOPERATIVE",
+    isUnconfirmed: false, ...STAMPS,
+};
+
+/** El caso real: la misma cooperativa registrada tres veces. */
+const JARDIN: BankOverview["institutions"] = [
+    { ...overview.institutions[0], id: "i1", name: "COAC Jardín Azuayo", kind: "COOPERATIVE" },
+    { ...VACIA, id: "i2", name: "Coop Jardín Azuayo" },
+    { ...VACIA, id: "i3", name: "Cooperativa de Ahorro y Crédito Jardín Azuayo" },
+];
+
 describe("BankOverviewClient", () => {
     it("identifica cada fila con su acrónimo y sus últimos dígitos", () => {
         render(<BankOverviewClient initialData={overview} />);
@@ -86,23 +98,75 @@ describe("BankOverviewClient", () => {
         expect(screen.queryByText("−$0,00")).not.toBeInTheDocument();
     });
 
-    it("las instituciones sin nada registrado se pliegan en una sola línea", () => {
+    it("cada emisor se pliega desde su cabecera", () => {
+        render(<BankOverviewClient initialData={overview} />);
+
+        const header = screen.getByRole("button", { name: /Banco del Austro/i });
+        expect(header).toHaveAttribute("aria-expanded", "true");
+        expect(screen.getByText("····0814")).toBeInTheDocument();
+
+        act(() => { fireEvent.click(header); });
+
+        expect(header).toHaveAttribute("aria-expanded", "false");
+        // Plegado esconde las filas, no el total: el saldo del grupo sigue a la vista.
+        expect(screen.queryByText("····0814")).not.toBeInTheDocument();
+        expect(screen.getAllByText("$2.104,18").length).toBeGreaterThan(0);
+    });
+
+    it("una institución vacía se anuncia como tal sin ocupar una caja", () => {
+        render(<BankOverviewClient initialData={{
+            ...overview,
+            institutions: [...overview.institutions, VACIA],
+        }} />);
+
+        expect(screen.getByRole("button", { name: /Cooperativa JEP.*vacía/i })).toBeInTheDocument();
+    });
+
+    it("detecta los emisores repetidos y ofrece unificarlos", () => {
+        render(<BankOverviewClient initialData={{ ...overview, institutions: JARDIN }} />);
+
+        // El usuario no tiene que ir a buscar la opción: la pantalla se la ofrece.
+        const aviso = screen.getByRole("button", { name: /3 emisores parecen el mismo/i });
+        expect(aviso).toHaveTextContent("«Jardin Azuayo» está repetido");
+
+        act(() => { fireEvent.click(aviso); });
+
+        expect(screen.getByText(/Unificar «Jardin Azuayo»/)).toBeInTheDocument();
+        // Sugiere quedarse con la que más tiene registrado.
+        expect(screen.getByRole("button", { name: /Unificar en «COAC Jardín Azuayo»/ })).toBeInTheDocument();
+        expect(screen.getByText(/se archivarán 2 instituciones/i)).toBeInTheDocument();
+    });
+
+    it("no avisa de duplicados cuando los emisores solo comparten «Banco»", () => {
         render(<BankOverviewClient initialData={{
             ...overview,
             institutions: [
                 ...overview.institutions,
-                { id: "i2", ownerUserId: "u", name: "Coop Jardín Azuayo", kind: "COOPERATIVE", isUnconfirmed: false, ...STAMPS },
-                { id: "i3", ownerUserId: "u", name: "COAC Jardín Azuayo", kind: "COOPERATIVE", isUnconfirmed: false, ...STAMPS },
+                { ...VACIA, id: "i9", name: "Banco del Pacífico" },
             ],
         }} />);
 
-        // Tres bancos duplicados y vacíos enterraban las cuentas de verdad.
-        expect(screen.queryByText("Coop Jardín Azuayo")).not.toBeInTheDocument();
-        const toggle = screen.getByRole("button", { name: /2 instituciones sin cuentas/i });
+        expect(screen.queryByText(/parecen el mismo/i)).not.toBeInTheDocument();
+    });
 
-        act(() => { fireEvent.click(toggle); });
-        expect(screen.getByText("Coop Jardín Azuayo")).toBeInTheDocument();
-        expect(screen.getByText("COAC Jardín Azuayo")).toBeInTheDocument();
+    it("el lápiz suelto se va: editar vive en el menú de la fila", () => {
+        render(<BankOverviewClient initialData={overview} />);
+
+        act(() => { fireEvent.click(screen.getByRole("button", { name: /Acciones de AHO ····0814/i })); });
+
+        expect(screen.getByText("Editar")).toBeInTheDocument();
+        expect(screen.getByText("Registrar saldo")).toBeInTheDocument();
+        expect(screen.getByText("Archivar cuenta")).toBeInTheDocument();
+        expect(screen.getByText("Ver detalle y movimientos")).toBeInTheDocument();
+    });
+
+    it("una tarjeta no ofrece registrar saldo: no tiene saldo propio", () => {
+        render(<BankOverviewClient initialData={overview} />);
+
+        act(() => { fireEvent.click(screen.getByRole("button", { name: /Acciones de TCR ····8361/i })); });
+
+        expect(screen.getByText("Archivar tarjeta")).toBeInTheDocument();
+        expect(screen.queryByText("Registrar saldo")).not.toBeInTheDocument();
     });
 
     it("el alta es una sola puerta con las tres opciones dentro", () => {

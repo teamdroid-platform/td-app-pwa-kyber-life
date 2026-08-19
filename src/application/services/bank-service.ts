@@ -1055,6 +1055,41 @@ export class BankService {
         return this.institutions.delete(id);
     }
 
+    /**
+     * Unifica varios emisores duplicados en uno.
+     *
+     * El caso que lo motiva: la misma cooperativa registrada tres veces —dos
+     * nacidas de un escaneo que no supo emparejar el nombre—. Las cuentas y
+     * tarjetas de cada origen pasan al destino y los orígenes se archivan, de
+     * modo que la pantalla vuelve a tener un emisor por banco.
+     *
+     * Se comprueba la propiedad de todos antes de mover nada: a medio camino
+     * dejaría cuentas repartidas entre un emisor vivo y otro archivado.
+     */
+    async mergeInstitutions(
+        userId: UUID, sourceIds: UUID[], targetId: UUID,
+    ): Promise<{ movedAccounts: number; movedCards: number; mergedInstitutions: number }> {
+        const sources = sourceIds.filter(id => id !== targetId);
+        if (sources.length === 0) {
+            throw new Error("Elige al menos una institución distinta de la destino");
+        }
+
+        await this.requireInstitution(userId, targetId);
+        for (const sourceId of sources) {
+            await this.requireInstitution(userId, sourceId);
+        }
+
+        let movedAccounts = 0;
+        let movedCards = 0;
+        for (const sourceId of sources) {
+            movedAccounts += await this.accounts.reassignInstitution(userId, sourceId, targetId);
+            movedCards += await this.cards.reassignInstitution(userId, sourceId, targetId);
+            await this.institutions.delete(sourceId);
+        }
+
+        return { movedAccounts, movedCards, mergedInstitutions: sources.length };
+    }
+
     async createAccount(userId: UUID, input: CreateAccountInput): Promise<BankAccount> {
         return this.accounts.create({
             id: randomUUID(),
