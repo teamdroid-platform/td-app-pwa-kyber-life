@@ -42,6 +42,14 @@ export class InMemoryBankAccountRepository
     async findCashAccount(userId: UUID): Promise<BankAccount | null> {
         return (await this.findByOwnerId(userId)).find(a => a.accountType === "CASH") ?? null;
     }
+
+    async reassignInstitution(userId: UUID, from: UUID, to: UUID): Promise<number> {
+        const moving = (await this.findByInstitutionId(userId, from));
+        for (const account of moving) {
+            await this.update({ ...account, institutionId: to });
+        }
+        return moving.length;
+    }
 }
 
 export class InMemoryBankCardRepository
@@ -54,6 +62,14 @@ export class InMemoryBankCardRepository
 
     async findByAccountId(userId: UUID, accountId: UUID): Promise<BankCard[]> {
         return (await this.findByOwnerId(userId)).filter(c => c.accountId === accountId);
+    }
+
+    async reassignInstitution(userId: UUID, from: UUID, to: UUID): Promise<number> {
+        const moving = (await this.findByOwnerId(userId)).filter(c => c.institutionId === from);
+        for (const card of moving) {
+            await this.update({ ...card, institutionId: to });
+        }
+        return moving.length;
     }
 }
 

@@ -83,6 +83,19 @@ export const payStatementSchema = z.object({
 //
 // `isUnconfirmed` solo aparece aquí: se pone al detectar una identidad en un
 // escaneo y se quita al revisarla, nunca se declara en un alta manual.
+/**
+ * Unificación de emisores duplicados. El destino no puede estar entre los
+ * orígenes: sería pedir que una institución se absorba a sí misma y dejaría el
+ * grupo sin ninguna viva.
+ */
+export const mergeInstitutionsSchema = z.object({
+    sourceIds: z.array(uuid).min(1, "Elige al menos una institución a unificar"),
+    targetId: uuid,
+}).refine(
+    ({ sourceIds, targetId }) => !sourceIds.includes(targetId),
+    { message: "La institución destino no puede estar entre las que se unifican", path: ["targetId"] },
+);
+
 export const updateInstitutionSchema = createInstitutionSchema.partial();
 export const updateAccountSchema = accountBase.partial().extend({
     isUnconfirmed: z.boolean().optional(),

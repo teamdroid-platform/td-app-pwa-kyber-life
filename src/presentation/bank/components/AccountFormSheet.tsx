@@ -25,7 +25,10 @@ const TYPES: { value: BankAccountType; label: string }[] = [
 
 interface AccountFormSheetProps {
     institutions: BankInstitution[];
-    trigger: React.ReactNode;
+    /** Opcional: quien lo abre desde un menú controla `open` y no monta disparador. */
+    trigger?: React.ReactNode;
+    open?: boolean;
+    onOpenChange?: (open: boolean) => void;
     /**
      * Qué hacer con lo recién creado, en vez de recargar la página.
      *
@@ -59,10 +62,13 @@ interface AccountFormSheetProps {
  * cuenta en un solo guardado.
  */
 export function AccountFormSheet({
-    institutions, trigger, onCreated, account, defaultNumber = "", defaultInstitution,
+    institutions, trigger, open: controlledOpen, onOpenChange, onCreated, account,
+    defaultNumber = "", defaultInstitution,
 }: AccountFormSheetProps) {
     const router = useRouter();
-    const [open, setOpen] = useState(false);
+    const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
+    const open = controlledOpen ?? uncontrolledOpen;
+    const setOpen = onOpenChange ?? setUncontrolledOpen;
     const isEdit = !!account;
     const [institution, setInstitution] = useState<InstitutionChoice>(() => {
         const own = institutions.find(i => i.id === account?.institutionId);

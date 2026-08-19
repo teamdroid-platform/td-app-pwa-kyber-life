@@ -2,20 +2,25 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, ChevronRight, CreditCard, Landmark, Plus, Scale, Wallet } from "lucide-react";
+import {
+    AlertTriangle, ChevronDown, ChevronRight, CreditCard, Landmark, Merge, Plus, Scale, Wallet,
+} from "lucide-react";
 import { BankBalanceHero } from "./BankBalanceHero";
 import { AccountRow } from "./AccountRow";
 import { CardRow } from "./CardRow";
 import { InstitutionFormSheet } from "./InstitutionFormSheet";
 import { AccountFormSheet } from "./AccountFormSheet";
 import { CardFormSheet } from "./CardFormSheet";
+import { MergeInstitutionsSheet, type MergeCandidate } from "./MergeInstitutionsSheet";
 import { FormSheet } from "@/components/ui/form-sheet";
 import { cn } from "@/lib/utils";
 import { accountLabel } from "@/lib/bank-identity-label";
+import { findDuplicateInstitutions } from "@/lib/institution-duplicates";
 import { money } from "../lib/format-money";
 import type {
     BankOverview, BankAccountWithBalance, BankCardWithDebt,
 } from "@/application/services/bank-service";
+import type { BankInstitution } from "@/domain/entities/bank";
 
 interface Group {
     id: string | null;
@@ -60,7 +65,10 @@ function CreateTile({
 export function BankOverviewClient({ initialData }: { initialData: BankOverview }) {
     const { institutions, accounts, cards } = initialData;
     const [addOpen, setAddOpen] = useState(false);
-    const [showEmpty, setShowEmpty] = useState(false);
+    const [mergeGroupKey, setMergeGroupKey] = useState<string | null>(null);
+    // Todo abierto de entrada: plegar por defecto escondería los saldos, que
+    // son la razón de entrar a la pantalla.
+    const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
 
     const accountNameById = useMemo(
         () => new Map(accounts.map(a => [a.id, accountLabel(a)])),
@@ -108,11 +116,35 @@ export function BankOverviewClient({ initialData }: { initialData: BankOverview 
         return byInstitution;
     }, [institutions, accounts, cards]);
 
-    // Una institución sin nada registrado no merece una tarjeta entera: con
-    // tres duplicadas —el caso real— la pantalla se llenaba de cajas vacías y
-    // enterraba las cuentas de verdad. Se cuentan aparte y se despliegan.
-    const filled = groups.filter(g => g.accounts.length > 0 || g.cards.length > 0);
-    const empty = groups.filter(g => g.accounts.length === 0 && g.cards.length === 0);
+    // Los emisores repetidos son el problema real del usuario: la misma
+    // cooperativa registrada tres veces, dos de ellas nacidas de un escaneo.
+    // La app los detecta y ofrece unirlos; buscarlos a mano era la parte cara.
+    const duplicateGroups = useMemo(
+        () => findDuplicateInstitutions(institutions),
+        [institutions],
+    );
+
+    const countsById = useMemo(() => {
+        const map = new Map<string, { accounts: number; cards: number; total: number }>();
+        for (const group of groups) {
+            if (group.id) {
+                map.set(group.id, {
+                    accounts: group.accounts.length,
+                    cards: group.cards.length,
+                    total: group.total,
+                });
+            }
+        }
+        return map;
+    }, [groups]);
+
+    const mergeGroup = duplicateGroups.find(g => g.fingerprint === mergeGroupKey);
+    const mergeCandidates: MergeCandidate[] = (mergeGroup?.members ?? []).map(
+        (institution: BankInstitution) => ({
+            institution,
+            ...(countsById.get(institution.id) ?? { accounts: 0, cards: 0, total: 0 }),
+        }),
+    );
 
     // Vacío es no tener nada, ni siquiera un emisor. Una institución sola ya es
     // algo que el usuario registró —o que nació de un escaneo— y ocultarla hacía
@@ -120,6 +152,12 @@ export function BankOverviewClient({ initialData }: { initialData: BankOverview 
     const isEmpty = institutions.length === 0 && accounts.length === 0 && cards.length === 0;
 
     const closeAdd = () => setAddOpen(false);
+    const toggleGroup = (key: string) => setCollapsed(current => {
+        const next = new Set(current);
+        if (next.has(key)) next.delete(key);
+        else next.add(key);
+        return next;
+    });
 
     const subtitle = accounts.length === 0 && cards.length === 0
         ? "Registra tus bancos, cuentas y tarjetas"
@@ -149,6 +187,28 @@ export function BankOverviewClient({ initialData }: { initialData: BankOverview 
                 cashBalance={initialData.cashBalance}
                 nextDueDate={initialData.nextDueDate}
             />
+
+            {duplicateGroups.map(group => (
+                <button
+                    key={group.fingerprint}
+                    type="button"
+                    onClick={() => setMergeGroupKey(group.fingerprint)}
+                    className="flex items-center gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3 text-left transition-colors hover:bg-amber-500/15"
+                >
+                    <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-amber-500/15 text-amber-500">
+                        <Merge className="h-4 w-4" />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                        <span className="block text-[13px] font-semibold">
+                            {group.members.length} emisores parecen el mismo
+                        </span>
+                        <span className="block truncate text-[11px] text-muted-foreground">
+                            «{group.label}» está repetido
+                        </span>
+                    </span>
+                    <span className="shrink-0 text-[11px] font-semibold text-amber-500">Unificar</span>
+                </button>
+            ))}
 
             {/* Conciliar está siempre a mano: el aviso depende de que existan
                 identidades sin revisar, pero los números pendientes de atribuir
@@ -206,60 +266,75 @@ export function BankOverviewClient({ initialData }: { initialData: BankOverview 
                     </button>
                 </div>
             ) : (
-                <>
-                    {[...filled, ...(showEmpty ? empty : [])].map(group => (
-                        <section key={group.id ?? "cash"} className="mt-1 flex flex-col gap-1.5">
-                            {/* El emisor es un rótulo, no una caja: las filas de
-                                abajo ya tienen el borde, y anidarlas dentro de
-                                otro marco sumaba un contorno por grupo. */}
-                            <header className="flex items-center gap-2 px-1">
+                groups.map(group => {
+                    const key = group.id ?? "__efectivo__";
+                    const isCollapsed = collapsed.has(key);
+                    const count = group.accounts.length + group.cards.length;
+
+                    return (
+                        <section key={key} className="flex flex-col gap-1.5">
+                            {/* La cabecera es el control de plegado: con tres
+                                emisores vacíos la lista se llenaba de cajas y
+                                enterraba las cuentas de verdad. */}
+                            <button
+                                type="button"
+                                onClick={() => toggleGroup(key)}
+                                aria-expanded={!isCollapsed}
+                                className="flex items-center gap-2 rounded-lg px-1 py-0.5 text-left transition-colors hover:bg-muted/40"
+                            >
+                                {isCollapsed
+                                    ? <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                                    : <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
                                 <h2 className="min-w-0 flex-1 truncate text-[10.5px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
                                     {group.name}
                                 </h2>
+                                <span className="shrink-0 text-[10px] text-muted-foreground">
+                                    {count === 0 ? "vacía" : count === 1 ? "1 ítem" : `${count} ítems`}
+                                </span>
                                 <span className="shrink-0 text-[12px] font-semibold tabular-nums text-foreground/80">
                                     {money(group.total)}
                                 </span>
-                            </header>
+                            </button>
 
-                            {group.accounts.length > 0 || group.cards.length > 0 ? (
-                                <div className="divide-y divide-border/50 overflow-hidden rounded-2xl border bg-card">
-                                    {group.accounts.map(account => (
-                                        <AccountRow key={account.id} account={account} />
-                                    ))}
-                                    {group.cards.map(card => (
-                                        <CardRow
-                                            key={card.id}
-                                            card={card}
-                                            accountName={card.accountId ? accountNameById.get(card.accountId) : undefined}
-                                        />
-                                    ))}
-                                </div>
-                            ) : (
-                                <p className="rounded-2xl border border-dashed bg-muted/20 px-3 py-2.5 text-xs text-muted-foreground">
-                                    Sin cuentas ni tarjetas todavía.
-                                </p>
+                            {!isCollapsed && (
+                                count > 0 ? (
+                                    <div className="divide-y divide-border/50 overflow-hidden rounded-2xl border bg-card">
+                                        {group.accounts.map(account => (
+                                            <AccountRow
+                                                key={account.id}
+                                                account={account}
+                                                institutions={institutions}
+                                            />
+                                        ))}
+                                        {group.cards.map(card => (
+                                            <CardRow
+                                                key={card.id}
+                                                card={card}
+                                                accountName={card.accountId ? accountNameById.get(card.accountId) : undefined}
+                                                institutions={institutions}
+                                                accounts={accounts}
+                                            />
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <p className="rounded-2xl border border-dashed bg-muted/20 px-3 py-2.5 text-xs text-muted-foreground">
+                                        Sin cuentas ni tarjetas todavía.
+                                    </p>
+                                )
                             )}
                         </section>
-                    ))}
+                    );
+                })
+            )}
 
-                    {empty.length > 0 && (
-                        <button
-                            type="button"
-                            onClick={() => setShowEmpty(open => !open)}
-                            className="mt-1 flex items-center gap-2.5 rounded-2xl border border-dashed px-3 py-2.5 text-left text-[11px] text-muted-foreground transition-colors hover:border-primary/50"
-                        >
-                            <Landmark className="h-4 w-4 shrink-0 opacity-60" />
-                            <span className="flex-1">
-                                {empty.length === 1
-                                    ? "1 institución sin cuentas ni tarjetas"
-                                    : `${empty.length} instituciones sin cuentas ni tarjetas`}
-                            </span>
-                            <span className="shrink-0 font-semibold text-foreground/70">
-                                {showEmpty ? "Ocultar" : "Ver"}
-                            </span>
-                        </button>
-                    )}
-                </>
+            {mergeGroup && (
+                <MergeInstitutionsSheet
+                    key={mergeGroup.fingerprint}
+                    open
+                    onOpenChange={open => { if (!open) setMergeGroupKey(null); }}
+                    label={mergeGroup.label}
+                    candidates={mergeCandidates}
+                />
             )}
 
             {/* Una sola puerta al alta. Tres botones sueltos competían entre sí
