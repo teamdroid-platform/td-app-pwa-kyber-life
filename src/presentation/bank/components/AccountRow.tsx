@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ArrowUpRight, Landmark, Pencil, PiggyBank, Scale, Trash2, TrendingUp, Wallet } from "lucide-react";
-import { formatLastFour } from "@/lib/format-bank-number";
+import { formatIdentityNumber } from "@/lib/format-bank-number";
 import { ACCOUNT_TYPE_ACRONYM, ACCOUNT_TYPE_LABEL } from "@/lib/bank-identity-label";
 import { deleteBankAccountAction } from "@/app/actions/bank";
 import { IdentityBadge } from "./IdentityBadge";
@@ -45,7 +45,7 @@ export function AccountRow({ account, institutions }: AccountRowProps) {
     const router = useRouter();
     const Icon = TYPE_ICON[account.accountType];
     const negative = account.balance < 0;
-    const number = formatLastFour(account);
+    const number = formatIdentityNumber(account);
     const acronym = ACCOUNT_TYPE_ACRONYM[account.accountType];
 
     const [menuOpen, setMenuOpen] = useState(false);

@@ -11,7 +11,7 @@ import {
     ACCOUNT_TYPE_ACRONYM, ACCOUNT_TYPE_LABEL, CARD_TYPE_ACRONYM, CARD_TYPE_LABEL,
     UNKNOWN_TYPE_ACRONYM, cardLabel,
 } from "@/lib/bank-identity-label";
-import { formatLastFour, lastFourOfDisplay } from "@/lib/format-bank-number";
+import { formatIdentityNumber, identityNumberFromDisplay } from "@/lib/format-bank-number";
 import { IdentityBadge } from "@/presentation/bank/components/IdentityBadge";
 import type { BankAccount, BankCard, BankInstitution } from "@/domain/entities/bank";
 import type { ScannedAccountDecision, ScannedAccountView } from "@/application/services/bank-service";
@@ -300,7 +300,7 @@ function describe(
             <IdentityLine
                 acronym={CARD_TYPE_ACRONYM[card.cardType]}
                 meaning={`Tarjeta de ${CARD_TYPE_LABEL[card.cardType].toLowerCase()}`}
-                number={formatLastFour(card)}
+                number={formatIdentityNumber(card)}
                 sub={[card.brand?.trim(), card.institutionName?.trim()].filter(Boolean).join(" · ")}
             />
         );
@@ -313,7 +313,7 @@ function describe(
             <IdentityLine
                 acronym={ACCOUNT_TYPE_ACRONYM[account.accountType]}
                 meaning={ACCOUNT_TYPE_LABEL[account.accountType]}
-                number={formatLastFour(account)}
+                number={formatIdentityNumber(account)}
                 sub={account.institutionName?.trim() ?? ""}
             />
         );
@@ -325,7 +325,7 @@ function describe(
             <IdentityLine
                 acronym={matched ? matched.typeAcronym : UNKNOWN_TYPE_ACRONYM}
                 meaning={matched ? matched.typeLabel : "Tipo desconocido: aún sin registrar"}
-                number={lastFourOfDisplay(scanned.display)}
+                number={identityNumberFromDisplay(scanned.display)}
                 sub={matched ? (matched.institutionName ?? matched.typeLabel) : "sin registrar"}
                 title={scanned.raw}
             />

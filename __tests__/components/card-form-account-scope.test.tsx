@@ -48,8 +48,8 @@ describe("CardFormSheet — atar a la cuenta", () => {
         open();
 
         // El emisor por defecto es el primero: Banco del Austro.
-        expect(screen.getByLabelText("Atar a la cuenta")).toHaveTextContent("Ahorros ••••0814");
-        expect(screen.queryByText("Ahorros ••••9511")).not.toBeInTheDocument();
+        expect(screen.getByLabelText("Atar a la cuenta")).toHaveTextContent("Ahorros XXXX0814");
+        expect(screen.queryByText("Ahorros XXXX9511")).not.toBeInTheDocument();
     });
 
     it("cambiar de banco descarta la cuenta que ya no pertenece", () => {
@@ -58,7 +58,7 @@ describe("CardFormSheet — atar a la cuenta", () => {
         fireEvent.change(screen.getByLabelText("Institución"), { target: { value: "Banco Pichincha" } });
 
         // La del Austro deja de ofrecerse; la elección anterior se limpia.
-        expect(screen.queryByLabelText("Atar a la cuenta")).not.toHaveTextContent("••••0814");
+        expect(screen.queryByLabelText("Atar a la cuenta")).not.toHaveTextContent("XXXX0814");
     });
 
     it("sin cuentas en ese banco lo dice, en vez de un desplegable vacío", () => {

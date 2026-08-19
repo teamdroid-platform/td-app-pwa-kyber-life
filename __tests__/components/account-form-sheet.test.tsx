@@ -47,7 +47,9 @@ describe("AccountFormSheet — el número de la cuenta", () => {
         open({ account: cuenta });
 
         // 10 delante y 11 detrás: los dos extremos que el banco mostró.
-        expect(screen.getByLabelText(/Número de cuenta/)).toHaveValue("10••••11");
+        // El campo editable muestra la forma fiel —máscara de cuatro, sin
+        // recortar ni rellenar—: es lo que se vuelve a guardar.
+        expect(screen.getByLabelText(/Número de cuenta/)).toHaveValue("10XXXX11");
     });
 
     it("guarda principio y final de lo que se escriba", async () => {
