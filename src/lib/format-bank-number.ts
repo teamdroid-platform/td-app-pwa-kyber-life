@@ -64,6 +64,20 @@ export function formatIdentityNumber(parts: BankNumberParts): string {
 }
 
 /**
+ * Si una cadena cruda ya no aporta nada frente al número que se muestra.
+ *
+ * La conciliación enseña lo que escribió el banco como evidencia, pero
+ * `XXXXXXXX7903` junto a `XXXX7903` es el mismo número dos veces: solo cambia
+ * el largo de la máscara. Se compara por dígitos, que es lo único que
+ * identifica — `4043615213` frente a `XXXX5213` sí aporta, porque trae seis
+ * dígitos que el mostrado no tiene.
+ */
+export function isRedundantSample(sample: string, shown: string): boolean {
+    const digits = (text: string) => text.replace(/\D/g, "");
+    return digits(sample) === digits(shown);
+}
+
+/**
  * Lo mismo, partiendo de una cadena ya enmascarada: `493176XXXX2780` →
  * `XXXX2780`, `25••••10` → `25XXXX10`.
  *
