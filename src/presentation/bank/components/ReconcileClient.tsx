@@ -13,7 +13,18 @@ import { CardFormSheet } from "./CardFormSheet";
 import { formatBankNumber, formatIdentityNumber } from "@/lib/format-bank-number";
 import { confirmReconcileAction, assignGroupAction } from "@/app/actions/bank-reconcile";
 import type { ReconcileState, ReconcileGroup } from "@/app/actions/bank-reconcile";
+import type { ConfirmBlocker } from "@/application/services/bank-identification-service";
 import type { BankAccount, BankCard } from "@/domain/entities/bank";
+
+/**
+ * Qué pedirle al usuario según lo que falte. Decirlo por su nombre importa: con
+ * un «no se puede confirmar» a secas hay que abrir el formulario para descubrir
+ * cuál de los dos datos es.
+ */
+const BLOCKER_ACTION: Record<ConfirmBlocker, string> = {
+    ISSUER: "Falta el emisor",
+    DEBIT_ACCOUNT: "Falta la cuenta",
+};
 
 const SECTIONS = [
     {
@@ -51,8 +62,8 @@ export function ReconcileClient({ initialData }: { initialData: ReconcileState }
     const [fixingCard, setFixingCard] = useState<BankCard | null>(null);
 
     const total = initialData.exact.length + initialData.inferred.length + initialData.pending.length;
-    const { accounts: sinEmisorCuentas, cards: sinEmisorTarjetas } = initialData.missingIssuer;
-    const sinEmisor = sinEmisorCuentas.length + sinEmisorTarjetas.length;
+    const { accounts: incompletas, cards: incompletasTarjetas } = initialData.blocked;
+    const incompletasTotal = incompletas.length + incompletasTarjetas.length;
 
     async function confirmar() {
         setConfirming(true);
@@ -73,8 +84,8 @@ export function ReconcileClient({ initialData }: { initialData: ReconcileState }
         if (skipped > 0) {
             toast.warning(
                 skipped === 1
-                    ? "1 identidad se quedó fuera: le falta el emisor"
-                    : `${skipped} identidades se quedaron fuera: les falta el emisor`,
+                    ? "1 identidad se quedó fuera: está incompleta"
+                    : `${skipped} identidades se quedaron fuera: están incompletas`,
             );
         }
         router.refresh();
@@ -119,7 +130,7 @@ export function ReconcileClient({ initialData }: { initialData: ReconcileState }
 
             {/* El motivo por el que confirmar fallaba, dicho antes de intentarlo
                 y con la salida al lado. */}
-            {sinEmisor > 0 && (
+            {incompletasTotal > 0 && (
                 <section className="flex flex-col gap-2 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3">
                     <div className="flex items-start gap-2.5">
                         <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-amber-500/15 text-amber-500">
@@ -127,19 +138,19 @@ export function ReconcileClient({ initialData }: { initialData: ReconcileState }
                         </span>
                         <span className="min-w-0 flex-1">
                             <span className="block text-[12.5px] font-semibold">
-                                {sinEmisor === 1
+                                {incompletasTotal === 1
                                     ? "1 identidad no se puede confirmar"
-                                    : `${sinEmisor} identidades no se pueden confirmar`}
+                                    : `${incompletasTotal} identidades no se pueden confirmar`}
                             </span>
                             <span className="block text-[11px] leading-relaxed text-muted-foreground">
-                                Nacieron de un escaneo que no dedujo el banco. Sin emisor no
-                                entran a los saldos.
+                                Les falta un dato que solo se les exige una vez revisadas.
+                                Hasta entonces no entran a los saldos.
                             </span>
                         </span>
                     </div>
 
                     <div className="flex flex-col gap-1">
-                        {sinEmisorCuentas.map(account => (
+                        {incompletas.map(({ account, reason }) => (
                             <button
                                 key={account.id}
                                 type="button"
@@ -151,11 +162,11 @@ export function ReconcileClient({ initialData }: { initialData: ReconcileState }
                                     {formatIdentityNumber(account) || "Cuenta sin número"}
                                 </span>
                                 <span className="shrink-0 text-[11px] font-semibold text-amber-500">
-                                    Asignar emisor
+                                    {BLOCKER_ACTION[reason]}
                                 </span>
                             </button>
                         ))}
-                        {sinEmisorTarjetas.map(card => (
+                        {incompletasTarjetas.map(({ card, reason }) => (
                             <button
                                 key={card.id}
                                 type="button"
@@ -167,7 +178,7 @@ export function ReconcileClient({ initialData }: { initialData: ReconcileState }
                                     {formatIdentityNumber(card) || "Tarjeta sin número"}
                                 </span>
                                 <span className="shrink-0 text-[11px] font-semibold text-amber-500">
-                                    Asignar emisor
+                                    {BLOCKER_ACTION[reason]}
                                 </span>
                             </button>
                         ))}

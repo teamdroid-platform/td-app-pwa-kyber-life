@@ -30,16 +30,60 @@ export interface PendingGroup {
     cardId: UUID | null;
 }
 
-/** Identidades agrupadas por tipo; lo que la confirmación aparta o toca. */
-export interface MissingIssuer {
-    accounts: BankAccount[];
-    cards: BankCard[];
+/**
+ * Lo que le falta a una identidad para poder confirmarse.
+ *
+ * Son las tres reglas que la base relaja mientras algo está sin revisar y
+ * vuelve a exigir en cuanto se confirma. Están enumeradas, no adivinadas: son
+ * los únicos CHECK de las migraciones con un `OR is_unconfirmed`.
+ */
+export type ConfirmBlocker =
+    /** Cuenta o tarjeta sin emisor. El efectivo queda fuera: nunca tiene. */
+    | "ISSUER"
+    /** Tarjeta de débito sin la cuenta de la que gasta. */
+    | "DEBIT_ACCOUNT";
+
+export interface BlockedAccount {
+    account: BankAccount;
+    reason: ConfirmBlocker;
+}
+
+export interface BlockedCard {
+    card: BankCard;
+    reason: ConfirmBlocker;
+}
+
+/** Lo que la confirmación va a apartar, y por qué. */
+export interface ConfirmBlockers {
+    accounts: BlockedAccount[];
+    cards: BlockedCard[];
 }
 
 export interface ConfirmResult {
     confirmed: number;
-    /** Apartadas por no tener emisor. Sin esto el usuario no sabría que faltan. */
+    /** Apartadas por incompletas. Sin esto el usuario no sabría que faltan. */
     skipped: number;
+}
+
+/**
+ * Qué le impide a una cuenta confirmarse, o null si nada.
+ *
+ * El efectivo es la excepción escrita en la propia tabla: no cuelga de ningún
+ * banco y aun así se confirma.
+ */
+function blockerForAccount(account: BankAccount): ConfirmBlocker | null {
+    if (account.accountType === "CASH") return null;
+    return account.institutionId ? null : "ISSUER";
+}
+
+/**
+ * Lo mismo para una tarjeta. El emisor va primero: sin él no se puede ni
+ * elegir la cuenta, que tiene que ser del mismo banco.
+ */
+function blockerForCard(card: BankCard): ConfirmBlocker | null {
+    if (!card.institutionId) return "ISSUER";
+    if (card.cardType === "DEBIT" && !card.accountId) return "DEBIT_ACCOUNT";
+    return null;
 }
 
 /** Las decisiones del usuario; nunca las pisa una re-resolución automática. */
@@ -309,44 +353,50 @@ export class BankIdentificationService {
     }
 
     /**
-     * Las identidades que la confirmación dejaría fuera por no tener emisor.
+     * Las identidades que la confirmación dejaría fuera, con lo que les falta.
      *
      * La pantalla las pide antes de confirmar. Se calcula con el mismo reparto
      * que usa {@link confirmResolvedIdentities}, para que lo que avisa y lo que
      * hace no puedan discrepar.
      */
-    async identitiesMissingIssuer(userId: UUID): Promise<MissingIssuer> {
+    async identitiesBlockedFromConfirming(userId: UUID): Promise<ConfirmBlockers> {
         return (await this.splitConfirmable(userId)).blocked;
     }
 
     /**
      * Reparte lo confirmable de lo que no lo es.
      *
-     * Una identidad sin emisor solo puede existir mientras está sin revisar: la
-     * tabla lo exige. Confirmarla lanzaría, y como el bucle guarda una por una,
-     * las anteriores ya estarían escritas — la conciliación quedaba a medias sin
-     * decir por qué. Aquí se aparta antes de tocar nada.
+     * Confirmar no es solo poner una bandera: es prometerle a la base que la
+     * fila cumple lo que solo se le exige a una identidad revisada. Sin ese
+     * reparto, la primera incompleta lanzaba y —como el bucle guarda una por
+     * una— las anteriores ya estaban escritas: la conciliación quedaba a medias
+     * sin decir por qué.
      */
-    private async splitConfirmable(userId: UUID): Promise<{ ready: MissingIssuer; blocked: MissingIssuer }> {
+    private async splitConfirmable(
+        userId: UUID,
+    ): Promise<{ ready: { accounts: BankAccount[]; cards: BankCard[] }; blocked: ConfirmBlockers }> {
         const resolved = await this.observations.findResolved(userId);
         const accountIds = new Set(resolved.map(o => o.accountId).filter(Boolean) as UUID[]);
         const cardIds = new Set(resolved.map(o => o.cardId).filter(Boolean) as UUID[]);
 
-        const ready: MissingIssuer = { accounts: [], cards: [] };
-        const blocked: MissingIssuer = { accounts: [], cards: [] };
+        const ready: { accounts: BankAccount[]; cards: BankCard[] } = { accounts: [], cards: [] };
+        const blocked: ConfirmBlockers = { accounts: [], cards: [] };
 
         for (const id of accountIds) {
             const account = await this.accounts.findById(id);
             if (!account?.isUnconfirmed) continue;
-            // El efectivo es la excepción escrita en la propia tabla: no cuelga
-            // de ningún banco y aun así se confirma.
-            const needsIssuer = account.accountType !== "CASH" && !account.institutionId;
-            (needsIssuer ? blocked : ready).accounts.push(account);
+
+            const reason = blockerForAccount(account);
+            if (reason) blocked.accounts.push({ account, reason });
+            else ready.accounts.push(account);
         }
         for (const id of cardIds) {
             const card = await this.cards.findById(id);
             if (!card?.isUnconfirmed) continue;
-            (card.institutionId ? ready : blocked).cards.push(card);
+
+            const reason = blockerForCard(card);
+            if (reason) blocked.cards.push({ card, reason });
+            else ready.cards.push(card);
         }
 
         return { ready, blocked };

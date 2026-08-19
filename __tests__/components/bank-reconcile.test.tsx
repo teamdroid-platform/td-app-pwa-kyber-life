@@ -39,7 +39,7 @@ const state: ReconcileState = {
         { id: "c1", kind: "CARD", label: "Pacificard XXXX8361" },
     ],
     totalMovements: 83,
-    missingIssuer: { accounts: [], cards: [] },
+    blocked: { accounts: [], cards: [] },
     institutions: [],
     accounts: [],
 };
@@ -47,10 +47,23 @@ const state: ReconcileState = {
 const STAMPS = { createdAt: "", updatedAt: "", isDeleted: false };
 
 /** Una cuenta nacida de un escaneo que no dedujo el banco. */
-const SIN_EMISOR: ReconcileState["missingIssuer"]["accounts"][number] = {
-    id: "a9", ownerUserId: "u", institutionId: null, accountType: "SAVINGS",
-    lastFour: "8729", currency: "USD", status: "ACTIVE", isUnconfirmed: true,
-    ...STAMPS,
+const SIN_EMISOR: ReconcileState["blocked"]["accounts"][number] = {
+    account: {
+        id: "a9", ownerUserId: "u", institutionId: null, accountType: "SAVINGS",
+        lastFour: "8729", currency: "USD", status: "ACTIVE", isUnconfirmed: true,
+        ...STAMPS,
+    },
+    reason: "ISSUER",
+};
+
+/** Una de débito con emisor pero sin la cuenta de la que gasta. */
+const SIN_CUENTA: ReconcileState["blocked"]["cards"][number] = {
+    card: {
+        id: "c9", ownerUserId: "u", institutionId: "i1", accountId: null,
+        cardType: "DEBIT", lastFour: "2780", currency: "USD", status: "ACTIVE",
+        isUnconfirmed: true, ...STAMPS,
+    },
+    reason: "DEBIT_ACCOUNT",
 };
 
 describe("ReconcileClient", () => {
@@ -117,18 +130,20 @@ describe("ReconcileClient", () => {
         expect(screen.getByText(/9 mov\./)).toBeInTheDocument();
     });
 
-    it("avisa de las identidades que no se pueden confirmar por falta de emisor", () => {
+    it("avisa de lo que no se puede confirmar y dice qué le falta a cada una", () => {
         render(<ReconcileClient initialData={{
-            ...state, missingIssuer: { accounts: [SIN_EMISOR], cards: [] },
+            ...state, blocked: { accounts: [SIN_EMISOR], cards: [SIN_CUENTA] },
         }} />);
 
-        // El guardado reventaba contra el CHECK de la tabla; ahora se dice
-        // antes de intentarlo, con la salida al lado.
-        expect(screen.getByText(/1 identidad no se puede confirmar/i)).toBeInTheDocument();
-        expect(screen.getByRole("button", { name: /XXXX8729.*Asignar emisor/ })).toBeInTheDocument();
+        // El guardado reventaba contra dos CHECK distintos de la base; ahora se
+        // dice antes de intentarlo, y por su nombre: con un «no se puede
+        // confirmar» a secas hay que abrir el formulario para saber cuál falta.
+        expect(screen.getByText(/2 identidades no se pueden confirmar/i)).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: /XXXX8729.*Falta el emisor/ })).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: /XXXX2780.*Falta la cuenta/ })).toBeInTheDocument();
     });
 
-    it("sin identidades sin emisor no hay aviso", () => {
+    it("sin identidades incompletas no hay aviso", () => {
         render(<ReconcileClient initialData={state} />);
         expect(screen.queryByText(/no se puede confirmar/i)).not.toBeInTheDocument();
     });
@@ -151,7 +166,7 @@ describe("ReconcileClient", () => {
     it("sin nada que conciliar muestra el estado vacío", () => {
         render(<ReconcileClient initialData={{
             exact: [], inferred: [], pending: [], identities: [], totalMovements: 0,
-            missingIssuer: { accounts: [], cards: [] }, institutions: [], accounts: [],
+            blocked: { accounts: [], cards: [] }, institutions: [], accounts: [],
         }} />);
         expect(screen.getByText(/no hay nada que conciliar/i)).toBeInTheDocument();
     });

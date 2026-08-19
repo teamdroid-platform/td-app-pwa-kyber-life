@@ -113,29 +113,76 @@ describe("confirmResolvedIdentities", () => {
             .toEqual({ confirmed: 0, skipped: 1 });
         expect((await cards.findById(huerfana.id))?.isUnconfirmed).toBe(true);
     });
+
+    it("una de débito sin cuenta se aparta aunque tenga emisor", async () => {
+        const { service, cards, card, resolved } = await build();
+        // Segunda regla que la base relaja mientras está sin revisar: un débito
+        // confirmado tiene que decir de qué cuenta gasta.
+        const debito = await card({ cardType: "DEBIT", accountId: null, lastFour: "2780" });
+        await resolved({ cardId: debito.id });
+
+        expect(await service.confirmResolvedIdentities(USER))
+            .toEqual({ confirmed: 0, skipped: 1 });
+        expect((await cards.findById(debito.id))?.isUnconfirmed).toBe(true);
+    });
+
+    it("una de débito con su cuenta sí se confirma", async () => {
+        const { service, cards, account, card, resolved } = await build();
+        const cuenta = await account();
+        const debito = await card({ cardType: "DEBIT", accountId: cuenta.id, lastFour: "2780" });
+        await resolved({ cardId: debito.id });
+
+        expect((await service.confirmResolvedIdentities(USER)).confirmed).toBe(1);
+        expect((await cards.findById(debito.id))?.isUnconfirmed).toBe(false);
+    });
+
+    it("una de crédito sin cuenta se confirma: la cuenta es cosa del débito", async () => {
+        const { service, cards, card, resolved } = await build();
+        const credito = await card({ cardType: "CREDIT", accountId: null });
+        await resolved({ cardId: credito.id });
+
+        expect((await service.confirmResolvedIdentities(USER)).confirmed).toBe(1);
+        expect((await cards.findById(credito.id))?.isUnconfirmed).toBe(false);
+    });
 });
 
-describe("identitiesMissingIssuer", () => {
-    it("nombra exactamente las que la confirmación va a apartar", async () => {
+describe("identitiesBlockedFromConfirming", () => {
+    it("nombra cada una con lo que le falta", async () => {
         const { service, account, card, resolved } = await build();
         const cuenta = await account({ institutionId: null, lastFour: "8729" });
-        const tarjeta = await card({ institutionId: null });
+        const sinEmisor = await card({ institutionId: null });
+        const debito = await card({ cardType: "DEBIT", accountId: null, lastFour: "2780" });
         await account({ lastFour: "0814" });
         await resolved({ accountId: cuenta.id });
-        await resolved({ cardId: tarjeta.id });
+        await resolved({ cardId: sinEmisor.id });
+        await resolved({ cardId: debito.id });
 
-        const faltan = await service.identitiesMissingIssuer(USER);
+        const faltan = await service.identitiesBlockedFromConfirming(USER);
 
-        expect(faltan.accounts.map(a => a.id)).toEqual([cuenta.id]);
-        expect(faltan.cards.map(c => c.id)).toEqual([tarjeta.id]);
+        expect(faltan.accounts).toEqual([{ account: expect.objectContaining({ id: cuenta.id }), reason: "ISSUER" }]);
+        expect(faltan.cards).toEqual(expect.arrayContaining([
+            { card: expect.objectContaining({ id: sinEmisor.id }), reason: "ISSUER" },
+            { card: expect.objectContaining({ id: debito.id }), reason: "DEBIT_ACCOUNT" },
+        ]));
+    });
+
+    it("el emisor va antes que la cuenta: sin banco no se puede elegir", async () => {
+        const { service, card, resolved } = await build();
+        // Una de débito a la que le faltan las dos cosas pide primero el emisor,
+        // porque la cuenta tiene que ser de ese mismo banco.
+        const ambas = await card({ cardType: "DEBIT", institutionId: null, accountId: null });
+        await resolved({ cardId: ambas.id });
+
+        expect((await service.identitiesBlockedFromConfirming(USER)).cards[0].reason).toBe("ISSUER");
     });
 
     it("lo que avisa y lo que hace no pueden discrepar", async () => {
-        const { service, account, resolved } = await build();
+        const { service, account, card, resolved } = await build();
         await resolved({ accountId: (await account({ institutionId: null })).id });
+        await resolved({ cardId: (await card({ cardType: "DEBIT", accountId: null })).id });
         await resolved({ accountId: (await account()).id });
 
-        const faltan = await service.identitiesMissingIssuer(USER);
+        const faltan = await service.identitiesBlockedFromConfirming(USER);
         const { skipped } = await service.confirmResolvedIdentities(USER);
 
         expect(skipped).toBe(faltan.accounts.length + faltan.cards.length);
@@ -145,7 +192,7 @@ describe("identitiesMissingIssuer", () => {
         const { service, account, resolved } = await build();
         await resolved({ accountId: (await account()).id });
 
-        expect(await service.identitiesMissingIssuer(USER))
+        expect(await service.identitiesBlockedFromConfirming(USER))
             .toEqual({ accounts: [], cards: [] });
     });
 });

@@ -8,8 +8,10 @@ import {
 } from "@/infrastructure/container";
 import { requireUserId } from "@/infrastructure/supabase/auth-user";
 import { accountLabel, cardLabel } from "@/lib/bank-identity-label";
-import type { PendingGroup } from "@/application/services/bank-identification-service";
-import type { BankAccount, BankCard, BankInstitution } from "@/domain/entities/bank";
+import type {
+    PendingGroup, ConfirmBlockers,
+} from "@/application/services/bank-identification-service";
+import type { BankAccount, BankInstitution } from "@/domain/entities/bank";
 
 const uuid = z.string().uuid();
 
@@ -50,13 +52,10 @@ export interface ReconcileState {
     identities: ReconcileIdentity[];
     totalMovements: number;
     /**
-     * Las que la confirmación va a apartar por no tener emisor, y lo que hace
-     * falta para arreglarlas ahí mismo.
+     * Las que la confirmación va a apartar por incompletas, con lo que le falta
+     * a cada una para poder arreglarlas ahí mismo.
      */
-    missingIssuer: {
-        accounts: BankAccount[];
-        cards: BankCard[];
-    };
+    blocked: ConfirmBlockers;
     /** Emisores del usuario, para el formulario que corrige lo anterior. */
     institutions: BankInstitution[];
     /** Cuentas del usuario, para atar una tarjeta de débito. */
@@ -110,14 +109,14 @@ export async function getReconcileStateAction() {
         // una identidad creada desde el último paso puede resolver pendientes.
         await bankIdentificationService.reparseAll(userId);
 
-        const [exact, inferred, pending, accounts, cards, institutions, missingIssuer] = await Promise.all([
+        const [exact, inferred, pending, accounts, cards, institutions, blocked] = await Promise.all([
             bankIdentificationService.groupsByResolution(userId, "EXACT"),
             bankIdentificationService.groupsByResolution(userId, "INFERRED"),
             bankIdentificationService.groupsByResolution(userId, "PENDING"),
             bankAccountRepository.findByOwnerId(userId),
             bankCardRepository.findByOwnerId(userId),
             bankInstitutionRepository.findByOwnerId(userId),
-            bankIdentificationService.identitiesMissingIssuer(userId),
+            bankIdentificationService.identitiesBlockedFromConfirming(userId),
         ]);
 
         const identities: ReconcileIdentity[] = [
@@ -138,7 +137,7 @@ export async function getReconcileStateAction() {
             identities,
             totalMovements: [...exact, ...inferred, ...pending]
                 .reduce((sum, g) => sum + g.occurrences, 0),
-            missingIssuer,
+            blocked,
             institutions,
             accounts,
         };
