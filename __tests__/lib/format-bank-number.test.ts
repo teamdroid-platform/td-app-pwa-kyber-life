@@ -1,5 +1,6 @@
 import {
-    formatBankNumber, formatIdentityNumber, identityNumberFromDisplay, IDENTITY_NUMBER_LENGTH,
+    formatBankNumber, formatIdentityNumber, identityNumberFromDisplay, isRedundantSample,
+    IDENTITY_NUMBER_LENGTH,
 } from "@/lib/format-bank-number";
 
 describe("formatBankNumber", () => {
@@ -81,6 +82,21 @@ describe("formatIdentityNumber", () => {
         // comparables, invitaría a compararlo con ellas.
         expect(formatIdentityNumber({ prefixDigits: "493176" })).toBe("");
         expect(formatIdentityNumber({ prefixDigits: "25", lastFour: null })).toBe("");
+    });
+});
+
+describe("isRedundantSample", () => {
+    it("la misma cifra con otra máscara no aporta nada", () => {
+        expect(isRedundantSample("XXXXXXXX7903", "XXXX7903")).toBe(true);
+        expect(isRedundantSample("XXXXXX4058", "XXXX4058")).toBe(true);
+        expect(isRedundantSample("******8973", "XXXX8973")).toBe(true);
+        expect(isRedundantSample("25••••10", "25XXXX10")).toBe(true);
+    });
+
+    it("una cadena con más dígitos sí aporta", () => {
+        // El normalizado sacrifica el prefijo largo; el crudo lo conserva.
+        expect(isRedundantSample("4043615213", "XXXX5213")).toBe(false);
+        expect(isRedundantSample("493176XXXX2780", "XXXX2780")).toBe(false);
     });
 });
 
