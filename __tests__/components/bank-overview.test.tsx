@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { BankOverviewClient } from "@/presentation/bank/components/BankOverviewClient";
 import type { BankOverview } from "@/application/services/bank-service";
 
@@ -101,8 +101,7 @@ describe("BankOverviewClient", () => {
     it("cada emisor se pliega desde su cabecera", () => {
         render(<BankOverviewClient initialData={overview} />);
 
-        const header = screen.getByRole("button", { name: /Banco del Austro/i });
-        expect(header).toHaveAttribute("aria-expanded", "true");
+        const header = screen.getByRole("button", { name: /Banco del Austro/i, expanded: true });
         expect(screen.getByText("XXXX0814")).toBeInTheDocument();
 
         act(() => { fireEvent.click(header); });
@@ -135,6 +134,65 @@ describe("BankOverviewClient", () => {
         // Sugiere quedarse con la que más tiene registrado.
         expect(screen.getByRole("button", { name: /Unificar en «COAC Jardín Azuayo»/ })).toBeInTheDocument();
         expect(screen.getByText(/se archivarán 2 instituciones/i)).toBeInTheDocument();
+    });
+
+    it("cualquier emisor se puede unificar a mano desde su menú", () => {
+        // El detector solo ve las que comparten huella: «Coop. Jardín Azuayo
+        // CJA» se le escapa por un sufijo que no es forma jurídica. La decisión
+        // no puede depender de que la app la adivine.
+        render(<BankOverviewClient initialData={{
+            ...overview,
+            institutions: [
+                { ...VACIA, id: "i2", name: "Coop Jardín Azuayo" },
+                { ...VACIA, id: "i3", name: "Coop. Jardín Azuayo CJA" },
+            ],
+        }} />);
+
+        expect(screen.queryByText(/parecen el mismo/i)).not.toBeInTheDocument();
+
+        act(() => { fireEvent.click(screen.getByRole("button", { name: /Acciones de Coop\. Jardín Azuayo CJA/ })); });
+        act(() => { fireEvent.click(screen.getByText("Unificar con otra institución")); });
+
+        const hoja = screen.getByRole("dialog");
+        expect(within(hoja).getByText(/Unificar «Coop\. Jardín Azuayo CJA»/)).toBeInTheDocument();
+        // El destino se elige entre las demás; la de origen no se ofrece.
+        expect(within(hoja).getByText("Coop Jardín Azuayo")).toBeInTheDocument();
+        expect(within(hoja).queryByText("Coop. Jardín Azuayo CJA")).not.toBeInTheDocument();
+    });
+
+    it("la dirección va fijada: se elige a dónde pasa lo de esta", () => {
+        render(<BankOverviewClient initialData={{
+            ...overview,
+            institutions: [
+                { ...VACIA, id: "i2", name: "Coop Jardín Azuayo" },
+                { ...VACIA, id: "i3", name: "Coop. Jardín Azuayo CJA" },
+            ],
+        }} />);
+
+        act(() => { fireEvent.click(screen.getByRole("button", { name: /Acciones de Coop\. Jardín Azuayo CJA/ })); });
+        act(() => { fireEvent.click(screen.getByText("Unificar con otra institución")); });
+
+        // Sin destino elegido no se puede confirmar: «unificar» sin decir con
+        // qué archivaría la institución sin mover nada a ninguna parte.
+        const hoja = screen.getByRole("dialog");
+        expect(within(hoja).getByRole("button", { name: /Elige la institución destino/ })).toBeDisabled();
+
+        act(() => { fireEvent.click(within(hoja).getByText("Coop Jardín Azuayo")); });
+        expect(screen.getByRole("button", { name: /Pasar todo a «Coop Jardín Azuayo»/ })).toBeEnabled();
+    });
+
+    it("los cajones que no son bancos no ofrecen unificar", () => {
+        render(<BankOverviewClient initialData={{
+            ...overview,
+            accounts: [
+                ...overview.accounts,
+                { ...overview.accounts[0], id: "a9", institutionId: null, accountType: "CASH", lastFour: null },
+            ],
+        }} />);
+
+        // «Efectivo» y «Sin institución» agrupan, no son emisores.
+        expect(screen.getByRole("button", { name: /Efectivo/, expanded: true })).toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: /Acciones de Efectivo/ })).not.toBeInTheDocument();
     });
 
     it("no avisa de duplicados cuando los emisores solo comparten «Banco»", () => {
