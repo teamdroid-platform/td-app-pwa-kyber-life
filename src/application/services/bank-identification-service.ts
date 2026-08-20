@@ -307,14 +307,61 @@ export class BankIdentificationService {
         });
     }
 
+    /**
+     * Declara que el número es de otra persona.
+     *
+     * La observación se desliga y se queda: sigue colgada del movimiento, que es
+     * donde tiene sentido saber a qué cuenta le transferiste. Lo que no puede
+     * quedarse es la identidad que se hubiera fundado suponiendo que era tuya
+     * —el escaneo la crea cuando el número sale como origen de un gasto—, porque
+     * ahí seguiría en Bancos y en la conciliación como si fuera del usuario.
+     */
     async markExternal(userId: UUID, observationId: UUID): Promise<BankNumberObservation> {
         const observation = await this.requireObservation(userId, observationId);
-        return this.observations.update({
+
+        const updated = await this.observations.update({
             ...observation,
             accountId: null, cardId: null,
             resolution: "EXTERNAL",
             updatedAt: new Date().toISOString(),
         });
+
+        await this.archiveIfOrphanGuess(
+            userId, observation.accountId ?? null, observation.cardId ?? null,
+        );
+        return updated;
+    }
+
+    /**
+     * Archiva la identidad que solo existía por la suposición que el usuario
+     * acaba de desmentir.
+     *
+     * Con dos guardas, porque archivar es destructivo: solo lo que nació de un
+     * escaneo y nadie ha revisado —una que el usuario dio de alta a mano es
+     * suya aunque este número no lo sea—, y solo si ninguna otra observación
+     * sigue apuntándola.
+     */
+    private async archiveIfOrphanGuess(
+        userId: UUID, accountId: UUID | null, cardId: UUID | null,
+    ): Promise<void> {
+        const stillReferenced = async (predicate: (o: BankNumberObservation) => boolean) =>
+            (await this.observations.findByOwnerId(userId)).some(predicate);
+
+        if (accountId) {
+            const account = await this.accounts.findById(accountId);
+            if (account?.ownerUserId === userId && account.isUnconfirmed
+                && !(await stillReferenced(o => o.accountId === accountId))) {
+                await this.accounts.delete(accountId);
+            }
+        }
+
+        if (cardId) {
+            const card = await this.cards.findById(cardId);
+            if (card?.ownerUserId === userId && card.isUnconfirmed
+                && !(await stillReferenced(o => o.cardId === cardId))) {
+                await this.cards.delete(cardId);
+            }
+        }
     }
 
     /**

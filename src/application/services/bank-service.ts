@@ -568,6 +568,15 @@ export class BankService {
                     : await this.identification.reobserve(userId, raw);
             }
 
+            // Decir «no es mía» sobre un número que el escaneo ya había fundado
+            // como propio no hacía nada: la observación seguía ligada, así que
+            // el flujo entraba por las ramas de abajo y la identidad se quedaba
+            // en Bancos. La decisión del usuario tiene que poder deshacer la
+            // suposición, no solo evitarla.
+            if (declared === "EXTERNAL" && (observation.accountId || observation.cardId)) {
+                observation = await this.identification.markExternal(userId, observation.id);
+            }
+
             if (observation.cardId) {
                 links.bankCardId = observation.cardId;
                 // Una tarjeta de débito gasta de su cuenta; el crédito, de ninguna.
