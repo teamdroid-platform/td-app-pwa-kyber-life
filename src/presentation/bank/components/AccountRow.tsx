@@ -4,18 +4,21 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ArrowUpRight, Landmark, Pencil, PiggyBank, Scale, Trash2, TrendingUp, Wallet } from "lucide-react";
+import {
+    ArrowUpRight, CreditCard, Landmark, Pencil, PiggyBank, Scale, Trash2, TrendingUp, Wallet,
+} from "lucide-react";
 import { formatIdentityNumber } from "@/lib/format-bank-number";
 import { ACCOUNT_TYPE_ACRONYM, ACCOUNT_TYPE_LABEL } from "@/lib/bank-identity-label";
 import { deleteBankAccountAction } from "@/app/actions/bank";
 import { IdentityBadge } from "./IdentityBadge";
 import { RowActionsSheet, KebabButton } from "./RowActionsSheet";
 import { AccountFormSheet } from "./AccountFormSheet";
+import { ConvertToCardSheet } from "./ConvertToCardSheet";
 import { BalanceSnapshotSheet } from "./BalanceSnapshotSheet";
 import { money, shortDate } from "../lib/format-money";
 import { cn } from "@/lib/utils";
 import type { BankAccountWithBalance } from "@/application/services/bank-service";
-import type { BankInstitution } from "@/domain/entities/bank";
+import type { BankAccount, BankInstitution } from "@/domain/entities/bank";
 
 const TYPE_ICON = {
     CHECKING: Landmark,
@@ -28,6 +31,8 @@ interface AccountRowProps {
     account: BankAccountWithBalance;
     /** Para el formulario de edición que abre el menú. */
     institutions: BankInstitution[];
+    /** Para elegir de qué cuenta gasta, al convertirla en tarjeta de débito. */
+    accounts: BankAccount[];
 }
 
 /**
@@ -41,7 +46,7 @@ interface AccountRowProps {
  * Tocar la fila lleva al detalle; el resto de acciones vive en el menú, no en
  * un lápiz suelto fuera de la tarjeta.
  */
-export function AccountRow({ account, institutions }: AccountRowProps) {
+export function AccountRow({ account, institutions, accounts }: AccountRowProps) {
     const router = useRouter();
     const Icon = TYPE_ICON[account.accountType];
     const negative = account.balance < 0;
@@ -51,6 +56,7 @@ export function AccountRow({ account, institutions }: AccountRowProps) {
     const [menuOpen, setMenuOpen] = useState(false);
     const [editOpen, setEditOpen] = useState(false);
     const [snapshotOpen, setSnapshotOpen] = useState(false);
+    const [convertOpen, setConvertOpen] = useState(false);
     const [archiving, setArchiving] = useState(false);
 
     async function archive() {
@@ -135,6 +141,14 @@ export function AccountRow({ account, institutions }: AccountRowProps) {
                         icon: <Scale className="h-4 w-4" />,
                         onSelect: () => { setMenuOpen(false); setSnapshotOpen(true); },
                     },
+                    // El efectivo no es un número de banco: no hay tarjeta que
+                    // pueda ser.
+                    ...(account.accountType === "CASH" ? [] : [{
+                        label: "Convertir en tarjeta",
+                        hint: "Si en realidad es de débito o crédito",
+                        icon: <CreditCard className="h-4 w-4" />,
+                        onSelect: () => { setMenuOpen(false); setConvertOpen(true); },
+                    }]),
                     {
                         label: archiving ? "Archivando…" : "Archivar cuenta",
                         icon: <Trash2 className="h-4 w-4" />,
@@ -155,6 +169,14 @@ export function AccountRow({ account, institutions }: AccountRowProps) {
                 open={snapshotOpen}
                 onOpenChange={setSnapshotOpen}
             />
+            {convertOpen && (
+                <ConvertToCardSheet
+                    open
+                    onOpenChange={setConvertOpen}
+                    account={account}
+                    accounts={accounts}
+                />
+            )}
         </div>
     );
 }
