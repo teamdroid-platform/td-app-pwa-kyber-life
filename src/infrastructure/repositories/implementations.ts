@@ -228,6 +228,27 @@ export class InMemoryFinancialTransactionRepository extends InMemoryRepository<F
         }
         return affected.length;
     }
+
+    async relinkAccountToCard(
+        userId: UUID, fromAccountId: UUID, toCardId: UUID, toSourceAccountId: UUID | null,
+    ): Promise<number> {
+        const affected = (await this.findByOwnerId(userId)).filter(
+            t => t.bankSourceAccountId === fromAccountId || t.bankDestinationAccountId === fromAccountId,
+        );
+
+        for (const t of affected) {
+            await this.update({
+                ...t,
+                bankCardId: toCardId,
+                bankSourceAccountId: t.bankSourceAccountId === fromAccountId
+                    ? toSourceAccountId : t.bankSourceAccountId,
+                bankDestinationAccountId: t.bankDestinationAccountId === fromAccountId
+                    ? toSourceAccountId : t.bankDestinationAccountId,
+                updatedAt: new Date().toISOString(),
+            });
+        }
+        return affected.length;
+    }
 }
 
 export class InMemoryUserRepository extends InMemoryRepository<User> implements IUserRepository {

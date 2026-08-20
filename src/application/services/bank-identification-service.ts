@@ -365,6 +365,28 @@ export class BankIdentificationService {
     }
 
     /**
+     * Mueve a una tarjeta las observaciones que identificaban a una cuenta.
+     *
+     * Va con la conversión: sin esto el número se quedaría apuntando a una
+     * cuenta archivada y volvería a la conciliación como si nadie lo hubiera
+     * decidido nunca.
+     */
+    async relinkAccountToCard(userId: UUID, fromAccountId: UUID, toCardId: UUID): Promise<number> {
+        const own = await this.observations.findByOwnerId(userId);
+        const affected = own.filter(o => o.accountId === fromAccountId);
+
+        for (const observation of affected) {
+            await this.observations.update({
+                ...observation,
+                accountId: null,
+                cardId: toCardId,
+                updatedAt: new Date().toISOString(),
+            });
+        }
+        return affected.length;
+    }
+
+    /**
      * Liga todas las observaciones de un grupo a la misma identidad de una vez.
      * Es lo que hace el botón de conciliación cuando el usuario nombra un grupo.
      */

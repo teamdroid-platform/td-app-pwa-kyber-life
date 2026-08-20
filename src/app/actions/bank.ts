@@ -13,7 +13,7 @@ import {
     createAccountSchema, updateAccountSchema,
     createCardSchema, updateCardSchema,
     balanceSnapshotSchema, statementTotalSchema, payStatementSchema,
-    mergeInstitutionsSchema,
+    mergeInstitutionsSchema, convertToCardSchema,
 } from "@/lib/validators/bank-schemas";
 
 const idSchema = z.string().uuid();
@@ -157,6 +157,23 @@ export async function updateBankAccountAction(id: string, input: unknown) {
         );
         revalidateBanks();
         revalidatePath(`/financial/banks/accounts/${id}`);
+        return result;
+    });
+}
+
+/**
+ * Convierte una cuenta en la tarjeta que en realidad era, con su historial.
+ * Devuelve cuánto se movió para poder decirlo: «listo» no es una confirmación
+ * cuando lo que acaba de pasar toca 51 movimientos.
+ */
+export async function convertAccountToCardAction(accountId: string, input: unknown) {
+    return run("convertAccountToCard", async userId => {
+        const parsed = convertToCardSchema.parse(input);
+        const result = await bankService.convertAccountToCard(
+            userId, idSchema.parse(accountId), parsed,
+        );
+        revalidateBanks();
+        revalidatePath("/financial/transactions");
         return result;
     });
 }

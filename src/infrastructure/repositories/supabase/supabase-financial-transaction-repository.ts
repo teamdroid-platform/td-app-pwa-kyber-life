@@ -193,6 +193,32 @@ export class SupabaseFinancialTransactionRepository implements IFinancialTransac
         return data?.length ?? 0;
     }
 
+    /**
+     * Dos UPDATE porque la cuenta puede estar en cualquiera de los dos lados, y
+     * cada lado se reemplaza por su propio destino.
+     */
+    async relinkAccountToCard(
+        userId: UUID, fromAccountId: UUID, toCardId: UUID, toSourceAccountId: UUID | null,
+    ): Promise<number> {
+        const supabase = await createClient();
+        const stamp = new Date().toISOString();
+        const moved = new Set<string>();
+
+        for (const column of ['bank_source_account_id', 'bank_destination_account_id'] as const) {
+            const { data, error } = await supabase
+                .from('financial_transactions')
+                .update({ bank_card_id: toCardId, [column]: toSourceAccountId, updated_at: stamp })
+                .eq('owner_user_id', userId)
+                .eq(column, fromAccountId)
+                .select('id');
+
+            if (error) throw new Error(`Error relinking transactions to card: ${error.message}`);
+            for (const row of data ?? []) moved.add(row.id as string);
+        }
+
+        return moved.size;
+    }
+
     async findRecent(userId: UUID, limit: number): Promise<FinancialTransaction[]> {
         const supabase = await createClient();
         const { data, error } = await supabase
