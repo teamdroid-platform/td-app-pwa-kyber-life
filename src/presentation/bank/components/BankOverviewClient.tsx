@@ -12,6 +12,8 @@ import { InstitutionFormSheet } from "./InstitutionFormSheet";
 import { AccountFormSheet } from "./AccountFormSheet";
 import { CardFormSheet } from "./CardFormSheet";
 import { MergeInstitutionsSheet, type MergeCandidate } from "./MergeInstitutionsSheet";
+import { MergeIntoSheet } from "./MergeIntoSheet";
+import { RowActionsSheet, KebabButton } from "./RowActionsSheet";
 import { FormSheet } from "@/components/ui/form-sheet";
 import { cn } from "@/lib/utils";
 import { accountLabel } from "@/lib/bank-identity-label";
@@ -57,6 +59,15 @@ function CreateTile({
     );
 }
 
+/** Lo que tiene un emisor, para el subtítulo de su menú. */
+function describeGroup(counts?: { accounts: number; cards: number }): string {
+    if (!counts || counts.accounts + counts.cards === 0) return "Sin cuentas ni tarjetas";
+    const parts: string[] = [];
+    if (counts.accounts > 0) parts.push(counts.accounts === 1 ? "1 cuenta" : `${counts.accounts} cuentas`);
+    if (counts.cards > 0) parts.push(counts.cards === 1 ? "1 tarjeta" : `${counts.cards} tarjetas`);
+    return parts.join(" · ");
+}
+
 /**
  * Resumen del módulo: primero la respuesta —cuánto tengo disponible—, después
  * cuentas y tarjetas agrupadas por emisor. El efectivo no tiene institución,
@@ -66,6 +77,9 @@ export function BankOverviewClient({ initialData }: { initialData: BankOverview 
     const { institutions, accounts, cards } = initialData;
     const [addOpen, setAddOpen] = useState(false);
     const [mergeGroupKey, setMergeGroupKey] = useState<string | null>(null);
+    // El emisor cuyo menú está abierto, y el que se está unificando a mano.
+    const [menuFor, setMenuFor] = useState<BankInstitution | null>(null);
+    const [mergingInto, setMergingInto] = useState<BankInstitution | null>(null);
     // Todo abierto de entrada: plegar por defecto escondería los saldos, que
     // son la razón de entrar a la pantalla.
     const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
@@ -73,6 +87,11 @@ export function BankOverviewClient({ initialData }: { initialData: BankOverview 
     const accountNameById = useMemo(
         () => new Map(accounts.map(a => [a.id, accountLabel(a)])),
         [accounts],
+    );
+
+    const institutionById = useMemo(
+        () => new Map(institutions.map(i => [i.id, i])),
+        [institutions],
     );
 
     const groups = useMemo<Group[]>(() => {
@@ -276,25 +295,37 @@ export function BankOverviewClient({ initialData }: { initialData: BankOverview 
                             {/* La cabecera es el control de plegado: con tres
                                 emisores vacíos la lista se llenaba de cajas y
                                 enterraba las cuentas de verdad. */}
-                            <button
-                                type="button"
-                                onClick={() => toggleGroup(key)}
-                                aria-expanded={!isCollapsed}
-                                className="flex items-center gap-2 rounded-lg px-1 py-0.5 text-left transition-colors hover:bg-muted/40"
-                            >
-                                {isCollapsed
-                                    ? <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                                    : <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
-                                <h2 className="min-w-0 flex-1 truncate text-[10.5px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                                    {group.name}
-                                </h2>
-                                <span className="shrink-0 text-[10px] text-muted-foreground">
-                                    {count === 0 ? "vacía" : count === 1 ? "1 ítem" : `${count} ítems`}
-                                </span>
-                                <span className="shrink-0 text-[12px] font-semibold tabular-nums text-foreground/80">
-                                    {money(group.total)}
-                                </span>
-                            </button>
+                            <div className="flex items-center gap-1">
+                                <button
+                                    type="button"
+                                    onClick={() => toggleGroup(key)}
+                                    aria-expanded={!isCollapsed}
+                                    className="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-1 py-0.5 text-left transition-colors hover:bg-muted/40"
+                                >
+                                    {isCollapsed
+                                        ? <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                                        : <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
+                                    <h2 className="min-w-0 flex-1 truncate text-[10.5px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                                        {group.name}
+                                    </h2>
+                                    <span className="shrink-0 text-[10px] text-muted-foreground">
+                                        {count === 0 ? "vacía" : count === 1 ? "1 ítem" : `${count} ítems`}
+                                    </span>
+                                    <span className="shrink-0 text-[12px] font-semibold tabular-nums text-foreground/80">
+                                        {money(group.total)}
+                                    </span>
+                                </button>
+
+                                {/* Solo los emisores de verdad: «Efectivo» y
+                                    «Sin institución» son cajones, no bancos, y
+                                    no hay nada que unificar en ellos. */}
+                                {institutionById.get(key) && (
+                                    <KebabButton
+                                        label={`Acciones de ${group.name}`}
+                                        onClick={() => setMenuFor(institutionById.get(key)!)}
+                                    />
+                                )}
+                            </div>
 
                             {!isCollapsed && (
                                 count > 0 ? (
@@ -325,6 +356,42 @@ export function BankOverviewClient({ initialData }: { initialData: BankOverview 
                         </section>
                     );
                 })
+            )}
+
+            {menuFor && (
+                <RowActionsSheet
+                    open
+                    onOpenChange={open => { if (!open) setMenuFor(null); }}
+                    title={menuFor.name}
+                    description={describeGroup(countsById.get(menuFor.id))}
+                    actions={[
+                        {
+                            label: "Unificar con otra institución",
+                            hint: "Mueve sus cuentas y tarjetas a la que elijas",
+                            icon: <Merge className="h-4 w-4" />,
+                            onSelect: () => {
+                                const source = menuFor;
+                                setMenuFor(null);
+                                setMergingInto(source);
+                            },
+                        },
+                    ]}
+                />
+            )}
+
+            {mergingInto && (
+                <MergeIntoSheet
+                    open
+                    onOpenChange={open => { if (!open) setMergingInto(null); }}
+                    source={mergingInto}
+                    sourceCounts={countsById.get(mergingInto.id) ?? { accounts: 0, cards: 0 }}
+                    options={institutions
+                        .filter(i => i.id !== mergingInto.id)
+                        .map(institution => ({
+                            institution,
+                            ...(countsById.get(institution.id) ?? { accounts: 0, cards: 0, total: 0 }),
+                        }))}
+                />
             )}
 
             {mergeGroup && (
