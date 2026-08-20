@@ -115,6 +115,17 @@ export interface CreateAccountInput {
     isUnconfirmed?: boolean;
 }
 
+/** Lo que hace falta para convertir una cuenta en la tarjeta que era. */
+export interface ConvertToCardInput {
+    cardType: BankCard["cardType"];
+    /** La cuenta de la que gasta. Obligatoria en débito, ignorada en crédito. */
+    accountId?: UUID | null;
+    brand?: string | null;
+    creditLimit?: number | null;
+    statementDay?: number | null;
+    dueDay?: number | null;
+}
+
 /** Una entrada del jsonb `accounts` que produce el escáner. */
 export interface ScannedAccountEntry {
     /** "origen" | "destino", tal cual lo escribe el escáner. */
@@ -1150,6 +1161,79 @@ export class BankService {
             isUnconfirmed: input.isUnconfirmed ?? false,
             ...stamps(),
         });
+    }
+
+    /**
+     * Convierte una cuenta en la tarjeta que en realidad era.
+     *
+     * El escaneo no distingue una cuenta de una tarjeta de débito por el
+     * número, así que puede fundar la identidad equivocada; corregirlo obligaba
+     * a archivar la cuenta y crear la tarjeta a mano, dejando su historial
+     * apuntando a algo archivado y el número de vuelta en la conciliación.
+     *
+     * Lo que se mueve va todo junto: los movimientos, las observaciones que la
+     * identifican y el propio número. Un débito descuenta de su cuenta, así que
+     * los movimientos pasan a apuntar a esa —es lo que ya hace el escaneo con
+     * uno nuevo, y dejar el historial contando otra cosa lo haría incomparable.
+     */
+    async convertAccountToCard(
+        userId: UUID, accountId: UUID, input: ConvertToCardInput,
+    ): Promise<{ card: BankCard; movedTransactions: number; movedObservations: number }> {
+        const account = await this.requireAccount(userId, accountId);
+
+        // El efectivo no es un número de banco: no hay tarjeta que pueda ser.
+        if (account.accountType === "CASH") {
+            throw new Error("El efectivo no se puede convertir en tarjeta");
+        }
+
+        const isCredit = input.cardType === "CREDIT";
+        const spendsFrom = isCredit ? null : (input.accountId ?? null);
+
+        if (!isCredit && !spendsFrom) {
+            throw new Error("Una tarjeta de débito tiene que decir de qué cuenta gasta");
+        }
+        // Apuntarse a sí misma dejaría la tarjeta gastando de una cuenta
+        // archivada en el mismo movimiento en que nace.
+        if (spendsFrom === accountId) {
+            throw new Error("La tarjeta no puede gastar de la cuenta que se está convirtiendo");
+        }
+        if (spendsFrom) await this.requireAccount(userId, spendsFrom);
+
+        // Una tarjeta de débito que ya gastaba de esta cuenta se quedaría sin
+        // ella: archivar primero y preguntar después no es una opción.
+        const dependents = await this.cards.findByAccountId(userId, accountId);
+        if (dependents.some(c => !c.isDeleted)) {
+            throw new Error(
+                "Otra tarjeta gasta de esta cuenta. Cámbiale la cuenta antes de convertirla.",
+            );
+        }
+
+        const card = await this.createCard(userId, {
+            institutionId: account.institutionId,
+            accountId: spendsFrom,
+            cardType: input.cardType,
+            brand: input.brand ?? null,
+            lastFour: account.lastFour,
+            prefixDigits: account.prefixDigits,
+            currency: account.currency,
+            creditLimit: input.creditLimit ?? null,
+            statementDay: input.statementDay ?? null,
+            dueDay: input.dueDay ?? null,
+            // Hereda el estado de revisión: convertir corrige el tipo, no da
+            // por revisado algo que el usuario todavía no miró.
+            isUnconfirmed: account.isUnconfirmed,
+        });
+
+        const movedTransactions = await this.transactions.relinkAccountToCard(
+            userId, accountId, card.id, spendsFrom,
+        );
+        const movedObservations = await this.identification.relinkAccountToCard(
+            userId, accountId, card.id,
+        );
+
+        await this.accounts.delete(accountId);
+
+        return { card, movedTransactions, movedObservations };
     }
 
     async updateCard(userId: UUID, id: UUID, input: Partial<CreateCardInput>): Promise<BankCard> {

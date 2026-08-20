@@ -335,6 +335,7 @@ export function BankOverviewClient({ initialData }: { initialData: BankOverview 
                                                 key={account.id}
                                                 account={account}
                                                 institutions={institutions}
+                                                accounts={accounts}
                                             />
                                         ))}
                                         {group.cards.map(card => (

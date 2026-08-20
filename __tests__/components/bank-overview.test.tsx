@@ -218,6 +218,51 @@ describe("BankOverviewClient", () => {
         expect(screen.getByText("Ver detalle y movimientos")).toBeInTheDocument();
     });
 
+    it("una cuenta mal clasificada se puede convertir en tarjeta", () => {
+        render(<BankOverviewClient initialData={{
+            ...overview,
+            accounts: [
+                ...overview.accounts,
+                { ...overview.accounts[0], id: "a2", lastFour: "2780", balance: 0 },
+            ],
+        }} />);
+
+        act(() => { fireEvent.click(screen.getByRole("button", { name: /Acciones de AHO XXXX2780/i })); });
+        act(() => { fireEvent.click(screen.getByText("Convertir en tarjeta")); });
+
+        const hoja = screen.getByRole("dialog");
+        // Un débito tiene que decir de qué cuenta gasta; el aviso dice qué pasa
+        // con el historial antes de que pase.
+        expect(within(hoja).getByText("Gasta de la cuenta")).toBeInTheDocument();
+        expect(within(hoja).getByText("Elige la cuenta")).toBeInTheDocument();
+        expect(within(hoja).getByText(/movimientos pasarán a la tarjeta/i)).toBeInTheDocument();
+    });
+
+    it("sin otra cuenta en el banco, lo dice en vez de ofrecer un selector vacío", () => {
+        render(<BankOverviewClient initialData={overview} />);
+
+        act(() => { fireEvent.click(screen.getByRole("button", { name: /Acciones de AHO XXXX0814/i })); });
+        act(() => { fireEvent.click(screen.getByText("Convertir en tarjeta")); });
+
+        const hoja = screen.getByRole("dialog");
+        expect(within(hoja).getByText(/No tienes otra cuenta en este banco/i)).toBeInTheDocument();
+    });
+
+    it("el efectivo no ofrece convertirse: no es un número de banco", () => {
+        render(<BankOverviewClient initialData={{
+            ...overview,
+            accounts: [
+                ...overview.accounts,
+                { ...overview.accounts[0], id: "a9", institutionId: null, accountType: "CASH", lastFour: null },
+            ],
+        }} />);
+
+        act(() => { fireEvent.click(screen.getByRole("button", { name: /Acciones de EFE/i })); });
+
+        expect(screen.getByText("Archivar cuenta")).toBeInTheDocument();
+        expect(screen.queryByText("Convertir en tarjeta")).not.toBeInTheDocument();
+    });
+
     it("una tarjeta no ofrece registrar saldo: no tiene saldo propio", () => {
         render(<BankOverviewClient initialData={overview} />);
 

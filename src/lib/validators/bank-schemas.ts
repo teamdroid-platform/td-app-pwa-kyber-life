@@ -96,6 +96,22 @@ export const mergeInstitutionsSchema = z.object({
     { message: "La institución destino no puede estar entre las que se unifican", path: ["targetId"] },
 );
 
+/**
+ * Convertir una cuenta en tarjeta. El débito exige la cuenta de la que gasta;
+ * el crédito la prohíbe, igual que el CHECK de la tabla.
+ */
+export const convertToCardSchema = z.object({
+    cardType: z.enum(["CREDIT", "DEBIT"]),
+    accountId: uuid.optional().nullable(),
+    brand: z.string().max(40).optional().nullable(),
+    creditLimit: z.number().nonnegative().optional().nullable(),
+    statementDay: z.number().int().min(1).max(31).optional().nullable(),
+    dueDay: z.number().int().min(1).max(31).optional().nullable(),
+}).refine(
+    v => v.cardType !== "DEBIT" || !!v.accountId,
+    { message: "Elige la cuenta de la que gasta esta tarjeta", path: ["accountId"] },
+);
+
 export const updateInstitutionSchema = createInstitutionSchema.partial();
 export const updateAccountSchema = accountBase.partial().extend({
     isUnconfirmed: z.boolean().optional(),

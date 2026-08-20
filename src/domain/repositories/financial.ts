@@ -53,6 +53,18 @@ export interface IFinancialTransactionRepository extends IRepository<FinancialTr
      * `toInstitutionId` (or null). Returns how many were updated.
      */
     reassignInstitution(userId: UUID, fromInstitutionId: UUID, toInstitutionId: UUID | null): Promise<number>;
+    /**
+     * Repunta a una tarjeta los movimientos que apuntaban a una cuenta, cuando
+     * esa cuenta resultó ser la tarjeta.
+     *
+     * `toSourceAccountId` es la cuenta de la que gasta la tarjeta —null en una
+     * de crédito, que no descuenta de ninguna hasta que se paga el estado—. Sin
+     * moverlos, el historial seguiría colgando de una cuenta archivada y
+     * contaría algo distinto de lo que cuentan los movimientos nuevos.
+     */
+    relinkAccountToCard(
+        userId: UUID, fromAccountId: UUID, toCardId: UUID, toSourceAccountId: UUID | null,
+    ): Promise<number>;
 }
 
 export interface ScanExecutionDateFilter {
