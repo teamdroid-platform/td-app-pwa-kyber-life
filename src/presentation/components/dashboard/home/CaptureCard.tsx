@@ -1,26 +1,21 @@
-import Link from "next/link";
-import { Camera, ChevronRight, ClipboardList, MessageSquareText, Mic } from "lucide-react";
+import { ChevronRight, ClipboardList, MessageSquareText, Mic } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { NewTransactionDialog } from "@/presentation/financial/components/ai-capture/NewTransactionDialog";
 import type { CaptureMethod } from "@/presentation/financial/components/ai-capture/CaptureMethodChooser";
 import { CARD } from "./ui";
 
 /**
- * Las cuatro vías, cada una con su color.
+ * Las tres vías, cada una con su color.
  *
- * El tinte no adorna: son cuatro filas del mismo tamaño y sin él la única
+ * El tinte no adorna: son tres filas del mismo tamaño y sin él la única
  * diferencia entre ellas sería leer la etiqueta. El verde encabeza porque es
  * el color con el que el sistema habla de dinero.
- *
- * Las tres primeras abren el diálogo de captura por su pantalla; escanear no
- * es una vía del diálogo sino la bandeja del escáner, y por eso lleva `href`.
  */
 const WAYS: {
-    id: CaptureMethod | "scan";
+    id: CaptureMethod;
     label: string;
     hint: string;
     Icon: typeof Mic;
-    href?: string;
     className: string;
     iconClassName: string;
 }[] = [
@@ -39,15 +34,15 @@ const WAYS: {
         className: "border-amber-500/35 bg-amber-500/10 text-amber-300 hover:border-amber-500/70",
         iconClassName: "bg-amber-500/20 text-amber-300",
     },
-    {
-        id: "scan", label: "Escanear comprobante", hint: "Sube o captura tu comprobante.", Icon: Camera,
-        href: "/financial/scanner",
-        className: "border-sky-500/35 bg-sky-500/10 text-sky-300 hover:border-sky-500/70",
-        iconClassName: "bg-sky-500/20 text-sky-300",
-    },
 ];
 
-const ROW = "flex w-full items-center gap-3 rounded-2xl border px-3.5 py-3 text-left transition-colors";
+/**
+ * Cada vía ocupa una fila alta —la tarjeta llega hasta el pie de los paneles—,
+ * así que el contenido va a la escala de esa fila: icono grande, rótulo de
+ * titular y descripción legible. Con el cuerpo pequeño de una lista, las tres
+ * filas eran tres islas de texto flotando en un hueco.
+ */
+const ROW = "flex w-full items-center gap-4 rounded-2xl border px-5 py-4 text-left transition-colors";
 
 /**
  * La acción principal del inicio: anotar lo que se acaba de gastar.
@@ -69,35 +64,28 @@ export function CaptureCard({ className }: { className?: string }) {
             />
 
             <div className="relative flex h-full flex-col">
-                <h2 className="text-xl font-bold tracking-tight text-text-primary">Registrar un movimiento</h2>
-                <p className="mt-1 text-[13px] text-text-tertiary">Elige cómo deseas registrar tu movimiento.</p>
+                <h2 className="text-[22px] font-bold tracking-tight text-text-primary">Registrar un movimiento</h2>
+                <p className="mt-1 text-[14px] text-text-tertiary">Elige cómo deseas registrar tu movimiento.</p>
 
-                {/* Las cuatro filas se reparten el alto sobrante: la tarjeta llega
+                {/* Las tres filas se reparten el alto sobrante: la tarjeta llega
                     hasta el pie de los paneles de al lado, y con alto fijo dejaría
-                    un hueco muerto al final. */}
-                <div className="mt-4 grid flex-1 auto-rows-fr gap-2.5">
-                    {WAYS.map(({ id, label, hint, Icon, href, className: tone, iconClassName }) => {
-                        const content = (
-                            <>
-                                <span className={cn("grid h-9 w-9 shrink-0 place-items-center rounded-xl", iconClassName)}>
-                                    <Icon className="h-4 w-4" />
+                    un hueco muerto al final. Quitar una vía no encoge la tarjeta:
+                    las que quedan crecen para ocupar lo mismo. */}
+                <div className="mt-5 grid flex-1 auto-rows-fr gap-3">
+                    {WAYS.map(({ id, label, hint, Icon, className: tone, iconClassName }) => (
+                        <NewTransactionDialog key={id} startWith={id}>
+                            <button type="button" className={cn(ROW, tone)}>
+                                <span className={cn("grid h-12 w-12 shrink-0 place-items-center rounded-2xl", iconClassName)}>
+                                    <Icon className="h-6 w-6" />
                                 </span>
                                 <span className="min-w-0 flex-1">
-                                    <span className="block truncate text-[14px] font-bold">{label}</span>
-                                    <span className="block truncate text-[11px] text-text-tertiary">{hint}</span>
+                                    <span className="block truncate text-[17px] font-bold leading-tight">{label}</span>
+                                    <span className="mt-0.5 block truncate text-[13px] text-text-tertiary">{hint}</span>
                                 </span>
-                                <ChevronRight className="h-4 w-4 shrink-0 opacity-70" />
-                            </>
-                        );
-
-                        return href
-                            ? <Link key={id} href={href} className={cn(ROW, tone)}>{content}</Link>
-                            : (
-                                <NewTransactionDialog key={id} startWith={id as CaptureMethod}>
-                                    <button type="button" className={cn(ROW, tone)}>{content}</button>
-                                </NewTransactionDialog>
-                            );
-                    })}
+                                <ChevronRight className="h-5 w-5 shrink-0 opacity-70" />
+                            </button>
+                        </NewTransactionDialog>
+                    ))}
                 </div>
             </div>
         </section>

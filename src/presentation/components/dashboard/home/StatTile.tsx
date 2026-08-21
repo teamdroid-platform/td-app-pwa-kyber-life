@@ -9,6 +9,7 @@ import { CARD_LINK, IconTile, type Tint } from "./ui";
 const STROKE: Record<Tint, string> = {
     emerald: "#34d399",
     violet: "#a78bfa",
+    red: "#ef4444",
     sky: "#38bdf8",
     amber: "#fbbf24",
     cyan: "#22d3ee",
