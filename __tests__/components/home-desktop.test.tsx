@@ -59,16 +59,15 @@ function alertsFor(metrics: HomeMetrics, pendingScans = 1, pendingBalances = 4) 
 const BASE = { metrics: METRICS, alerts: alertsFor(METRICS) };
 
 describe("HomeDesktop", () => {
-    it("abre con las cuatro vías de registro", () => {
+    it("abre con las tres vías de registro", () => {
         render(<HomeDesktop {...BASE} />);
 
         expect(screen.getByRole("heading", { name: "Registrar un movimiento" })).toBeInTheDocument();
         for (const way of ["Audio", "Texto", "Formulario"]) {
             expect(screen.getByRole("button", { name: new RegExp(way) })).toBeInTheDocument();
         }
-        // Escanear no es una vía del diálogo: lleva a la bandeja del escáner.
-        expect(screen.getByRole("link", { name: /Escanear comprobante/ }))
-            .toHaveAttribute("href", "/financial/scanner");
+        // El escáner no es una vía de captura: vive en su propia pantalla.
+        expect(screen.queryByText(/Escanear comprobante/)).not.toBeInTheDocument();
     });
 
     it("encabeza con las cifras del periodo, cada una hacia donde se explica", () => {

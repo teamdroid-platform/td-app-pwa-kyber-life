@@ -1,26 +1,21 @@
-import Link from "next/link";
-import { Camera, ChevronRight, ClipboardList, MessageSquareText, Mic } from "lucide-react";
+import { ChevronRight, ClipboardList, MessageSquareText, Mic } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { NewTransactionDialog } from "@/presentation/financial/components/ai-capture/NewTransactionDialog";
 import type { CaptureMethod } from "@/presentation/financial/components/ai-capture/CaptureMethodChooser";
 import { CARD } from "./ui";
 
 /**
- * Las cuatro vías, cada una con su color.
+ * Las tres vías, cada una con su color.
  *
- * El tinte no adorna: son cuatro filas del mismo tamaño y sin él la única
+ * El tinte no adorna: son tres filas del mismo tamaño y sin él la única
  * diferencia entre ellas sería leer la etiqueta. El verde encabeza porque es
  * el color con el que el sistema habla de dinero.
- *
- * Las tres primeras abren el diálogo de captura por su pantalla; escanear no
- * es una vía del diálogo sino la bandeja del escáner, y por eso lleva `href`.
  */
 const WAYS: {
-    id: CaptureMethod | "scan";
+    id: CaptureMethod;
     label: string;
     hint: string;
     Icon: typeof Mic;
-    href?: string;
     className: string;
     iconClassName: string;
 }[] = [
@@ -38,12 +33,6 @@ const WAYS: {
         id: "form", label: "Formulario", hint: "Completa todos los detalles.", Icon: ClipboardList,
         className: "border-amber-500/35 bg-amber-500/10 text-amber-300 hover:border-amber-500/70",
         iconClassName: "bg-amber-500/20 text-amber-300",
-    },
-    {
-        id: "scan", label: "Escanear comprobante", hint: "Sube o captura tu comprobante.", Icon: Camera,
-        href: "/financial/scanner",
-        className: "border-sky-500/35 bg-sky-500/10 text-sky-300 hover:border-sky-500/70",
-        iconClassName: "bg-sky-500/20 text-sky-300",
     },
 ];
 
@@ -72,13 +61,14 @@ export function CaptureCard({ className }: { className?: string }) {
                 <h2 className="text-xl font-bold tracking-tight text-text-primary">Registrar un movimiento</h2>
                 <p className="mt-1 text-[13px] text-text-tertiary">Elige cómo deseas registrar tu movimiento.</p>
 
-                {/* Las cuatro filas se reparten el alto sobrante: la tarjeta llega
+                {/* Las tres filas se reparten el alto sobrante: la tarjeta llega
                     hasta el pie de los paneles de al lado, y con alto fijo dejaría
-                    un hueco muerto al final. */}
+                    un hueco muerto al final. Quitar una vía no encoge la tarjeta:
+                    las que quedan crecen para ocupar lo mismo. */}
                 <div className="mt-4 grid flex-1 auto-rows-fr gap-2.5">
-                    {WAYS.map(({ id, label, hint, Icon, href, className: tone, iconClassName }) => {
-                        const content = (
-                            <>
+                    {WAYS.map(({ id, label, hint, Icon, className: tone, iconClassName }) => (
+                        <NewTransactionDialog key={id} startWith={id}>
+                            <button type="button" className={cn(ROW, tone)}>
                                 <span className={cn("grid h-9 w-9 shrink-0 place-items-center rounded-xl", iconClassName)}>
                                     <Icon className="h-4 w-4" />
                                 </span>
@@ -87,17 +77,9 @@ export function CaptureCard({ className }: { className?: string }) {
                                     <span className="block truncate text-[11px] text-text-tertiary">{hint}</span>
                                 </span>
                                 <ChevronRight className="h-4 w-4 shrink-0 opacity-70" />
-                            </>
-                        );
-
-                        return href
-                            ? <Link key={id} href={href} className={cn(ROW, tone)}>{content}</Link>
-                            : (
-                                <NewTransactionDialog key={id} startWith={id as CaptureMethod}>
-                                    <button type="button" className={cn(ROW, tone)}>{content}</button>
-                                </NewTransactionDialog>
-                            );
-                    })}
+                            </button>
+                        </NewTransactionDialog>
+                    ))}
                 </div>
             </div>
         </section>
