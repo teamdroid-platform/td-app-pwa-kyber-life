@@ -18,6 +18,7 @@ export const CARD_LINK = cn(CARD, "transition-colors hover:border-border-strong 
 export const TINT = {
     emerald: "bg-emerald-500/15 text-emerald-400",
     violet: "bg-violet-500/15 text-violet-300",
+    red: "bg-red-500/15 text-red-400",
     sky: "bg-sky-500/15 text-sky-300",
     amber: "bg-amber-500/15 text-amber-400",
     cyan: "bg-cyan-500/15 text-cyan-300",

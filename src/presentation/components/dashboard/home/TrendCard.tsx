@@ -4,11 +4,19 @@ import { cn } from "@/lib/utils";
 import { formatCompact, formatMoney, formatDayLabel, linePath, seriesDomain } from "@/lib/home-overview";
 import { CARD, CardHeader, Pill } from "./ui";
 
-/** El color de cada línea, en el mismo orden en que se leen las tres cifras. */
+/**
+ * El color de cada línea, en el mismo orden en que se leen las tres cifras.
+ *
+ * Los dos primeros son los mismos verdes y rojos que `UnifiedTrendChart` usa
+ * en el panel financiero: el usuario llega aquí desde allí, y que el gasto
+ * cambie de color entre dos pantallas obliga a releer la leyenda. El ahorro no
+ * existe como serie en aquel panel, así que toma el acento del sistema
+ * (`--accent-primary`), que no choca con retiros ni transferencias.
+ */
 const LINES = [
-    { key: "income", label: "Ingresos", color: "#34d399" },
-    { key: "expenses", label: "Gastos", color: "#a78bfa" },
-    { key: "net", label: "Ahorro", color: "#38bdf8" },
+    { key: "income", label: "Ingresos", color: "hsl(142, 71%, 45%)" },
+    { key: "expenses", label: "Gastos", color: "hsl(0, 84%, 60%)" },
+    { key: "net", label: "Ahorro", color: "#6366f1" },
 ] as const;
 
 export interface TrendCardProps {
