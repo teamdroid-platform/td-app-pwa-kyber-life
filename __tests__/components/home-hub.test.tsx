@@ -40,18 +40,27 @@ describe("HomeHub", () => {
             .toHaveAttribute("href", "/market/analytics");
     });
 
-    it("pide poner los saldos al día, diciendo desde cuándo", () => {
+    it("pide poner los saldos al día, con el título y el contador y nada más", () => {
         render(<HomeHub {...BASE} />);
 
         const row = screen.getByRole("link", { name: /Registrar saldos a la fecha/ });
         expect(row).toHaveAttribute("href", "/financial/balances");
-        expect(within(row).getByText(/hace 12 días/)).toBeInTheDocument();
+        expect(within(row).getByText("4")).toBeInTheDocument();
     });
 
-    it("sin ningún corte todavía, lo dice en vez de contar días", () => {
-        render(<HomeHub {...BASE} balances={{ total: 2, pending: 2, lastAsOf: null }} />);
+    it("cuando ninguna cuenta espera corte, lo dice sin número", () => {
+        render(<HomeHub {...BASE} balances={{ total: 4, pending: 0, lastAsOf: daysAgo(1) }} />);
 
-        expect(screen.getByText("Aún sin registrar")).toBeInTheDocument();
+        const row = screen.getByRole("link", { name: /Registrar saldos a la fecha/ });
+        expect(within(row).getByText("Al día")).toBeInTheDocument();
+    });
+
+    it("cuenta los escaneos que esperan en la bandeja", () => {
+        render(<HomeHub {...BASE} pendingScans={233} />);
+
+        const row = screen.getByRole("link", { name: /Escaneos pendientes/ });
+        expect(row).toHaveAttribute("href", "/financial/scans");
+        expect(within(row).getByText("233")).toBeInTheDocument();
     });
 
     it("no menciona escaneos cuando la bandeja está vacía", () => {
