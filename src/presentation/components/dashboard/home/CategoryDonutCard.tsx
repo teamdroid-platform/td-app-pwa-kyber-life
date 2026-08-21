@@ -7,11 +7,12 @@ import { CARD, CardHeader } from "./ui";
 /**
  * La paleta del anillo, en orden de porción.
  *
- * Es la misma de `CategoryAnalytics`, el reparto por categoría del análisis de
- * compras: esta tarjeta enlaza justo allí, y una categoría que cambia de color
- * al hacer clic obliga a reconstruir la lectura.
+ * Es la del panel de compras —la misma lista de `TopProductsChart`, el anillo
+ * de productos más comprados—, no una elegida aquí: esta tarjeta lleva a ese
+ * panel, y una categoría que cambia de color al hacer clic obliga a
+ * reconstruir la lectura.
  */
-export const DONUT_COLORS = ["#D4AF37", "#98FF98", "#E6E6FA", "#F08080", "#87CEEB", "#FFB6C1"];
+export const DONUT_COLORS = ["#5b4dff", "#0ea5e9", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"];
 
 export interface CategoryDonutCardProps {
     /** Categorías ya ordenadas de mayor a menor, con su color asignado. */
