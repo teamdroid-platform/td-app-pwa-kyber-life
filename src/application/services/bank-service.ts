@@ -78,6 +78,13 @@ export interface BankOverview {
     unconfirmedCount: number;
 }
 
+/** Una cuenta y la fecha a la que su saldo fue declarado por última vez. */
+export interface AccountBalanceStatus {
+    account: BankAccount;
+    lastAsOf: string | null;
+    lastBalance: number | null;
+}
+
 export interface BankAccountDetail {
     account: BankAccountWithBalance;
     snapshots: BankAccountBalanceSnapshot[];
@@ -938,6 +945,65 @@ export class BankService {
             note: note ?? null,
             ...stamps(),
         });
+    }
+
+    /**
+     * Las cuentas que pueden recibir un corte, con el último que tienen.
+     *
+     * No pasa por `getOverview`: para preguntar «¿a qué fecha está esto?» no
+     * hace falta recorrer todos los movimientos ni cerrar estados de cuenta.
+     * Solo entran las cuentas vivas y ya revisadas — una que aún espera en la
+     * conciliación no es un saldo que el usuario pueda declarar.
+     */
+    async getBalanceBoard(userId: UUID): Promise<AccountBalanceStatus[]> {
+        const [rawAccounts, institutions] = await Promise.all([
+            this.accounts.findByOwnerId(userId),
+            this.institutions.findByOwnerId(userId),
+        ]);
+
+        const usable = rawAccounts.filter(a => !a.isUnconfirmed && a.status === "ACTIVE");
+        const reference = new Date().toISOString();
+
+        return Promise.all(usable.map(async account => {
+            const last = await this.snapshots.findLatestForAccount(account.id, reference);
+            return {
+                account: namedByInstitution(account, institutions),
+                lastAsOf: last?.asOf ?? null,
+                lastBalance: last?.balance ?? null,
+            };
+        }));
+    }
+
+    /**
+     * Varios cortes a la misma fecha, en una sola pasada.
+     *
+     * El corte de una cuenta suelta se pone desde su propia ficha; esto existe
+     * para el día en que el usuario se sienta con el banco abierto y pone al
+     * día todas. La fecha es una sola a propósito: son lecturas del mismo
+     * momento, y repetirla cuenta por cuenta solo daría ocasión de equivocarse.
+     *
+     * Las cuentas se validan **todas antes de escribir ninguna**: a media
+     * escritura no hay a dónde volver, y un id ajeno en la lista no puede
+     * dejar la mitad de los saldos guardados.
+     */
+    async registerBalanceSnapshots(
+        userId: UUID, asOf: string, entries: readonly { accountId: UUID; balance: number }[],
+    ): Promise<BankAccountBalanceSnapshot[]> {
+        const owned = await this.accounts.findByOwnerId(userId);
+
+        for (const entry of entries) {
+            const account = owned.find(a => a.id === entry.accountId);
+            if (!account) {
+                throw new Error("Alguna de las cuentas no existe o no es tuya");
+            }
+            if (account.isUnconfirmed || account.status !== "ACTIVE") {
+                throw new Error("Solo se registra el saldo de cuentas activas y ya revisadas");
+            }
+        }
+
+        return Promise.all(entries.map(entry =>
+            this.registerBalanceSnapshot(userId, entry.accountId, entry.balance, asOf),
+        ));
     }
 
     // ─── Ciclo de facturación ────────────────────────────────

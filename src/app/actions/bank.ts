@@ -12,7 +12,8 @@ import {
     createInstitutionSchema, updateInstitutionSchema,
     createAccountSchema, updateAccountSchema,
     createCardSchema, updateCardSchema,
-    balanceSnapshotSchema, statementTotalSchema, payStatementSchema,
+    balanceSnapshotSchema, balanceSnapshotBatchSchema,
+    statementTotalSchema, payStatementSchema,
     mergeInstitutionsSchema, convertToCardSchema,
 } from "@/lib/validators/bank-schemas";
 
@@ -226,6 +227,27 @@ export async function registerBalanceSnapshotAction(input: unknown) {
         revalidateBanks();
         revalidatePath(`/financial/banks/accounts/${v.accountId}`);
         return result;
+    });
+}
+
+/** Las cuentas que pueden recibir un corte, con la fecha del último. */
+export async function getBalanceBoardAction() {
+    return run("getBalanceBoard", userId => bankService.getBalanceBoard(userId));
+}
+
+/** Todos los saldos de una sesión de puesta al día, a la misma fecha. */
+export async function registerBalanceSnapshotsAction(input: unknown) {
+    return run("registerBalanceSnapshots", async userId => {
+        const v = balanceSnapshotBatchSchema.parse(input);
+        const saved = await bankService.registerBalanceSnapshots(userId, v.asOf, v.entries);
+        revalidateBanks();
+        revalidatePath("/financial/balances");
+        // El home cuenta los días desde el último corte.
+        revalidatePath("/dashboard");
+        for (const entry of v.entries) {
+            revalidatePath(`/financial/banks/accounts/${entry.accountId}`);
+        }
+        return saved.length;
     });
 }
 
