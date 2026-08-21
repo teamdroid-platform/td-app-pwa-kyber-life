@@ -58,18 +58,50 @@ function CountBadge({ count, tone }: { count: number; tone: "amber" | "sky" }) {
     );
 }
 
+interface AttentionChipProps {
+    href: string;
+    icon: ReactNode;
+    iconClassName: string;
+    /** Una palabra: en media pantalla no cabe más, y el contador dice el resto. */
+    label: string;
+    count: number;
+    tone: "amber" | "sky";
+}
+
+/**
+ * Lo que espera, en media fila.
+ *
+ * Iban una debajo de otra y entre las dos empujaban los accesos fuera de la
+ * pantalla en móvil. Puestas en paralelo caben en el alto de una sola, y como
+ * lo que se lee de ellas es el número, perder el subtítulo no cuesta nada.
+ */
+function AttentionChip({ href, icon, iconClassName, label, count, tone }: AttentionChipProps) {
+    return (
+        <Link
+            href={href}
+            className="flex min-w-0 flex-1 items-center gap-2.5 rounded-2xl border border-border-base bg-bg-secondary p-2.5 transition-colors hover:border-border-strong"
+        >
+            <span className={cn("grid h-8 w-8 shrink-0 place-items-center rounded-xl", iconClassName)}>
+                {icon}
+            </span>
+            <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-text-primary">
+                {label}
+            </span>
+            <CountBadge count={count} tone={tone} />
+        </Link>
+    );
+}
+
 interface RowLinkProps {
     href: string;
     icon: ReactNode;
     iconClassName: string;
     title: string;
-    /** Solo donde hace falta: en «atención» el título y el contador bastan. */
-    hint?: string;
-    trailing?: ReactNode;
+    hint: string;
 }
 
 /** Una fila de lista: icono con el color de su módulo, qué es y a dónde lleva. */
-function RowLink({ href, icon, iconClassName, title, hint, trailing }: RowLinkProps) {
+function RowLink({ href, icon, iconClassName, title, hint }: RowLinkProps) {
     return (
         <Link
             href={href}
@@ -80,9 +112,9 @@ function RowLink({ href, icon, iconClassName, title, hint, trailing }: RowLinkPr
             </span>
             <span className="min-w-0 flex-1">
                 <span className="block truncate text-[13px] font-semibold text-text-primary">{title}</span>
-                {hint && <span className="block truncate text-[11px] text-text-tertiary">{hint}</span>}
+                <span className="block truncate text-[11px] text-text-tertiary">{hint}</span>
             </span>
-            {trailing ?? <ChevronRight className="h-4 w-4 shrink-0 text-text-tertiary" />}
+            <ChevronRight className="h-4 w-4 shrink-0 text-text-tertiary" />
         </Link>
     );
 }
@@ -207,11 +239,10 @@ export function HomeHub({ userFirstName, todayLabel, balances, pendingScans }: H
                 />
 
                 <div className="relative">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-emerald-400">
-                        Registrar
-                    </p>
-                    <h2 className="mt-1 text-xl font-bold tracking-tight text-text-primary sm:text-2xl">
-                        Anotar un movimiento
+                    {/* Un solo título: el rótulo pequeño encima decía «Registrar» y el
+                        titular «Anotar un movimiento» — lo mismo dos veces. */}
+                    <h2 className="text-xl font-bold tracking-tight text-text-primary sm:text-2xl">
+                        Registrar un movimiento
                     </h2>
                     <p className="mt-1 text-[13px] text-text-tertiary">
                         Dilo, escríbelo en una frase o llena el formulario.
@@ -240,23 +271,27 @@ export function HomeHub({ userFirstName, todayLabel, balances, pendingScans }: H
             {hasAttention && (
                 <section>
                     <SectionTitle>Requiere tu atención</SectionTitle>
-                    <div className="overflow-hidden rounded-2xl border border-border-base bg-bg-secondary">
+                    {/* Flex y no rejilla: cuando solo hay una, ocupa la fila entera
+                        en vez de dejar media pantalla vacía al lado. */}
+                    <div className="flex gap-2">
                         {balances.total > 0 && (
-                            <RowLink
+                            <AttentionChip
                                 href="/financial/balances"
                                 icon={<Scale className="h-4 w-4" />}
                                 iconClassName="bg-amber-500/15 text-amber-400"
-                                title="Registrar saldos a la fecha"
-                                trailing={<CountBadge count={balances.pending} tone="amber" />}
+                                label="Saldos"
+                                count={balances.pending}
+                                tone="amber"
                             />
                         )}
                         {pendingScans > 0 && (
-                            <RowLink
+                            <AttentionChip
                                 href="/financial/scans"
                                 icon={<Inbox className="h-4 w-4" />}
                                 iconClassName="bg-sky-500/15 text-sky-400"
-                                title="Escaneos pendientes"
-                                trailing={<CountBadge count={pendingScans} tone="sky" />}
+                                label="Escaneos"
+                                count={pendingScans}
+                                tone="sky"
                             />
                         )}
                     </div>
@@ -291,19 +326,21 @@ export function HomeHub({ userFirstName, todayLabel, balances, pendingScans }: H
                 <section>
                     <SectionTitle>Ir a</SectionTitle>
                     <div className="overflow-hidden rounded-2xl border border-border-base bg-bg-secondary">
-                        <RowLink
-                            href="/financial/banks"
-                            icon={<Landmark className="h-4 w-4" />}
-                            iconClassName="bg-blue-500/15 text-blue-300"
-                            title="Bancos"
-                            hint="Cuentas, tarjetas e instituciones"
-                        />
+                        {/* El historial primero: es a donde más se vuelve, y en móvil
+                            es la fila que más veces queda a la vista. */}
                         <RowLink
                             href="/financial/transactions"
                             icon={<Receipt className="h-4 w-4" />}
                             iconClassName="bg-violet-500/15 text-violet-300"
                             title="Transacciones"
                             hint="Historial y filtros"
+                        />
+                        <RowLink
+                            href="/financial/banks"
+                            icon={<Landmark className="h-4 w-4" />}
+                            iconClassName="bg-blue-500/15 text-blue-300"
+                            title="Bancos"
+                            hint="Cuentas, tarjetas e instituciones"
                         />
                         <RowLink
                             href="/market/purchases"
