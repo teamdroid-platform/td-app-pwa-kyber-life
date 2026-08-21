@@ -10,7 +10,7 @@ export type MenuItem = {
 };
 
 export const MENU_ITEMS: MenuItem[] = [
-    { label: "Dashboard", icon: Home, href: "/dashboard" },
+    { label: "Inicio", icon: Home, href: "/dashboard" },
     {
         label: "Finanzas",
         isSection: true,

@@ -219,10 +219,6 @@ export interface HomeHubProps {
 export function HomeHub({ userFirstName, todayLabel, balances, pendingScans }: HomeHubProps) {
     const greeting = userFirstName ? `Hola, ${userFirstName}` : "Bienvenido";
 
-    // El corte de saldo aparece siempre que haya cuentas: es una tarea que se
-    // repite, no una alerta. Lo que cambia es si urge o solo está a mano.
-    const hasAttention = balances.total > 0 || pendingScans > 0;
-
     return (
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-5 pb-8">
             <header>
@@ -267,36 +263,38 @@ export function HomeHub({ userFirstName, todayLabel, balances, pendingScans }: H
                 </div>
             </section>
 
-            {/* ── Lo que espera ── */}
-            {hasAttention && (
-                <section>
-                    <SectionTitle>Requiere tu atención</SectionTitle>
-                    {/* Flex y no rejilla: cuando solo hay una, ocupa la fila entera
-                        en vez de dejar media pantalla vacía al lado. */}
-                    <div className="flex gap-2">
-                        {balances.total > 0 && (
-                            <AttentionChip
-                                href="/financial/balances"
-                                icon={<Scale className="h-4 w-4" />}
-                                iconClassName="bg-amber-500/15 text-amber-400"
-                                label="Saldos"
-                                count={balances.pending}
-                                tone="amber"
-                            />
-                        )}
-                        {pendingScans > 0 && (
-                            <AttentionChip
-                                href="/financial/scans"
-                                icon={<Inbox className="h-4 w-4" />}
-                                iconClassName="bg-sky-500/15 text-sky-400"
-                                label="Escaneos"
-                                count={pendingScans}
-                                tone="sky"
-                            />
-                        )}
-                    </div>
-                </section>
-            )}
+            {/* ── Lo que espera ──
+                Las dos fichas están siempre: son dos sitios a los que se entra
+                a diario, y esconderlas al quedar en cero las volvía difíciles
+                de encontrar justo cuando el usuario ya se acostumbró a que
+                estuvieran ahí. Con nada pendiente dicen «Al día», que es una
+                respuesta, no un hueco. La de saldos es la excepción: sin
+                ninguna cuenta registrada no hay saldo que declarar. */}
+            <section>
+                <SectionTitle>Requiere tu atención</SectionTitle>
+                {/* Flex y no rejilla: cuando solo hay una, ocupa la fila entera
+                    en vez de dejar media pantalla vacía al lado. */}
+                <div className="flex gap-2">
+                    {balances.total > 0 && (
+                        <AttentionChip
+                            href="/financial/balances"
+                            icon={<Scale className="h-4 w-4" />}
+                            iconClassName="bg-amber-500/15 text-amber-400"
+                            label="Saldos"
+                            count={balances.pending}
+                            tone="amber"
+                        />
+                    )}
+                    <AttentionChip
+                        href="/financial/scans"
+                        icon={<Inbox className="h-4 w-4" />}
+                        iconClassName="bg-sky-500/15 text-sky-400"
+                        label="Escaneos"
+                        count={pendingScans}
+                        tone="sky"
+                    />
+                </div>
+            </section>
 
             <div className="grid gap-5 lg:grid-cols-2">
                 {/* ── Paneles ── */}

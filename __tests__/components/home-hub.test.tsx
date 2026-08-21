@@ -63,10 +63,12 @@ describe("HomeHub", () => {
         expect(within(chip).getByText("233")).toBeInTheDocument();
     });
 
-    it("no menciona escaneos cuando la bandeja está vacía", () => {
+    it("mantiene la ficha de escaneos con la bandeja vacía, diciendo que está al día", () => {
         render(<HomeHub {...BASE} pendingScans={0} />);
 
-        expect(screen.queryByRole("link", { name: /^Escaneos/ })).not.toBeInTheDocument();
+        const chip = screen.getByRole("link", { name: /^Escaneos/ });
+        expect(chip).toHaveAttribute("href", "/financial/scans");
+        expect(within(chip).getByText("Al día")).toBeInTheDocument();
     });
 
     it("pone el historial al frente de los accesos", () => {
@@ -80,7 +82,7 @@ describe("HomeHub", () => {
         expect(titulos[0]).toContain("Transacciones");
     });
 
-    it("esconde la sección de atención cuando no hay cuentas ni escaneos", () => {
+    it("sin ninguna cuenta registrada, no ofrece declarar saldos", () => {
         render(
             <HomeHub
                 {...BASE}
@@ -89,8 +91,9 @@ describe("HomeHub", () => {
             />,
         );
 
-        expect(screen.queryByText("Requiere tu atención")).not.toBeInTheDocument();
-        // Los accesos siguen ahí: el inicio no se queda sin a dónde ir.
+        expect(screen.queryByRole("link", { name: /^Saldos/ })).not.toBeInTheDocument();
+        // La de escaneos se queda: es un sitio al que se entra a diario.
+        expect(screen.getByRole("link", { name: /^Escaneos/ })).toBeInTheDocument();
         expect(screen.getByRole("link", { name: /Bancos/ })).toBeInTheDocument();
     });
 });
