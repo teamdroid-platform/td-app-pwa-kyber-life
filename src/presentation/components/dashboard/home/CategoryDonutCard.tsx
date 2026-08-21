@@ -48,9 +48,12 @@ export function CategoryDonutCard({ slices, total, currency, caption }: Category
                     Todavía no hay compras cerradas con las que repartir el gasto.
                 </p>
             ) : (
-                <div className="flex flex-1 flex-col items-center gap-4 sm:flex-row sm:items-center">
+                <div className="flex flex-1 flex-col items-center gap-3 sm:flex-row sm:items-center">
                     <div className="relative shrink-0">
-                        <svg aria-hidden viewBox="-60 -60 120 120" className="h-[132px] w-[132px]">
+                        {/* El `viewBox` va justo al diámetro del anillo: cualquier
+                            margen de más lo encoge dentro del mismo hueco. El tamaño
+                            en pantalla lo pone la clase, y el trazo escala con él. */}
+                        <svg aria-hidden viewBox="-53 -53 106 106" className="h-[168px] w-[168px]">
                             <circle
                                 r={radius} fill="none" strokeWidth="13"
                                 stroke="currentColor" className="text-bg-tertiary/60"
@@ -64,10 +67,10 @@ export function CategoryDonutCard({ slices, total, currency, caption }: Category
                             ))}
                         </svg>
                         <span className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-                            <span className="text-[15px] font-bold tabular-nums text-text-primary">
+                            <span className="text-[17px] font-bold tabular-nums text-text-primary">
                                 {formatMoney(total, currency)}
                             </span>
-                            <span className="text-[10px] text-text-tertiary">Total gastado</span>
+                            <span className="text-[11px] text-text-tertiary">Total gastado</span>
                         </span>
                     </div>
 
