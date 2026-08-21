@@ -33,6 +33,15 @@ export interface NewTransactionDialogProps {
      * that accepts an `onClick`.
      */
     children: ReactNode;
+    /**
+     * Skip the chooser when the entry point already said how.
+     *
+     * The home offers the three methods as three separate buttons, so asking
+     * again which one it is would be asking a question the user just answered.
+     * `"form"` never opens the dialog — it goes straight to the manual form —
+     * and `"voice"` falls back to the chooser where the browser cannot record.
+     */
+    startWith?: CaptureMethod;
 }
 
 /**
@@ -47,7 +56,7 @@ export interface NewTransactionDialogProps {
  * With the feature flag off this is a plain link to the manual form, so the
  * entry points do not need to know which mode the app is in.
  */
-export function NewTransactionDialog({ children }: NewTransactionDialogProps) {
+export function NewTransactionDialog({ children, startWith }: NewTransactionDialogProps) {
     const router = useRouter();
     const [open, setOpen] = useState(false);
     const [screen, setScreen] = useState<DialogScreen>("chooser");
@@ -81,6 +90,25 @@ export function NewTransactionDialog({ children }: NewTransactionDialogProps) {
         close();
         router.push(NEW_TRANSACTION_URL);
     }, [close, router]);
+
+    /**
+     * Abrir por donde toque. Sin `startWith` es el menú de siempre; con él, la
+     * pantalla que ya se pidió — salvo el formulario, que no es un paso del
+     * diálogo sino otra ruta.
+     */
+    const start = useCallback(() => {
+        if (startWith === "form") {
+            goToManualForm();
+            return;
+        }
+        if (startWith && (startWith !== "voice" || voiceAvailable)) {
+            router.prefetch(REVIEW_URL);
+            setScreen(startWith);
+        } else {
+            setScreen("chooser");
+        }
+        setOpen(true);
+    }, [goToManualForm, router, startWith, voiceAvailable]);
 
     const runExtraction = useCallback(async (
         call: () => Promise<ExtractionResult>,
@@ -170,7 +198,7 @@ export function NewTransactionDialog({ children }: NewTransactionDialogProps) {
 
     return (
         <>
-            <Slot onClick={() => setOpen(true)}>{children}</Slot>
+            <Slot onClick={start}>{children}</Slot>
             <ResponsiveDialog open={open} onOpenChange={handleOpenChange}>
                 <ResponsiveDialogContent>{renderScreen()}</ResponsiveDialogContent>
             </ResponsiveDialog>

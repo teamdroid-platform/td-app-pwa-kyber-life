@@ -66,6 +66,22 @@ export const balanceSnapshotSchema = z.object({
     note: z.string().max(280).optional().nullable(),
 });
 
+/**
+ * Varios cortes a la misma fecha. Una sola `asOf` para todos: son lecturas del
+ * mismo momento, y las cuentas no pueden repetirse — dos saldos distintos para
+ * la misma cuenta y fecha dejarían el corte a suerte del orden de escritura.
+ */
+export const balanceSnapshotBatchSchema = z.object({
+    asOf: z.string().datetime(),
+    entries: z.array(z.object({
+        accountId: uuid,
+        balance: z.number(),
+    })).min(1, "Escribe al menos un saldo"),
+}).refine(
+    ({ entries }) => new Set(entries.map(e => e.accountId)).size === entries.length,
+    { message: "Hay una cuenta repetida en la lista", path: ["entries"] },
+);
+
 export const statementTotalSchema = z.object({
     statementId: uuid,
     totalAmount: z.number().nonnegative(),
