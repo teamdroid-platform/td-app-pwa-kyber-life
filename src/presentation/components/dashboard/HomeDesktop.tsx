@@ -85,7 +85,7 @@ export function HomeDesktop({ metrics, alerts }: HomeDesktopProps) {
                         ? "flat"
                         : metrics.expensesDeltaPct > 0 ? "up" : "down"}
                     invertTrendColor
-                    tint="violet"
+                    tint="red"
                     series={metrics.expensesSeries}
                     gradientId="home-spark-expenses"
                 />

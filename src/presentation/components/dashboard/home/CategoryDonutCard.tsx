@@ -4,8 +4,14 @@ import { cn } from "@/lib/utils";
 import { donutArcs, formatMoney, formatPercent, type DonutSlice } from "@/lib/home-overview";
 import { CARD, CardHeader } from "./ui";
 
-/** La paleta del anillo, en orden de porción. Distintas entre sí antes que bonitas. */
-export const DONUT_COLORS = ["#2dd4bf", "#a78bfa", "#fbbf24", "#38bdf8", "#94a3b8"];
+/**
+ * La paleta del anillo, en orden de porción.
+ *
+ * Es la misma de `CategoryAnalytics`, el reparto por categoría del análisis de
+ * compras: esta tarjeta enlaza justo allí, y una categoría que cambia de color
+ * al hacer clic obliga a reconstruir la lectura.
+ */
+export const DONUT_COLORS = ["#D4AF37", "#98FF98", "#E6E6FA", "#F08080", "#87CEEB", "#FFB6C1"];
 
 export interface CategoryDonutCardProps {
     /** Categorías ya ordenadas de mayor a menor, con su color asignado. */
