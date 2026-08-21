@@ -189,6 +189,27 @@
   --color-accent-coral: var(--accent-warning);
   --color-accent-magenta: var(--accent-danger);
   --color-glass: rgba(255, 255, 255, 0.06);
+
+  /* ===== ESCALA TIPOGRÁFICA =====
+     Un punto menos que la de fábrica, en cada paso: 12→11, 14→13, 16→15…
+     Va aquí y no en un `font-size` sobre `html` a propósito: el rem también
+     mide los espaciados, así que tocar la raíz encogería márgenes, alturas y
+     radios junto con las letras. Cambiando la escala se mueve solo el texto.
+
+     En rem y no en px para que siga respetando el tamaño de fuente que el
+     usuario tenga puesto en su navegador.
+
+     Las alturas de línea se quedan como estaban: así el texto adelgaza sin
+     que ninguna fila cambie de alto. */
+  --text-xs: 0.6875rem;   /* 11px */
+  --text-sm: 0.8125rem;   /* 13px */
+  --text-base: 0.9375rem; /* 15px */
+  --text-lg: 1.0625rem;   /* 17px */
+  --text-xl: 1.1875rem;   /* 19px */
+  --text-2xl: 1.4375rem;  /* 23px */
+  --text-3xl: 1.8125rem;  /* 29px */
+  --text-4xl: 2.1875rem;  /* 35px */
+  --text-5xl: 2.9375rem;  /* 47px */
 }
 
 /* ===== BASE STYLES ===== */
