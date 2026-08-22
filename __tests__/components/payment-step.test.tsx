@@ -96,6 +96,33 @@ describe("PaymentStep — el paso cabe en dos filas", () => {
         expect(screen.getByText("¿Con qué lo pagaste?")).toBeInTheDocument();
     });
 
+    // Una transferencia y un retiro llegan aquí igual: los dos lados, ninguno
+    // a crédito. Lo que los distingue —el tipo— ya lo resolvió el hook.
+    it("una transferencia o un retiro preguntan por ambos lados, sin crédito", () => {
+        renderStep({ creditEligible: false, destinationEligible: true });
+
+        expect(screen.getByText("Origen")).toBeInTheDocument();
+        expect(screen.getByText("Destino")).toBeInTheDocument();
+        expect(screen.queryByText("Pagado con tarjeta de crédito")).not.toBeInTheDocument();
+        expect(screen.getByText("¿Con qué lo pagaste?")).toBeInTheDocument();
+    });
+
+    /**
+     * El orden se invierte con `flex-col-reverse`, sin mover el DOM: la
+     * comprobación va sobre el contenedor, que es donde ocurre.
+     */
+    it("solo el ingreso pone el destino por encima del origen", () => {
+        renderStep({ creditEligible: false, destinationEligible: true, destinationFirst: true });
+
+        expect(screen.getByText("Origen").closest("div.flex-col-reverse")).not.toBeNull();
+    });
+
+    it("una transferencia mantiene el relato de origen a destino", () => {
+        renderStep({ creditEligible: false, destinationEligible: true });
+
+        expect(screen.getByText("Origen").closest("div.flex-col-reverse")).toBeNull();
+    });
+
     it("no despliega la lista de cuentas hasta que se pide", () => {
         // Todo el saturado de antes —opciones, altas, avisos— vive en la hoja.
         renderStep();
