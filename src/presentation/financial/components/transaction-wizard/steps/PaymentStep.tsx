@@ -23,6 +23,10 @@ interface PaymentStepProps {
     onChange: (value: PaymentSource) => void;
     /** El crédito solo aplica a tipos de gasto; con otros se ocultan las tarjetas. */
     creditEligible: boolean;
+    /** El tipo mete dinero en una cuenta propia (ingreso, transferencia, retiro). */
+    destinationEligible?: boolean;
+    /** En un ingreso lo que importa es dónde entró: esa fila va arriba. */
+    destinationFirst?: boolean;
     /** Cuenta a la que entró el dinero, cuando el movimiento tiene dos lados. */
     destinationAccountId?: string | null;
     onDestinationChange?: (accountId: string | null) => void;
@@ -50,6 +54,7 @@ interface PaymentStepProps {
  */
 export function PaymentStep({
     accounts, cards, value, onChange, creditEligible,
+    destinationEligible = false, destinationFirst = false,
     destinationAccountId, onDestinationChange, scannedAccounts = [],
     onScannedDecision, institutions = [], onAccountCreated, onCardCreated,
 }: PaymentStepProps) {
@@ -110,19 +115,29 @@ export function PaymentStep({
         });
     };
 
-    // El destino solo se ofrece cuando el movimiento tiene dos lados: en una
-    // compra el otro lado es el comercio, y no hay nada que elegir.
+    /**
+     * El destino solo se ofrece cuando el movimiento tiene dos lados: en una
+     * compra el otro lado es el comercio, y no hay nada que elegir.
+     *
+     * Lo decide el tipo, no el escaneo. Atado a que el escáner hubiera leído un
+     * número de destino, un ingreso escrito a mano no ofrecía dónde se acreditó
+     * —justo el único dato de cuenta que un ingreso tiene—, y quedaba la fila
+     * de origen, que ahí es la del pagador y no es del usuario.
+     */
     const hasDestination = !!onDestinationChange
-        && (!!scanned("DESTINATION") || !!destinationAccountId);
+        && (destinationEligible || !!scanned("DESTINATION") || !!destinationAccountId);
 
     return (
         <>
             <StepHeading
-                question="¿Con qué lo pagaste?"
+                question={destinationFirst ? "¿Dónde se acreditó?" : "¿Con qué lo pagaste?"}
                 hint="Puedes omitirlo si no quieres asociar una cuenta."
             />
 
-            <div className="flex flex-col gap-1.5">
+            {/* En un ingreso el orden se invierte: primero la cuenta a la que
+                entró —la única que el usuario conoce— y después el origen, que
+                ahí es el pagador. */}
+            <div className={cn("flex flex-col gap-1.5", destinationFirst && "flex-col-reverse")}>
                 <SideRow
                     role="SOURCE"
                     label="Origen"

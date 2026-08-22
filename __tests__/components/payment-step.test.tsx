@@ -80,6 +80,22 @@ describe("PaymentStep — el paso cabe en dos filas", () => {
         expect(screen.getByText("Destino")).toBeInTheDocument();
     });
 
+    // El caso que faltaba: un ingreso escrito a mano no trae escaneo, y su
+    // única cuenta conocida es a la que entró el dinero.
+    it("un ingreso pregunta dónde se acreditó aunque no haya escaneo", () => {
+        renderStep({ creditEligible: false, destinationEligible: true, destinationFirst: true });
+
+        expect(screen.getByText("Destino")).toBeInTheDocument();
+        expect(screen.getByText("¿Dónde se acreditó?")).toBeInTheDocument();
+    });
+
+    it("un gasto sigue sin destino: el otro lado es el comercio", () => {
+        renderStep({ destinationEligible: false });
+
+        expect(screen.queryByText("Destino")).not.toBeInTheDocument();
+        expect(screen.getByText("¿Con qué lo pagaste?")).toBeInTheDocument();
+    });
+
     it("no despliega la lista de cuentas hasta que se pide", () => {
         // Todo el saturado de antes —opciones, altas, avisos— vive en la hoja.
         renderStep();

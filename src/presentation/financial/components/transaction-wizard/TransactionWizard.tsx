@@ -373,6 +373,8 @@ export function TransactionWizard({
                             bankCardId: source.cardId ?? null,
                             paidWithCredit: source.paidWithCredit,
                         })}
+                        destinationEligible={wizard.destinationEligible}
+                        destinationFirst={wizard.destinationFirst}
                         destinationAccountId={values.bankDestinationAccountId}
                         onDestinationChange={(id) => setValue("bankDestinationAccountId", id)}
                         scannedAccounts={scannedAccountsWithChoice}
