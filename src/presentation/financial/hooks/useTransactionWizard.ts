@@ -4,9 +4,23 @@ import { useCallback, useMemo, useState } from "react";
 import type { BankInstitutionKind } from "@/domain/entities/bank";
 import type { ScannedAccountDecision } from "@/application/services/bank-service";
 import type { FinancialTransactionType } from "@/domain/entities/financial";
+import { isIncomeType } from "@/domain/services/financial-balance";
 
 /** Types for which "paid with credit card" is a meaningful, editable flag. */
 export const CREDIT_ELIGIBLE_TYPES: readonly FinancialTransactionType[] = ["EXPENSE"];
+
+/**
+ * Tipos en los que el dinero **entra** a una cuenta del usuario, y por tanto
+ * tiene sentido preguntar a cuál.
+ *
+ * Un gasto no está aquí porque su otro lado es el comercio: no hay cuenta
+ * propia que elegir. Un ingreso sí —el sueldo se acredita en algún sitio—, y
+ * hasta ahora solo se podía declarar la cuenta de origen, que en un ingreso es
+ * justamente la que no se conoce.
+ */
+export const DESTINATION_ELIGIBLE_TYPES: readonly FinancialTransactionType[] = [
+    "INCOME", "DEPOSIT", "REFUND", "TRANSFER", "WITHDRAWAL",
+];
 
 export type WizardStepId = "amount" | "institution" | "category" | "payment" | "date";
 
@@ -281,6 +295,10 @@ export function useTransactionWizard({ mode, initialValues, initialFocus }: UseT
     }, [initialValues]);
 
     const creditEligible = CREDIT_ELIGIBLE_TYPES.includes(values.type);
+    const destinationEligible = DESTINATION_ELIGIBLE_TYPES.includes(values.type);
+    // En un ingreso, la cuenta que importa es a la que entró: va primero. En
+    // una transferencia o un retiro el relato sigue siendo de dónde a dónde.
+    const destinationFirst = isIncomeType(values.type);
 
     return {
         values,
@@ -301,6 +319,8 @@ export function useTransactionWizard({ mode, initialValues, initialFocus }: UseT
         changed,
         canAdvance,
         creditEligible,
+        destinationEligible,
+        destinationFirst,
         isDirty: changed.length > 0,
     };
 }
