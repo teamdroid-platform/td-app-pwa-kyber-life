@@ -46,6 +46,12 @@ interface PaymentSourceSheetProps {
     /** «No es mía» solo tiene sentido en un lado que puede ser de otro. */
     allowExternal?: boolean;
     /**
+     * Si el lado tiene algo que quitar. Por defecto, lo elegido; quien además
+     * enseñe lo que leyó un escaneo debe pedirlo, porque eso también se ve en
+     * la fila y también se quiere poder borrar.
+     */
+    allowClear?: boolean;
+    /**
      * El número que leyó el escaneo para este lado. Abre el alta con él ya
      * puesto: registrar lo que el movimiento trae es el caso más frecuente.
      */
@@ -67,7 +73,7 @@ interface PaymentSourceSheetProps {
  */
 export function PaymentSourceSheet({
     open, onOpenChange, title, accounts, cards, institutions,
-    value, onPick, onAccountCreated, onCardCreated, allowExternal = true,
+    value, onPick, onAccountCreated, onCardCreated, allowExternal = true, allowClear,
     scannedNumber, scannedKind,
 }: PaymentSourceSheetProps) {
     const [query, setQuery] = useState("");
@@ -297,11 +303,10 @@ export function PaymentSourceSheet({
                 />
             )}
 
-            {/* Deshacer la elección solo aparece cuando hay algo que deshacer:
-                con el lado vacío sería una opción que no hace nada. Elegir mal
-                y no poder volver atrás obligaba a descartar la edición
-                entera. */}
-            {value.kind !== "NONE" && (
+            {/* Deshacer solo aparece cuando hay algo que deshacer: con el lado
+                vacío sería una opción que no hace nada. Elegir mal y no poder
+                volver atrás obligaba a descartar la edición entera. */}
+            {(allowClear ?? value.kind !== "NONE") && (
                 <Option
                     selected={false}
                     onClick={() => choose({ kind: "NONE" })}

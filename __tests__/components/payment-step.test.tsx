@@ -220,6 +220,22 @@ describe("PaymentStep — elegir desde la hoja", () => {
         expect(onDestinationChange).toHaveBeenCalledWith(null);
     });
 
+    // Lo que se veía: quitar la cuenta y que la fila volviera a enseñar lo que
+    // el escaneo —o el vínculo ya guardado— había puesto en ese lado.
+    it("quitar la cuenta no deja que el escaneo la reponga en la fila", () => {
+        renderStep({
+            creditEligible: false,
+            destinationEligible: true,
+            scannedAccounts: [scanned("DESTINATION", "XXXX9511")],
+        });
+
+        fireEvent.click(screen.getByText("Destino"));
+        fireEvent.click(screen.getByText("Quitar la cuenta"));
+
+        expect(screen.queryByText("XXXX9511")).not.toBeInTheDocument();
+        expect(screen.getAllByText("Sin elegir").length).toBeGreaterThan(0);
+    });
+
     it("con el lado vacío no ofrece quitar nada", () => {
         renderStep();
 

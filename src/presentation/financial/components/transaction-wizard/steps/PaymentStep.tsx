@@ -64,6 +64,26 @@ export function PaymentStep({
 
     const [editing, setEditing] = useState<"SOURCE" | "DESTINATION" | null>(null);
 
+    /**
+     * Lados que el usuario vació a mano.
+     *
+     * Sin esto, quitar la cuenta devolvía la fila a lo que el escaneo había
+     * leído en ese lado —o al vínculo que la transacción ya tenía—, y la
+     * pantalla seguía enseñando la cuenta que se acababa de quitar. Vaciar es
+     * una respuesta, no la ausencia de una: mientras dure la edición, ese lado
+     * se queda en «Sin elegir».
+     */
+    const [cleared, setCleared] = useState<Record<"SOURCE" | "DESTINATION", boolean>>({
+        SOURCE: false, DESTINATION: false,
+    });
+
+    const remember = (role: "SOURCE" | "DESTINATION", pick: PaymentPick) =>
+        setCleared(previous => ({ ...previous, [role]: pick.kind === "NONE" }));
+
+    /** Lo que el escaneo leyó en ese lado, salvo que el usuario lo haya vaciado. */
+    const fallbackFor = (role: "SOURCE" | "DESTINATION") =>
+        cleared[role] ? undefined : scanned(role);
+
     // La tarjeta de crédito elegida como origen, si la hay: es lo que decide si
     // el crédito se deriva o lo declara el usuario.
     const creditCard = value.cardId
@@ -99,6 +119,7 @@ export function PaymentStep({
 
     const applySource = (pick: PaymentPick) => {
         declare("SOURCE", pick);
+        remember("SOURCE", pick);
 
         if (pick.kind === "CARD") {
             const card = cards.find(c => c.id === pick.cardId);
@@ -141,7 +162,7 @@ export function PaymentStep({
                 <SideRow
                     role="SOURCE"
                     label="Origen"
-                    text={describe(sourcePick, accounts, cards, scanned("SOURCE"))}
+                    text={describe(sourcePick, accounts, cards, fallbackFor("SOURCE"))}
                     onEdit={() => setEditing("SOURCE")}
                 />
 
@@ -149,7 +170,7 @@ export function PaymentStep({
                     <SideRow
                         role="DESTINATION"
                         label="Destino"
-                        text={describe(destinationPick, accounts, cards, scanned("DESTINATION"))}
+                        text={describe(destinationPick, accounts, cards, fallbackFor("DESTINATION"))}
                         onEdit={() => setEditing("DESTINATION")}
                     />
                 )}
@@ -171,6 +192,9 @@ export function PaymentStep({
                 cards={selectableCards}
                 institutions={institutions}
                 value={sourcePick}
+                // También hay algo que quitar cuando la fila enseña lo que leyó
+                // el escaneo, aunque el usuario todavía no haya elegido nada.
+                allowClear={sourcePick.kind !== "NONE" || !!fallbackFor("SOURCE")}
                 onPick={applySource}
                 scannedNumber={scanned("SOURCE")?.display}
                 scannedKind={scanned("SOURCE")?.kind}
@@ -187,10 +211,12 @@ export function PaymentStep({
                 cards={[]}
                 institutions={institutions}
                 value={destinationPick}
+                allowClear={destinationPick.kind !== "NONE" || !!fallbackFor("DESTINATION")}
                 scannedNumber={scanned("DESTINATION")?.display}
                 scannedKind={scanned("DESTINATION")?.kind}
                 onPick={pick => {
                     declare("DESTINATION", pick);
+                    remember("DESTINATION", pick);
                     onDestinationChange?.(pick.kind === "ACCOUNT" ? pick.accountId : null);
                 }}
                 onAccountCreated={onAccountCreated}
