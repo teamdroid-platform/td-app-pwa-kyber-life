@@ -27,6 +27,9 @@ interface PaymentStepProps {
     destinationEligible?: boolean;
     /** En un ingreso lo que importa es dónde entró: esa fila va arriba. */
     destinationFirst?: boolean;
+    /** Lados que el usuario vació: ahí no se repone lo que leyó el escaneo. */
+    cleared?: Partial<Record<"SOURCE" | "DESTINATION", boolean>>;
+    onClearedChange?: (role: "SOURCE" | "DESTINATION", cleared: boolean) => void;
     /** Cuenta a la que entró el dinero, cuando el movimiento tiene dos lados. */
     destinationAccountId?: string | null;
     onDestinationChange?: (accountId: string | null) => void;
@@ -54,7 +57,7 @@ interface PaymentStepProps {
  */
 export function PaymentStep({
     accounts, cards, value, onChange, creditEligible,
-    destinationEligible = false, destinationFirst = false,
+    destinationEligible = false, destinationFirst = false, cleared, onClearedChange,
     destinationAccountId, onDestinationChange, scannedAccounts = [],
     onScannedDecision, institutions = [], onAccountCreated, onCardCreated,
 }: PaymentStepProps) {
@@ -64,25 +67,13 @@ export function PaymentStep({
 
     const [editing, setEditing] = useState<"SOURCE" | "DESTINATION" | null>(null);
 
-    /**
-     * Lados que el usuario vació a mano.
-     *
-     * Sin esto, quitar la cuenta devolvía la fila a lo que el escaneo había
-     * leído en ese lado —o al vínculo que la transacción ya tenía—, y la
-     * pantalla seguía enseñando la cuenta que se acababa de quitar. Vaciar es
-     * una respuesta, no la ausencia de una: mientras dure la edición, ese lado
-     * se queda en «Sin elegir».
-     */
-    const [cleared, setCleared] = useState<Record<"SOURCE" | "DESTINATION", boolean>>({
-        SOURCE: false, DESTINATION: false,
-    });
-
+    /** Vaciar es una respuesta: se declara hacia arriba, no se recuerda aquí. */
     const remember = (role: "SOURCE" | "DESTINATION", pick: PaymentPick) =>
-        setCleared(previous => ({ ...previous, [role]: pick.kind === "NONE" }));
+        onClearedChange?.(role, pick.kind === "NONE");
 
     /** Lo que el escaneo leyó en ese lado, salvo que el usuario lo haya vaciado. */
     const fallbackFor = (role: "SOURCE" | "DESTINATION") =>
-        cleared[role] ? undefined : scanned(role);
+        cleared?.[role] ? undefined : scanned(role);
 
     // La tarjeta de crédito elegida como origen, si la hay: es lo que decide si
     // el crédito se deriva o lo declara el usuario.
@@ -146,7 +137,8 @@ export function PaymentStep({
      * de origen, que ahí es la del pagador y no es del usuario.
      */
     const hasDestination = !!onDestinationChange
-        && (destinationEligible || !!scanned("DESTINATION") || !!destinationAccountId);
+        && (destinationEligible || !!scanned("DESTINATION") || !!destinationAccountId
+            || !!cleared?.DESTINATION);
 
     return (
         <>

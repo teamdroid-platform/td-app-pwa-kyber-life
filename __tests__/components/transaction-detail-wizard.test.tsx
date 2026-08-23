@@ -10,6 +10,7 @@ import {
 } from "@/app/actions/financial-transactions";
 import { getTransactionFormOptionsAction } from "@/app/actions/financial-settings";
 import type { FinancialTransaction } from "@/domain/entities/financial";
+import type { ScannedAccountView } from "@/application/services/bank-service";
 
 jest.mock("next/navigation", () => ({
     useRouter: jest.fn(),
@@ -59,7 +60,22 @@ const TRANSACTION: FinancialTransaction = {
     updatedAt: now,
 } as FinancialTransaction;
 
-async function renderDetail(overrides: Partial<FinancialTransaction> = {}) {
+/** Un lado ya resuelto por el módulo Bancos, como llega del servidor. */
+function resolved(role: "SOURCE" | "DESTINATION", display: string): ScannedAccountView {
+    return {
+        role, raw: display, display, kind: "ACCOUNT", resolution: "RESOLVED",
+        match: {
+            accountId: "acc-1", typeAcronym: "AHO", typeLabel: "Ahorros",
+            institutionName: "COAC Jardín Azuayo",
+        },
+        institutionHint: null, ownership: "MINE", decision: null,
+    } as unknown as ScannedAccountView;
+}
+
+async function renderDetail(
+    overrides: Partial<FinancialTransaction> = {},
+    bankAccounts: ScannedAccountView[] = [],
+) {
     (useRouter as jest.Mock).mockReturnValue({ push: jest.fn(), refresh: jest.fn() });
     (getUniqueTagsAction as jest.Mock).mockResolvedValue({ success: true, data: [] });
     (getAuditTrailAction as jest.Mock).mockResolvedValue({ success: true, data: [] });
@@ -72,7 +88,12 @@ async function renderDetail(overrides: Partial<FinancialTransaction> = {}) {
         data: { institutions: [], accounts: [], categories: [], institutionTypes: [] },
     });
 
-    render(<TransactionDetailClient initialTransaction={{ ...TRANSACTION, ...overrides }} />);
+    render(
+        <TransactionDetailClient
+            initialTransaction={{ ...TRANSACTION, ...overrides }}
+            bankAccounts={bankAccounts}
+        />,
+    );
     await waitFor(() => expect(getTransactionFormOptionsAction).toHaveBeenCalled());
 }
 
@@ -120,6 +141,23 @@ describe("TransactionDetailClient · stepped experience", () => {
         expect(await screen.findByText("¿Dónde se acreditó?")).toBeInTheDocument();
         expect(screen.getByText("Destino")).toBeInTheDocument();
         expect(screen.getByText("Origen")).toBeInTheDocument();
+    });
+
+    // Lo reportado: quitar la cuenta y que el resumen la siguiera enseñando,
+    // porque el recorrido que pinta esa fila venía del servidor y no de lo que
+    // el usuario acababa de responder.
+    it("al quitar la cuenta, el resumen deja de enseñarla y el cambio se puede guardar", async () => {
+        await renderDetail(
+            { type: "INCOME", bankDestinationAccountId: "acc-1" },
+            [resolved("DESTINATION", "25XXXX10")],
+        );
+
+        fireEvent.click(screen.getByText("Forma de pago"));
+        fireEvent.click(await screen.findByText("Destino"));
+        fireEvent.click(await screen.findByText("Quitar la cuenta"));
+
+        expect(screen.queryByText("25XXXX10")).not.toBeInTheDocument();
+        expect(screen.getByRole("button", { name: /Guardar cambio/i })).toBeEnabled();
     });
 
     it("opens the editor on the summary when the main button is used", async () => {

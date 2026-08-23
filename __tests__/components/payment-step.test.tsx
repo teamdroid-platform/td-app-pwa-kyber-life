@@ -220,17 +220,30 @@ describe("PaymentStep — elegir desde la hoja", () => {
         expect(onDestinationChange).toHaveBeenCalledWith(null);
     });
 
-    // Lo que se veía: quitar la cuenta y que la fila volviera a enseñar lo que
-    // el escaneo —o el vínculo ya guardado— había puesto en ese lado.
-    it("quitar la cuenta no deja que el escaneo la reponga en la fila", () => {
+    // Vaciar es una respuesta y se declara hacia arriba: quien la guarda es el
+    // wizard, para que el resumen deje de enseñar la cuenta quitada.
+    it("declara hacia arriba que ese lado quedó vacío", () => {
+        const onClearedChange = jest.fn();
         renderStep({
             creditEligible: false,
             destinationEligible: true,
             scannedAccounts: [scanned("DESTINATION", "XXXX9511")],
+            onClearedChange,
         });
 
         fireEvent.click(screen.getByText("Destino"));
         fireEvent.click(screen.getByText("Quitar la cuenta"));
+
+        expect(onClearedChange).toHaveBeenCalledWith("DESTINATION", true);
+    });
+
+    it("con el lado marcado como vacío, la fila no repone lo que leyó el escaneo", () => {
+        renderStep({
+            creditEligible: false,
+            destinationEligible: true,
+            scannedAccounts: [scanned("DESTINATION", "XXXX9511")],
+            cleared: { DESTINATION: true },
+        });
 
         expect(screen.queryByText("XXXX9511")).not.toBeInTheDocument();
         expect(screen.getAllByText("Sin elegir").length).toBeGreaterThan(0);
