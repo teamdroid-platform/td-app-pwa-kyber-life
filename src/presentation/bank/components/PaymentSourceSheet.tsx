@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { CreditCard, Landmark, PiggyBank, Plus, Search, TrendingUp, UserX, Wallet, Check } from "lucide-react";
+import { Ban, CreditCard, Landmark, PiggyBank, Plus, Search, TrendingUp, UserX, Wallet, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { FormSheet } from "@/components/ui/form-sheet";
 import { Input } from "@/components/ui/input";
@@ -46,6 +46,12 @@ interface PaymentSourceSheetProps {
     /** «No es mía» solo tiene sentido en un lado que puede ser de otro. */
     allowExternal?: boolean;
     /**
+     * Si el lado tiene algo que quitar. Por defecto, lo elegido; quien además
+     * enseñe lo que leyó un escaneo debe pedirlo, porque eso también se ve en
+     * la fila y también se quiere poder borrar.
+     */
+    allowClear?: boolean;
+    /**
      * El número que leyó el escaneo para este lado. Abre el alta con él ya
      * puesto: registrar lo que el movimiento trae es el caso más frecuente.
      */
@@ -67,7 +73,7 @@ interface PaymentSourceSheetProps {
  */
 export function PaymentSourceSheet({
     open, onOpenChange, title, accounts, cards, institutions,
-    value, onPick, onAccountCreated, onCardCreated, allowExternal = true,
+    value, onPick, onAccountCreated, onCardCreated, allowExternal = true, allowClear,
     scannedNumber, scannedKind,
 }: PaymentSourceSheetProps) {
     const [query, setQuery] = useState("");
@@ -294,6 +300,20 @@ export function PaymentSourceSheet({
                     iconClass="bg-slate-500/15 text-slate-400"
                     title="No es una cuenta mía"
                     subtitle="De otra persona o de un comercio"
+                />
+            )}
+
+            {/* Deshacer solo aparece cuando hay algo que deshacer: con el lado
+                vacío sería una opción que no hace nada. Elegir mal y no poder
+                volver atrás obligaba a descartar la edición entera. */}
+            {(allowClear ?? value.kind !== "NONE") && (
+                <Option
+                    selected={false}
+                    onClick={() => choose({ kind: "NONE" })}
+                    icon={<Ban className="h-4 w-4" />}
+                    iconClass="bg-slate-500/15 text-slate-400"
+                    title="Quitar la cuenta"
+                    subtitle="Deja este lado sin elegir"
                 />
             )}
 

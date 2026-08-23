@@ -27,6 +27,9 @@ interface PaymentStepProps {
     destinationEligible?: boolean;
     /** En un ingreso lo que importa es dónde entró: esa fila va arriba. */
     destinationFirst?: boolean;
+    /** Lados que el usuario vació: ahí no se repone lo que leyó el escaneo. */
+    cleared?: Partial<Record<"SOURCE" | "DESTINATION", boolean>>;
+    onClearedChange?: (role: "SOURCE" | "DESTINATION", cleared: boolean) => void;
     /** Cuenta a la que entró el dinero, cuando el movimiento tiene dos lados. */
     destinationAccountId?: string | null;
     onDestinationChange?: (accountId: string | null) => void;
@@ -54,7 +57,7 @@ interface PaymentStepProps {
  */
 export function PaymentStep({
     accounts, cards, value, onChange, creditEligible,
-    destinationEligible = false, destinationFirst = false,
+    destinationEligible = false, destinationFirst = false, cleared, onClearedChange,
     destinationAccountId, onDestinationChange, scannedAccounts = [],
     onScannedDecision, institutions = [], onAccountCreated, onCardCreated,
 }: PaymentStepProps) {
@@ -63,6 +66,14 @@ export function PaymentStep({
     const selectableCards = creditEligible ? cards : cards.filter(c => c.cardType === "DEBIT");
 
     const [editing, setEditing] = useState<"SOURCE" | "DESTINATION" | null>(null);
+
+    /** Vaciar es una respuesta: se declara hacia arriba, no se recuerda aquí. */
+    const remember = (role: "SOURCE" | "DESTINATION", pick: PaymentPick) =>
+        onClearedChange?.(role, pick.kind === "NONE");
+
+    /** Lo que el escaneo leyó en ese lado, salvo que el usuario lo haya vaciado. */
+    const fallbackFor = (role: "SOURCE" | "DESTINATION") =>
+        cleared?.[role] ? undefined : scanned(role);
 
     // La tarjeta de crédito elegida como origen, si la hay: es lo que decide si
     // el crédito se deriva o lo declara el usuario.
@@ -99,6 +110,7 @@ export function PaymentStep({
 
     const applySource = (pick: PaymentPick) => {
         declare("SOURCE", pick);
+        remember("SOURCE", pick);
 
         if (pick.kind === "CARD") {
             const card = cards.find(c => c.id === pick.cardId);
@@ -125,7 +137,8 @@ export function PaymentStep({
      * de origen, que ahí es la del pagador y no es del usuario.
      */
     const hasDestination = !!onDestinationChange
-        && (destinationEligible || !!scanned("DESTINATION") || !!destinationAccountId);
+        && (destinationEligible || !!scanned("DESTINATION") || !!destinationAccountId
+            || !!cleared?.DESTINATION);
 
     return (
         <>
@@ -141,7 +154,7 @@ export function PaymentStep({
                 <SideRow
                     role="SOURCE"
                     label="Origen"
-                    text={describe(sourcePick, accounts, cards, scanned("SOURCE"))}
+                    text={describe(sourcePick, accounts, cards, fallbackFor("SOURCE"))}
                     onEdit={() => setEditing("SOURCE")}
                 />
 
@@ -149,7 +162,7 @@ export function PaymentStep({
                     <SideRow
                         role="DESTINATION"
                         label="Destino"
-                        text={describe(destinationPick, accounts, cards, scanned("DESTINATION"))}
+                        text={describe(destinationPick, accounts, cards, fallbackFor("DESTINATION"))}
                         onEdit={() => setEditing("DESTINATION")}
                     />
                 )}
@@ -171,6 +184,9 @@ export function PaymentStep({
                 cards={selectableCards}
                 institutions={institutions}
                 value={sourcePick}
+                // También hay algo que quitar cuando la fila enseña lo que leyó
+                // el escaneo, aunque el usuario todavía no haya elegido nada.
+                allowClear={sourcePick.kind !== "NONE" || !!fallbackFor("SOURCE")}
                 onPick={applySource}
                 scannedNumber={scanned("SOURCE")?.display}
                 scannedKind={scanned("SOURCE")?.kind}
@@ -187,10 +203,12 @@ export function PaymentStep({
                 cards={[]}
                 institutions={institutions}
                 value={destinationPick}
+                allowClear={destinationPick.kind !== "NONE" || !!fallbackFor("DESTINATION")}
                 scannedNumber={scanned("DESTINATION")?.display}
                 scannedKind={scanned("DESTINATION")?.kind}
                 onPick={pick => {
                     declare("DESTINATION", pick);
+                    remember("DESTINATION", pick);
                     onDestinationChange?.(pick.kind === "ACCOUNT" ? pick.accountId : null);
                 }}
                 onAccountCreated={onAccountCreated}

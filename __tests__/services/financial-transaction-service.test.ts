@@ -253,6 +253,36 @@ describe("FinancialTransactionService", () => {
             );
         });
 
+        // `??` no distinguía «déjalo» de «quítalo», así que una cuenta quitada
+        // volvía a aparecer en la siguiente lectura.
+        it("clears a bank link when the caller sends null for it", async () => {
+            const existingTx = {
+                id: mockTransactionId, ownerUserId: mockUserId, type: "INCOME", amount: 500,
+                bankDestinationAccountId: "acc-1",
+            };
+            transactionRepoMock.findById.mockResolvedValue(existingTx);
+            transactionRepoMock.update.mockImplementation(async (tx: FinancialTransaction) => tx);
+
+            const result = await service.updateTransaction(mockTransactionId, mockUserId, {
+                bankDestinationAccountId: null,
+            });
+
+            expect(result.bankDestinationAccountId).toBeNull();
+        });
+
+        it("keeps a bank link the caller never mentioned", async () => {
+            const existingTx = {
+                id: mockTransactionId, ownerUserId: mockUserId, type: "INCOME", amount: 500,
+                bankDestinationAccountId: "acc-1",
+            };
+            transactionRepoMock.findById.mockResolvedValue(existingTx);
+            transactionRepoMock.update.mockImplementation(async (tx: FinancialTransaction) => tx);
+
+            const result = await service.updateTransaction(mockTransactionId, mockUserId, { amount: 600 });
+
+            expect(result.bankDestinationAccountId).toBe("acc-1");
+        });
+
         it("should throw if the transaction does not exist or doesn't belong to the user", async () => {
             transactionRepoMock.findById.mockResolvedValue(null);
 

@@ -96,6 +96,33 @@ describe("PaymentStep — el paso cabe en dos filas", () => {
         expect(screen.getByText("¿Con qué lo pagaste?")).toBeInTheDocument();
     });
 
+    // Una transferencia y un retiro llegan aquí igual: los dos lados, ninguno
+    // a crédito. Lo que los distingue —el tipo— ya lo resolvió el hook.
+    it("una transferencia o un retiro preguntan por ambos lados, sin crédito", () => {
+        renderStep({ creditEligible: false, destinationEligible: true });
+
+        expect(screen.getByText("Origen")).toBeInTheDocument();
+        expect(screen.getByText("Destino")).toBeInTheDocument();
+        expect(screen.queryByText("Pagado con tarjeta de crédito")).not.toBeInTheDocument();
+        expect(screen.getByText("¿Con qué lo pagaste?")).toBeInTheDocument();
+    });
+
+    /**
+     * El orden se invierte con `flex-col-reverse`, sin mover el DOM: la
+     * comprobación va sobre el contenedor, que es donde ocurre.
+     */
+    it("solo el ingreso pone el destino por encima del origen", () => {
+        renderStep({ creditEligible: false, destinationEligible: true, destinationFirst: true });
+
+        expect(screen.getByText("Origen").closest("div.flex-col-reverse")).not.toBeNull();
+    });
+
+    it("una transferencia mantiene el relato de origen a destino", () => {
+        renderStep({ creditEligible: false, destinationEligible: true });
+
+        expect(screen.getByText("Origen").closest("div.flex-col-reverse")).toBeNull();
+    });
+
     it("no despliega la lista de cuentas hasta que se pide", () => {
         // Todo el saturado de antes —opciones, altas, avisos— vive en la hoja.
         renderStep();
@@ -170,6 +197,64 @@ describe("PaymentStep — elegir desde la hoja", () => {
         fireEvent.click(screen.getByText("XXXX9511"));
 
         expect(onDestinationChange).toHaveBeenCalledWith("a2");
+    });
+
+    // Elegir mal y no poder deshacerlo obligaba a descartar la edición entera.
+    it("quitar la cuenta deja el origen sin elegir", () => {
+        const { onChange } = renderStep({ value: { accountId: "a1" } });
+
+        fireEvent.click(screen.getByText("Origen"));
+        fireEvent.click(screen.getByText("Quitar la cuenta"));
+
+        expect(onChange).toHaveBeenCalledWith({ accountId: undefined, paidWithCredit: false });
+    });
+
+    it("quitar la cuenta deja el destino sin elegir", () => {
+        const { onDestinationChange } = renderStep({
+            creditEligible: false, destinationEligible: true, destinationAccountId: "a2",
+        });
+
+        fireEvent.click(screen.getByText("Destino"));
+        fireEvent.click(screen.getByText("Quitar la cuenta"));
+
+        expect(onDestinationChange).toHaveBeenCalledWith(null);
+    });
+
+    // Vaciar es una respuesta y se declara hacia arriba: quien la guarda es el
+    // wizard, para que el resumen deje de enseñar la cuenta quitada.
+    it("declara hacia arriba que ese lado quedó vacío", () => {
+        const onClearedChange = jest.fn();
+        renderStep({
+            creditEligible: false,
+            destinationEligible: true,
+            scannedAccounts: [scanned("DESTINATION", "XXXX9511")],
+            onClearedChange,
+        });
+
+        fireEvent.click(screen.getByText("Destino"));
+        fireEvent.click(screen.getByText("Quitar la cuenta"));
+
+        expect(onClearedChange).toHaveBeenCalledWith("DESTINATION", true);
+    });
+
+    it("con el lado marcado como vacío, la fila no repone lo que leyó el escaneo", () => {
+        renderStep({
+            creditEligible: false,
+            destinationEligible: true,
+            scannedAccounts: [scanned("DESTINATION", "XXXX9511")],
+            cleared: { DESTINATION: true },
+        });
+
+        expect(screen.queryByText("XXXX9511")).not.toBeInTheDocument();
+        expect(screen.getAllByText("Sin elegir").length).toBeGreaterThan(0);
+    });
+
+    it("con el lado vacío no ofrece quitar nada", () => {
+        renderStep();
+
+        fireEvent.click(screen.getByText("Origen"));
+
+        expect(screen.queryByText("Quitar la cuenta")).not.toBeInTheDocument();
     });
 
     it("un ingreso no ofrece tarjetas de crédito", () => {

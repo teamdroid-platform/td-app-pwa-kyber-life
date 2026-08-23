@@ -278,12 +278,16 @@ export function TransactionWizard({
     // Lo que el usuario ya declaró se refleja en el panel sin esperar al
     // servidor: la elección tiene que verse en el mismo toque.
     const scannedAccountsWithChoice = useMemo(
-        () => scannedAccounts.map(account => ({
-            ...account,
-            decision: values.scannedOwnership?.[account.raw] ?? account.decision,
-            ownership: values.scannedOwnership?.[account.raw]?.ownership ?? account.ownership,
-        })),
-        [scannedAccounts, values.scannedOwnership],
+        () => scannedAccounts
+            // Un lado vaciado a mano desaparece del recorrido: si no, el
+            // resumen seguía enseñando la cuenta que se acababa de quitar.
+            .filter(account => !values.clearedSides?.[account.role])
+            .map(account => ({
+                ...account,
+                decision: values.scannedOwnership?.[account.raw] ?? account.decision,
+                ownership: values.scannedOwnership?.[account.raw]?.ownership ?? account.ownership,
+            })),
+        [scannedAccounts, values.scannedOwnership, values.clearedSides],
     );
 
     const stepDefinition = WIZARD_STEPS.find((s) => s.id === screen);
@@ -375,6 +379,10 @@ export function TransactionWizard({
                         })}
                         destinationEligible={wizard.destinationEligible}
                         destinationFirst={wizard.destinationFirst}
+                        cleared={values.clearedSides}
+                        onClearedChange={(role, isCleared) => wizard.patch({
+                            clearedSides: { ...values.clearedSides, [role]: isCleared },
+                        })}
                         destinationAccountId={values.bankDestinationAccountId}
                         onDestinationChange={(id) => setValue("bankDestinationAccountId", id)}
                         scannedAccounts={scannedAccountsWithChoice}
