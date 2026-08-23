@@ -110,6 +110,18 @@ describe("TransactionDetailClient · stepped experience", () => {
         expect(screen.getByRole("button", { name: /Guardar cambio/i })).toBeInTheDocument();
     });
 
+    // El caso reportado: un ingreso ya guardado con la cuenta puesta como
+    // origen, que el usuario quiere corregir a «entró aquí».
+    it("deja declarar la cuenta de destino al editar un ingreso", async () => {
+        await renderDetail({ type: "INCOME", bankSourceAccountId: "acc-1" });
+
+        fireEvent.click(screen.getByText("Forma de pago"));
+
+        expect(await screen.findByText("¿Dónde se acreditó?")).toBeInTheDocument();
+        expect(screen.getByText("Destino")).toBeInTheDocument();
+        expect(screen.getByText("Origen")).toBeInTheDocument();
+    });
+
     it("opens the editor on the summary when the main button is used", async () => {
         await renderDetail();
 
