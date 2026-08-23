@@ -199,6 +199,35 @@ describe("PaymentStep — elegir desde la hoja", () => {
         expect(onDestinationChange).toHaveBeenCalledWith("a2");
     });
 
+    // Elegir mal y no poder deshacerlo obligaba a descartar la edición entera.
+    it("quitar la cuenta deja el origen sin elegir", () => {
+        const { onChange } = renderStep({ value: { accountId: "a1" } });
+
+        fireEvent.click(screen.getByText("Origen"));
+        fireEvent.click(screen.getByText("Quitar la cuenta"));
+
+        expect(onChange).toHaveBeenCalledWith({ accountId: undefined, paidWithCredit: false });
+    });
+
+    it("quitar la cuenta deja el destino sin elegir", () => {
+        const { onDestinationChange } = renderStep({
+            creditEligible: false, destinationEligible: true, destinationAccountId: "a2",
+        });
+
+        fireEvent.click(screen.getByText("Destino"));
+        fireEvent.click(screen.getByText("Quitar la cuenta"));
+
+        expect(onDestinationChange).toHaveBeenCalledWith(null);
+    });
+
+    it("con el lado vacío no ofrece quitar nada", () => {
+        renderStep();
+
+        fireEvent.click(screen.getByText("Origen"));
+
+        expect(screen.queryByText("Quitar la cuenta")).not.toBeInTheDocument();
+    });
+
     it("un ingreso no ofrece tarjetas de crédito", () => {
         renderStep({ creditEligible: false });
 

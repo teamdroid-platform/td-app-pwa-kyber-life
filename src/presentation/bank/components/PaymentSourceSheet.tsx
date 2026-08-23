@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { CreditCard, Landmark, PiggyBank, Plus, Search, TrendingUp, UserX, Wallet, Check } from "lucide-react";
+import { Ban, CreditCard, Landmark, PiggyBank, Plus, Search, TrendingUp, UserX, Wallet, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { FormSheet } from "@/components/ui/form-sheet";
 import { Input } from "@/components/ui/input";
@@ -294,6 +294,21 @@ export function PaymentSourceSheet({
                     iconClass="bg-slate-500/15 text-slate-400"
                     title="No es una cuenta mía"
                     subtitle="De otra persona o de un comercio"
+                />
+            )}
+
+            {/* Deshacer la elección solo aparece cuando hay algo que deshacer:
+                con el lado vacío sería una opción que no hace nada. Elegir mal
+                y no poder volver atrás obligaba a descartar la edición
+                entera. */}
+            {value.kind !== "NONE" && (
+                <Option
+                    selected={false}
+                    onClick={() => choose({ kind: "NONE" })}
+                    icon={<Ban className="h-4 w-4" />}
+                    iconClass="bg-slate-500/15 text-slate-400"
+                    title="Quitar la cuenta"
+                    subtitle="Deja este lado sin elegir"
                 />
             )}
 
