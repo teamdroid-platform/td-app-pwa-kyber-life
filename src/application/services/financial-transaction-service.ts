@@ -216,6 +216,21 @@ export class FinancialTransactionService {
         // emisor nace aquí. Lo que el usuario haya elegido a mano no se pisa, y
         // una edición nunca funda cuentas — sin números enmascarados no hay de
         // dónde deducirlas.
+        /**
+         * Whether the caller mentioned a bank link at all.
+         *
+         * `??` cannot tell "leave it alone" from "clear it": both arrive as a
+         * missing value and the stored link always won, so removing an account
+         * from a transaction was impossible — it came back on the next read.
+         * Presence of the key is what separates the two.
+         */
+        const mentions = (key: keyof CreateFinancialTransactionDTO) =>
+            Object.prototype.hasOwnProperty.call(data, key);
+        const clearedLink = (key: "bankSourceAccountId" | "bankDestinationAccountId" | "bankCardId") =>
+            mentions(key) && data[key] === null;
+        const linkOr = (key: "bankSourceAccountId" | "bankDestinationAccountId" | "bankCardId") =>
+            mentions(key) ? (data[key] ?? null) : (tx[key] ?? null);
+
         const bankLinks = this.bankService
             ? await this.bankService.syncTransactionBankLinks(userId, {
                 merchant: data.merchant ?? institutionName ?? tx.merchant ?? null,
@@ -223,9 +238,9 @@ export class FinancialTransactionService {
                 paidWithCredit: data.paidWithCredit ?? tx.paidWithCredit ?? false,
                 institutionKind: bankInstitutionKind ?? null,
                 ownership: scannedOwnership ?? null,
-                bankSourceAccountId: data.bankSourceAccountId ?? tx.bankSourceAccountId ?? null,
-                bankDestinationAccountId: data.bankDestinationAccountId ?? tx.bankDestinationAccountId ?? null,
-                bankCardId: data.bankCardId ?? tx.bankCardId ?? null,
+                bankSourceAccountId: linkOr("bankSourceAccountId"),
+                bankDestinationAccountId: linkOr("bankDestinationAccountId"),
+                bankCardId: linkOr("bankCardId"),
                 bankInstitutionId: data.bankInstitutionId ?? tx.bankInstitutionId ?? null,
             })
             : null;
@@ -237,9 +252,18 @@ export class FinancialTransactionService {
             institutionName: institutionName === null ? undefined : (institutionName ?? tx.institutionName),
             institutionId: finalInstitutionId,
             categoryId: finalCategoryId,
-            bankSourceAccountId: bankLinks?.bankSourceAccountId ?? tx.bankSourceAccountId ?? null,
-            bankDestinationAccountId: bankLinks?.bankDestinationAccountId ?? tx.bankDestinationAccountId ?? null,
-            bankCardId: bankLinks?.bankCardId ?? tx.bankCardId ?? null,
+            // Un lado que el usuario vació se queda vacío: la identificación
+            // automática puede volver a deducirlo del emisor, y reponerlo aquí
+            // desharía justo lo que se acaba de pedir.
+            bankSourceAccountId: clearedLink("bankSourceAccountId")
+                ? null
+                : bankLinks?.bankSourceAccountId ?? tx.bankSourceAccountId ?? null,
+            bankDestinationAccountId: clearedLink("bankDestinationAccountId")
+                ? null
+                : bankLinks?.bankDestinationAccountId ?? tx.bankDestinationAccountId ?? null,
+            bankCardId: clearedLink("bankCardId")
+                ? null
+                : bankLinks?.bankCardId ?? tx.bankCardId ?? null,
             bankInstitutionId: bankLinks?.bankInstitutionId ?? tx.bankInstitutionId ?? null,
             updatedAt: now,
         };

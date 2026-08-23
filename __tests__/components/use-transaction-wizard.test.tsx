@@ -49,6 +49,45 @@ function Host({ mode, initial }: { mode: WizardMode; initial: WizardValues }) {
 const screenId = () => screen.getByTestId("screen").textContent;
 const click = (label: string) => fireEvent.click(screen.getByText(label));
 
+/** Host mínimo para leer lo que el paso de pago pregunta según el tipo. */
+function SidesHost({ type }: { type: WizardValues["type"] }) {
+    const w = useTransactionWizard({ mode: "create", initialValues: values({ type }) });
+    return (
+        <div>
+            <span data-testid="credit">{String(w.creditEligible)}</span>
+            <span data-testid="destination">{String(w.destinationEligible)}</span>
+            <span data-testid="destination-first">{String(w.destinationFirst)}</span>
+        </div>
+    );
+}
+
+describe("useTransactionWizard — qué lados tiene cada tipo", () => {
+    /** [tipo, ¿crédito?, ¿destino?, ¿destino primero?] */
+    const CASES: [WizardValues["type"], boolean, boolean, boolean][] = [
+        // Un gasto se paga desde una cuenta y el otro lado es el comercio.
+        ["EXPENSE", true, false, false],
+        // Un ingreso entra a una cuenta propia, y esa es la que se conoce.
+        ["INCOME", false, true, true],
+        ["DEPOSIT", false, true, true],
+        ["REFUND", false, true, true],
+        // Una transferencia y un retiro tienen los dos lados, en su orden.
+        ["TRANSFER", false, true, false],
+        ["WITHDRAWAL", false, true, false],
+        // Pagos, comisiones e impuestos salen de una cuenta hacia fuera.
+        ["PAYMENT", false, false, false],
+        ["FEE", false, false, false],
+        ["TAX", false, false, false],
+    ];
+
+    it.each(CASES)("%s → crédito %s, destino %s, destino primero %s", (type, credit, destination, first) => {
+        render(<SidesHost type={type} />);
+
+        expect(screen.getByTestId("credit")).toHaveTextContent(String(credit));
+        expect(screen.getByTestId("destination")).toHaveTextContent(String(destination));
+        expect(screen.getByTestId("destination-first")).toHaveTextContent(String(first));
+    });
+});
+
 describe("collectMissing", () => {
     it("accepts a complete transaction", () => {
         expect(collectMissing(values())).toEqual([]);

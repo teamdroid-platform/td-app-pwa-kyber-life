@@ -54,6 +54,15 @@ export interface WizardValues {
     bankDestinationAccountId?: string | null;
     /** Tarjeta usada. Con `paidWithCredit`, define un consumo diferido. */
     bankCardId?: string | null;
+    /**
+     * Lados que el usuario vació a mano.
+     *
+     * Vaciar es una respuesta, no la ausencia de una: sin esto, quitar la
+     * cuenta dejaba el valor en `null` pero la pantalla volvía a pintar lo que
+     * el escaneo —o el vínculo ya guardado— había puesto en ese lado, y el
+     * usuario veía la cuenta que acababa de quitar.
+     */
+    clearedSides?: Partial<Record<"SOURCE" | "DESTINATION", boolean>>;
     date: string;
     notes: string;
     tags: string[];
@@ -109,6 +118,7 @@ export const FIELD_STEP: Record<keyof WizardValues, WizardScreen> = {
     categoryName: "category",
     categoryId: "category",
     paidWithCredit: "payment",
+    clearedSides: "payment",
     scannedOwnership: "payment",
     bankSourceAccountId: "payment",
     bankDestinationAccountId: "payment",
@@ -146,11 +156,16 @@ export function canLeaveStep(step: WizardStepId, values: WizardValues): boolean 
  * from the list clears its id, and counting that as an unsaved change would
  * inflate "N cambios" for an edit that never happened.
  */
+// Los ids de institución y categoría son espejo de sus nombres —el nombre es
+// la fuente— así que compararlos marcaría un cambio que ya cuenta el nombre.
+// Los de banco sí cuentan: cambiar de cuenta, o quitarla, es el cambio entero
+// cuando se edita solo la forma de pago; ignorarlos dejaba «Sin cambios» y el
+// botón de guardar apagado.
 const DIFF_IGNORED: readonly (keyof WizardValues)[] = [
-    "institutionId", "categoryId", "bankSourceAccountId", "bankDestinationAccountId", "bankCardId",
+    "institutionId", "categoryId",
     // Un objeto nunca es igual a otro por identidad, así que compararlo
     // marcaría la fila como cambiada en cada render.
-    "scannedOwnership",
+    "scannedOwnership", "clearedSides",
 ];
 
 /** Fields whose value differs from the one the wizard opened with. */

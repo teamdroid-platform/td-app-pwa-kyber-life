@@ -304,6 +304,7 @@ export function SummaryStep({
                             <PaymentIdentityLine
                                 accountId={values.bankSourceAccountId}
                                 cardId={values.bankCardId}
+                                destinationAccountId={values.bankDestinationAccountId}
                                 accounts={accounts}
                                 cards={cards}
                                 fallback={<span className="text-text-tertiary">{paymentLabel}</span>}

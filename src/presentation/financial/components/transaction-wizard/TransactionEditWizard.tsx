@@ -76,9 +76,11 @@ export function TransactionEditWizard({
                 notes: values.notes,
                 tags: values.tags,
                 paidWithCredit: values.type === "EXPENSE" ? values.paidWithCredit : undefined,
-                bankSourceAccountId: values.bankSourceAccountId ?? undefined,
-                bankDestinationAccountId: values.bankDestinationAccountId ?? undefined,
-                bankCardId: values.bankCardId ?? undefined,
+                bankSourceAccountId: values.bankSourceAccountId ?? null,
+                // Explícitos y no `undefined`: quitar una cuenta es una edición
+                // como cualquier otra, y el servicio distingue null de ausente.
+                bankDestinationAccountId: values.bankDestinationAccountId ?? null,
+                bankCardId: values.bankCardId ?? null,
             });
 
             if (res.success && res.data) {
