@@ -136,9 +136,9 @@ describe("FinancialInbox", () => {
 
         expect(await screen.findByText("Transferencia directa enviada")).toBeInTheDocument();
         expect(screen.getByText("ORIGEN")).toBeInTheDocument();
-        expect(screen.getByText("**** **** **** 6287")).toBeInTheDocument();
+        expect(screen.getByText("**** 6287")).toBeInTheDocument();
         expect(screen.getByText("DESTINO")).toBeInTheDocument();
-        expect(screen.getByText("**** **** **** 3159")).toBeInTheDocument();
+        expect(screen.getByText("**** 3159")).toBeInTheDocument();
         expect(screen.getAllByText("VISA").length).toBeGreaterThan(0);
     });
 
