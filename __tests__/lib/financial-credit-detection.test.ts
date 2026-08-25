@@ -43,13 +43,13 @@ describe("financial-credit-detection", () => {
             })).toBe(true);
         });
 
-        it("returns false when paidWithCredit is explicitly false (user decision via wizard)", () => {
+        it("detects credit card payment from scan notes/emailBody even when paidWithCredit is false in legacy DB row", () => {
             expect(isTransactionPaidWithCredit({
                 type: "EXPENSE",
                 paidWithCredit: false,
                 description: "Consumo en KYWI",
                 notes: "Consumo en KYWI con tarjeta de crédito",
-            })).toBe(false);
+            })).toBe(true);
         });
 
         it("detects credit card payment from scan email body when paidWithCredit is null (legacy/scanner row)", () => {

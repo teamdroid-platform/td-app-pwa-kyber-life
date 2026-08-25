@@ -107,11 +107,8 @@ export function isTransactionPaidWithCredit(tx: {
     originStats?: Record<string, unknown> | null;
 } | null | undefined): boolean {
     if (!tx) return false;
-
-    // ── Explicit boolean: user already decided via wizard / form ──
-    if (typeof tx.paidWithCredit === "boolean") return tx.paidWithCredit;
-
-    // ── From here, paidWithCredit is null | undefined → run heuristics ──
+    // Explicit true is always respected immediately
+    if (tx.paidWithCredit === true) return true;
 
     // If the description explicitly says it's a payment TO a credit card (debt repayment),
     // this is NOT an expense paid WITH credit, regardless of what emailBody/notes say.
