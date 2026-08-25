@@ -25,9 +25,9 @@ export interface BalanceFreshness {
     lastAsOf: string | null;
 }
 
-/** Medianoche local: comparar días de calendario, no bloques de 24 horas. */
+/** Medianoche UTC: comparar días de calendario, no bloques de 24 horas. */
 function startOfDay(date: Date): number {
-    return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+    return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
 }
 
 /** Días de calendario transcurridos desde `iso`. Negativo si la fecha es futura. */

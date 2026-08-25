@@ -59,14 +59,15 @@ interface TransactionRow extends Record<string, unknown> {
 
 /** Map Supabase snake_case row to domain camelCase entity */
 function mapRowToTransaction(row: TransactionRow): FinancialTransaction {
-    const rawPaidWithCredit = row.paid_with_credit ?? false;
-    const isCredit = rawPaidWithCredit || isTransactionPaidWithCredit({
-        type: row.type,
-        paidWithCredit: row.paid_with_credit,
-        description: row.description,
-        notes: row.notes,
-        originStats: row.origin_stats,
-    });
+    const isCredit = typeof row.paid_with_credit === "boolean"
+        ? row.paid_with_credit
+        : isTransactionPaidWithCredit({
+            type: row.type,
+            paidWithCredit: row.paid_with_credit,
+            description: row.description,
+            notes: row.notes,
+            originStats: row.origin_stats,
+        });
 
     return {
         id: row.id,

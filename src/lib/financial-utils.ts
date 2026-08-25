@@ -50,18 +50,38 @@ export function buildFallbackTitle(type?: string | null, merchant?: string | nul
 }
 
 /**
- * Checks whether a text string mentions credit card payment keywords.
+ * Checks whether a text string mentions credit card payment keywords (paying WITH credit card),
+ * while distinguishing from bill payments TO a credit card (paying off card debt from savings/checking).
  */
 export function hasCreditCardKeywords(text: string | null | undefined): boolean {
     if (!text || typeof text !== "string") return false;
-    return /\b(?:tarjeta[s]?\s+(?:de\s+)?cr[eé]dito|credit\s*card)\b/i.test(text);
+
+    // Bill payments TO/OF a credit card (e.g. paying card debt from savings) are NOT expenses paid with credit card.
+    const isPaymentToCard = /\b(?:pago|abono|cancelaci[oó]n|transferencia)\s+(?:a|de|a\s+la|de\s+la|a\s+mi|de\s+mi|a\s+su|de\s+su)?\s*tarjeta[s]?\s+(?:de\s+)?cr[eé]dito\b/i.test(text);
+
+    // Explicit indicators of purchase or consumption WITH credit card
+    const isPaidWithCard =
+        /\b(?:con|mediante|por|v[ií]a)\s+tarjeta[s]?\s+(?:de\s+)?cr[eé]dito\b/i.test(text) ||
+        /\b(?:consumo|compra|cargo|gasto|autorizaci[oó]n|uso)\s+(?:con|de|en|por)?\s*tarjeta[s]?\s+(?:de\s+)?cr[eé]dito\b/i.test(text) ||
+        /\btarjeta[s]?\s+(?:de\s+)?cr[eé]dito\s*:\s*(?:consumo|compra|cargo|autorizaci[oó]n)\b/i.test(text) ||
+        /\bcredit\s*card\s*(?:purchase|expense|charge|transaction)\b/i.test(text) ||
+        /\b(?:paid|payment)\s+with\s+credit\s*card\b/i.test(text);
+
+    if (isPaymentToCard && !isPaidWithCard) {
+        return false;
+    }
+
+    return (
+        isPaidWithCard ||
+        (/\b(?:tarjeta[s]?\s+(?:de\s+)?cr[eé]dito|credit\s*card)\b/i.test(text) && !isPaymentToCard)
+    );
 }
 
 /**
  * Detects if a transaction or scanner transaction represents a credit card payment/expense.
  *
  * Evaluates:
- * 1. Explicit `paidWithCredit === true`
+ * 1. Explicit `paidWithCredit` boolean flag (ground truth)
  * 2. Origin stats flags (`is_credit_card`, `isCreditCard`, `paidWithCredit`)
  * 3. Text content in `summary`, `description`, `notes`, or `originStats` (emailBody, subject, snippet)
  */
@@ -74,7 +94,11 @@ export function isTransactionPaidWithCredit(tx: {
     originStats?: Record<string, unknown> | null;
 } | null | undefined): boolean {
     if (!tx) return false;
-    if (tx.paidWithCredit === true) return true;
+
+    // If paidWithCredit is explicitly set as a boolean, respect it as the definitive source of truth
+    if (typeof tx.paidWithCredit === "boolean") {
+        return tx.paidWithCredit;
+    }
 
     // Only expense-like transactions or unassigned types can be paid with credit
     const normalizedType = tx.type?.toUpperCase();
@@ -86,6 +110,9 @@ export function isTransactionPaidWithCredit(tx: {
     if (stats && typeof stats === "object") {
         if (stats.is_credit_card === true || stats.isCreditCard === true || stats.paidWithCredit === true) {
             return true;
+        }
+        if (stats.is_credit_card === false || stats.isCreditCard === false || stats.paidWithCredit === false) {
+            return false;
         }
         const emailBody = typeof stats.emailBody === "string" ? stats.emailBody : "";
         const subject = typeof stats.subject === "string" ? stats.subject : "";
@@ -102,4 +129,3 @@ export function isTransactionPaidWithCredit(tx: {
 
     return false;
 }
-
