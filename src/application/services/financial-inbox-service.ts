@@ -1,6 +1,7 @@
 import { UUID } from "../../domain/core";
 import { FinancialScannerTransaction, FinancialTransaction } from "../../domain/entities/financial";
 import { IFinancialScannerTransactionRepository, IFinancialTransactionRepository, IFinancialTransactionAuditLogRepository, IFinancialInstitutionRepository } from "../../domain/repositories/financial";
+import { isTransactionPaidWithCredit } from "../../lib/financial-utils";
 
 export function normalizeForMatch(str?: string | null): string {
     if (!str) return "";
@@ -130,6 +131,18 @@ export class FinancialInboxService {
             throw new Error("La descripción es requerida para confirmar la transacción");
         }
 
+        const detectedCredit = transactionType === 'EXPENSE' && isTransactionPaidWithCredit({
+            type: transactionType,
+            summary: scannerTx.summary,
+            description: scannerTx.description ?? dto.description,
+            originStats: scannerTx.originStats as Record<string, unknown> | null,
+            notes: (scannerTx.originStats as Record<string, string>)?.emailBody,
+        });
+
+        const effectivePaidWithCredit = dto.paidWithCredit !== undefined && dto.paidWithCredit !== null
+            ? dto.paidWithCredit
+            : detectedCredit;
+
         // El mismo punto único por el que pasan la creación y la edición:
         // identifica las cuentas del escaneo, crea las que falten y respeta lo
         // que el usuario eligió a mano — él vio el movimiento, la heurística
@@ -139,7 +152,7 @@ export class FinancialInboxService {
                 scannedAccounts: scannerTx.accounts ?? [],
                 merchant: dto.merchant ?? scannerTx.merchant ?? null,
                 currency: scannerTx.currency ?? 'USD',
-                paidWithCredit: dto.paidWithCredit ?? false,
+                paidWithCredit: effectivePaidWithCredit,
                 institutionKind: dto.bankInstitutionKind ?? null,
                 ownership: dto.scannedOwnership ?? null,
                 bankSourceAccountId: dto.bankSourceAccountId ?? null,
@@ -169,7 +182,7 @@ export class FinancialInboxService {
             description: resolvedDescription,
             notes: dto.notes ?? (scannerTx.originStats as Record<string, string>)?.emailBody ?? (scannerTx.originStats as Record<string, string>)?.snippet ?? null,
             possibleDuplicate: false,
-            paidWithCredit: dto.paidWithCredit ?? false,
+            paidWithCredit: effectivePaidWithCredit,
             executionId: validExecutionId,
             originStats: {
                 ...((scannerTx.originStats as Record<string, unknown>) || {}),

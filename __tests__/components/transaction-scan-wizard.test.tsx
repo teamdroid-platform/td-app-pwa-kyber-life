@@ -215,13 +215,21 @@ describe("TransactionScanWizard", () => {
         await waitFor(() => expect(dismissInboxTransactionAction).toHaveBeenCalledWith("scan-1"));
     });
 
-    it("does not discard when the confirmation is cancelled", async () => {
-        window.confirm = jest.fn(() => false);
-        renderScanWizard();
+    it("auto-detects credit card payment from scan data on confirmation", async () => {
+        renderScanWizard({
+            summary: "Pago realizado en KYWI con tarjeta de crédito",
+            originStats: {
+                origin: "email",
+                emailBody: "💳 Banco Pichincha: Tarjeta de Crédito (terminada en 620 ): Consumo por $186.50 USD en KYWI",
+            },
+        });
         await summaryHeading();
 
-        fireEvent.click(screen.getByRole("button", { name: /Descartar/i }));
+        fireEvent.click(screen.getByRole("button", { name: /Confirmar/i }));
 
-        expect(dismissInboxTransactionAction).not.toHaveBeenCalled();
+        await waitFor(() => expect(mapInboxTransactionAction).toHaveBeenCalledTimes(1));
+        expect(mapInboxTransactionAction).toHaveBeenCalledWith(expect.objectContaining({
+            paidWithCredit: true,
+        }));
     });
 });

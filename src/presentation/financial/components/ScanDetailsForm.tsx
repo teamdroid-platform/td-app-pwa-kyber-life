@@ -30,6 +30,7 @@ import type { InstitutionMatchInfo } from "@/lib/institution-match";
 import type { ScannedAccountView } from "@/application/services/bank-service";
 import { ScannedAccountsPanel } from "@/presentation/bank/components/ScannedAccountsPanel";
 import { isoToWallClockInput, wallClockInputToISO } from "@/lib/date-range";
+import { isTransactionPaidWithCredit } from "@/lib/financial-utils";
 import type { FinancialTransactionType } from "@/domain/entities/financial";
 import {
     FileText, Building2, Tag, CreditCard, DollarSign, Landmark, Calendar, Sparkles, Tags,
@@ -125,17 +126,27 @@ export function LegacyScanDetailsForm({
         setExpanded((cur) => (cur === id ? null : id));
     };
 
-    const [formData, setFormData] = useState(() => ({
-        description: initialData.description || "",
-        type: normalizeType(initialData.type),
-        amount: initialData.amount !== null && initialData.amount !== undefined ? String(initialData.amount) : "",
-        date: isoToWallClockInput(initialData.date) ?? "",
-        notes: extractSummary(initialData) || "",
-        institutionName: resolvedInstitutionName || initialData.merchant || "",
-        categoryName: initialData.category || "",
-        tags: [] as string[],
-        paidWithCredit: false,
-    }));
+    const [formData, setFormData] = useState(() => {
+        const detectedCredit = isTransactionPaidWithCredit({
+            type: initialData.type,
+            summary: initialData.summary,
+            description: initialData.description,
+            originStats: initialData.originStats as Record<string, unknown> | null,
+            notes: (initialData.originStats as Record<string, string>)?.emailBody,
+        }) || scannedAccounts.some(a => a.role === "SOURCE" && a.kind === "CARD" && a.match?.typeAcronym === "TCR");
+
+        return {
+            description: initialData.description || "",
+            type: normalizeType(initialData.type),
+            amount: initialData.amount !== null && initialData.amount !== undefined ? String(initialData.amount) : "",
+            date: isoToWallClockInput(initialData.date) ?? "",
+            notes: extractSummary(initialData) || "",
+            institutionName: resolvedInstitutionName || initialData.merchant || "",
+            categoryName: initialData.category || "",
+            tags: [] as string[],
+            paidWithCredit: detectedCredit,
+        };
+    });
 
     // Pickers' options come from a single resilient loader (see the hook): a
     // partial failure used to leave them silently empty.

@@ -7,7 +7,7 @@ import type { PaginatedResult } from "@/domain/pagination";
 import { TransactionCard } from "./TransactionCard";
 import { financialOfflineStore } from "@/infrastructure/offline/financial-offline-store";
 import { searchPaginatedTransactionsAction, createTransactionAction } from "@/app/actions/financial-transactions";
-import { buildFallbackTitle } from "@/lib/financial-utils";
+import { buildFallbackTitle, isTransactionPaidWithCredit } from "@/lib/financial-utils";
 import { useFinancialRealtime } from "../hooks/useFinancialRealtime";
 import { WifiOff, Loader2 } from "lucide-react";
 import { TransactionSummary } from "./TransactionSummary";
@@ -40,6 +40,11 @@ interface TransactionRow extends Record<string, unknown> {
     category_id: string | null;
     institution_id: string | null;
     account_id: string | null;
+    bank_source_account_id?: string | null;
+    bank_destination_account_id?: string | null;
+    bank_card_id?: string | null;
+    bank_institution_id?: string | null;
+    paid_with_credit?: boolean | null;
     tags: string[] | null;
     description: string;
     notes: string | null;
@@ -54,6 +59,15 @@ interface TransactionRow extends Record<string, unknown> {
 
 /** Map Supabase snake_case row to domain camelCase entity */
 function mapRowToTransaction(row: TransactionRow): FinancialTransaction {
+    const rawPaidWithCredit = row.paid_with_credit ?? false;
+    const isCredit = rawPaidWithCredit || isTransactionPaidWithCredit({
+        type: row.type,
+        paidWithCredit: row.paid_with_credit,
+        description: row.description,
+        notes: row.notes,
+        originStats: row.origin_stats,
+    });
+
     return {
         id: row.id,
         ownerUserId: row.owner_user_id,
@@ -65,6 +79,11 @@ function mapRowToTransaction(row: TransactionRow): FinancialTransaction {
         merchant: row.merchant,
         categoryId: row.category_id,
         institutionId: row.institution_id,
+        bankSourceAccountId: row.bank_source_account_id ?? null,
+        bankDestinationAccountId: row.bank_destination_account_id ?? null,
+        bankCardId: row.bank_card_id ?? null,
+        bankInstitutionId: row.bank_institution_id ?? null,
+        paidWithCredit: isCredit,
         tags: row.tags,
         description: row.description,
         notes: row.notes,
