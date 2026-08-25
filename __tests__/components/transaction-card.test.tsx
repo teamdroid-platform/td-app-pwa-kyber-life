@@ -70,10 +70,10 @@ describe("TransactionCard", () => {
         expect(screen.getByText("TC")).toBeInTheDocument();
     });
 
-    it("renders the TC badge when paidWithCredit is unset (undefined) and details contain credit card keywords", () => {
+    it("renders the TC badge when transaction details contain credit card keywords (e.g. Consumo en KYWI)", () => {
         render(<TransactionCard transaction={{
             ...TRANSACTION,
-            paidWithCredit: undefined,
+            paidWithCredit: false,
             description: "Consumo en KYWI",
             notes: "Pago realizado en KYWI con tarjeta de crédito, correspondiente al gasto por productos adquiridos.",
         }} />);
@@ -82,12 +82,13 @@ describe("TransactionCard", () => {
         expect(screen.getByText("TC")).toBeInTheDocument();
     });
 
-    it("does NOT render the TC badge when paidWithCredit is explicitly false even if text has keywords", () => {
+    it("does not render the TC badge for 'Pago a tarjeta de crédito' (bill payment)", () => {
         render(<TransactionCard transaction={{
             ...TRANSACTION,
             paidWithCredit: false,
-            description: "Consumo en KYWI",
-            notes: "Pago realizado en KYWI con tarjeta de crédito, correspondiente al gasto por productos adquiridos.",
+            description: "Pago a tarjeta de crédito",
+            merchant: "Banco del Pacifico",
+            notes: "Pago a tarjeta de crédito",
         }} />);
 
         expect(screen.queryByText("TC")).not.toBeInTheDocument();

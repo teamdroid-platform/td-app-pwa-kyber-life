@@ -7,6 +7,8 @@ describe("financial-credit-detection", () => {
             expect(hasCreditCardKeywords("Consumo con tarjeta de credito")).toBe(true);
             expect(hasCreditCardKeywords("Uso de tarjeta credito")).toBe(true);
             expect(hasCreditCardKeywords("Compra con tarjeta de crédito")).toBe(true);
+            expect(hasCreditCardKeywords("Pago realizado en KYWI con tarjeta de crédito, correspondiente al gasto por productos adquiridos.")).toBe(true);
+            expect(hasCreditCardKeywords("💳 RESUMEN DE GASTOS Y USO DE TARJETAS Banco Pichincha: Tarjeta de Crédito (terminada en 620 ): Consumo por $186.50 USD en KYWI a las 14:58.")).toBe(true);
         });
 
         it("detects 'credit card' purchase", () => {
@@ -41,24 +43,10 @@ describe("financial-credit-detection", () => {
             })).toBe(true);
         });
 
-        it("returns false when paidWithCredit is explicitly false, even if text contains credit keywords", () => {
-            expect(isTransactionPaidWithCredit({
-                type: "EXPENSE",
-                paidWithCredit: false,
-                description: "Consumo con tarjeta de crédito",
-                notes: "Gasto diferido con tarjeta de crédito",
-            })).toBe(false);
-
-            expect(isTransactionPaidWithCredit({
-                type: "EXPENSE",
-                paidWithCredit: false,
-                description: "Pago a tarjeta de crédito",
-            })).toBe(false);
-        });
-
-        it("detects credit card payment from scan email body (like Consumo en KYWI) when paidWithCredit is unset", () => {
+        it("detects credit card payment from scan email body (like Consumo en KYWI) even when paidWithCredit is false in DB default", () => {
             const kywiTx = {
                 type: "EXPENSE",
+                paidWithCredit: false,
                 description: "Consumo en KYWI",
                 summary: "Consumo en KYWI con tarjeta de crédito, correspondiente al gasto por productos adquiridos.",
                 originStats: {
@@ -83,9 +71,10 @@ describe("financial-credit-detection", () => {
             })).toBe(true);
         });
 
-        it("detects credit card payment from notes or summary when paidWithCredit is unset and originStats is null", () => {
+        it("detects credit card payment from notes or summary when originStats is null", () => {
             expect(isTransactionPaidWithCredit({
                 type: "EXPENSE",
+                paidWithCredit: false,
                 notes: "Gasto diferido con tarjeta de credito",
             })).toBe(true);
 
@@ -95,11 +84,16 @@ describe("financial-credit-detection", () => {
             })).toBe(true);
         });
 
-        it("does NOT detect 'Pago a tarjeta de crédito' when paidWithCredit is unset", () => {
+        it("does NOT detect 'Pago a tarjeta de crédito' (bill payment to card)", () => {
             expect(isTransactionPaidWithCredit({
                 type: "EXPENSE",
+                paidWithCredit: false,
                 description: "Pago a tarjeta de crédito",
                 merchant: "Banco del Pacifico",
+                notes: "Pago a tarjeta de crédito",
+                originStats: {
+                    subject: "Pago a tarjeta de crédito",
+                },
             })).toBe(false);
         });
 
@@ -118,6 +112,7 @@ describe("financial-credit-detection", () => {
         it("returns false for ordinary expense without credit card indicators", () => {
             expect(isTransactionPaidWithCredit({
                 type: "EXPENSE",
+                paidWithCredit: false,
                 description: "Compra de combustible",
                 notes: "CHAULLABAMBA Combustible",
                 originStats: {
