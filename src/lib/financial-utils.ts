@@ -91,12 +91,12 @@ function isPaymentToCardDescription(text: string | null | undefined): boolean {
 }
 
 /**
- * Detects if a transaction or scanner transaction represents a credit card payment/expense.
+ * Detects if a transaction represents a credit card payment/expense.
  *
- * Evaluates:
- * 1. Explicit `paidWithCredit === true`
- * 2. Origin stats flags (`is_credit_card`, `isCreditCard`, `paidWithCredit`)
- * 3. Text content in `summary`, `description`, `notes`, or `originStats` (emailBody, subject, snippet)
+ * Decision priority:
+ * 1. Explicit `paidWithCredit` boolean (set by user in wizard) → trusted directly.
+ * 2. When `paidWithCredit` is `null` or `undefined` (scanner inbox / legacy rows):
+ *    uses heuristics on originStats flags, emailBody, summary, notes, description.
  */
 export function isTransactionPaidWithCredit(tx: {
     type?: string | null;
@@ -107,7 +107,11 @@ export function isTransactionPaidWithCredit(tx: {
     originStats?: Record<string, unknown> | null;
 } | null | undefined): boolean {
     if (!tx) return false;
-    if (tx.paidWithCredit === true) return true;
+
+    // ── Explicit boolean: user already decided via wizard / form ──
+    if (typeof tx.paidWithCredit === "boolean") return tx.paidWithCredit;
+
+    // ── From here, paidWithCredit is null | undefined → run heuristics ──
 
     // If the description explicitly says it's a payment TO a credit card (debt repayment),
     // this is NOT an expense paid WITH credit, regardless of what emailBody/notes say.

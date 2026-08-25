@@ -145,7 +145,7 @@ export function TransactionCard({
     const style = TYPE_STYLE[transaction.type] ?? DEFAULT_TYPE_STYLE;
     const typeLabel = style.label;
     const displayTitle = getFallbackDescription(transaction, typeLabel);
-    const isPaidWithCredit = Boolean(transaction.paidWithCredit || isTransactionPaidWithCredit(transaction));
+    const isPaidWithCredit = isTransactionPaidWithCredit(transaction);
 
     const handleAction = async (
         actionFn: (id: string) => Promise<{ success: boolean; error?: string }>,

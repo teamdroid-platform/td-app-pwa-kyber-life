@@ -43,10 +43,19 @@ describe("financial-credit-detection", () => {
             })).toBe(true);
         });
 
-        it("detects credit card payment from scan email body (like Consumo en KYWI) even when paidWithCredit is false in DB default", () => {
-            const kywiTx = {
+        it("returns false when paidWithCredit is explicitly false (user decision via wizard)", () => {
+            expect(isTransactionPaidWithCredit({
                 type: "EXPENSE",
                 paidWithCredit: false,
+                description: "Consumo en KYWI",
+                notes: "Consumo en KYWI con tarjeta de crédito",
+            })).toBe(false);
+        });
+
+        it("detects credit card payment from scan email body when paidWithCredit is null (legacy/scanner row)", () => {
+            const kywiTx = {
+                type: "EXPENSE",
+                paidWithCredit: null,
                 description: "Consumo en KYWI",
                 summary: "Consumo en KYWI con tarjeta de crédito, correspondiente al gasto por productos adquiridos.",
                 originStats: {
@@ -74,7 +83,7 @@ describe("financial-credit-detection", () => {
         it("detects credit card payment from notes or summary when originStats is null", () => {
             expect(isTransactionPaidWithCredit({
                 type: "EXPENSE",
-                paidWithCredit: false,
+                paidWithCredit: null,
                 notes: "Gasto diferido con tarjeta de credito",
             })).toBe(true);
 
@@ -88,7 +97,7 @@ describe("financial-credit-detection", () => {
             // Simple case: all fields say "Pago a tarjeta"
             expect(isTransactionPaidWithCredit({
                 type: "EXPENSE",
-                paidWithCredit: false,
+                paidWithCredit: null,
                 description: "Pago a tarjeta de crédito",
                 merchant: "Banco del Pacifico",
                 notes: "Pago a tarjeta de crédito",
@@ -102,7 +111,7 @@ describe("financial-credit-detection", () => {
             // The description guard must short-circuit before emailBody is ever checked.
             expect(isTransactionPaidWithCredit({
                 type: "EXPENSE",
-                paidWithCredit: false,
+                paidWithCredit: null,
                 description: "Pago a tarjeta de crédito",
                 merchant: "Banco del Pacífico",
                 summary: "Se realizó un pago de $236.40 a la tarjeta de crédito Visa del Banco del Pacífico.",

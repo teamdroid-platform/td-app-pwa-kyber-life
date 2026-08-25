@@ -73,7 +73,7 @@ describe("TransactionCard", () => {
     it("renders the TC badge when transaction details contain credit card keywords (e.g. Consumo en KYWI)", () => {
         render(<TransactionCard transaction={{
             ...TRANSACTION,
-            paidWithCredit: false,
+            paidWithCredit: null,
             description: "Consumo en KYWI",
             notes: "Pago realizado en KYWI con tarjeta de crédito, correspondiente al gasto por productos adquiridos.",
         }} />);
@@ -85,7 +85,7 @@ describe("TransactionCard", () => {
     it("does not render the TC badge for 'Pago a tarjeta de crédito' (bill payment)", () => {
         render(<TransactionCard transaction={{
             ...TRANSACTION,
-            paidWithCredit: false,
+            paidWithCredit: null,
             description: "Pago a tarjeta de crédito",
             merchant: "Banco del Pacifico",
             notes: "Pago a tarjeta de crédito",
