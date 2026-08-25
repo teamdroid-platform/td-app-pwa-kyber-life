@@ -112,4 +112,34 @@ describe("TransactionCard", () => {
         // The inline summary is gone; its content lives on the detail screen.
         expect(screen.queryByText("Resumen")).not.toBeInTheDocument();
     });
+
+    it("renders the TC badge when paidWithCredit is true", () => {
+        render(<TransactionCard transaction={{ ...TRANSACTION, paidWithCredit: true }} />);
+
+        expect(screen.getByTitle(/Pagado con tarjeta de crédito/i)).toBeInTheDocument();
+        expect(screen.getByText("TC")).toBeInTheDocument();
+    });
+
+    it("renders the TC badge when transaction details contain credit card keywords even if paidWithCredit is false", () => {
+        render(<TransactionCard transaction={{
+            ...TRANSACTION,
+            paidWithCredit: false,
+            description: "Consumo en KYWI",
+            notes: "Pago realizado en KYWI con tarjeta de crédito, correspondiente al gasto por productos adquiridos.",
+        }} />);
+
+        expect(screen.getByTitle(/Pagado con tarjeta de crédito/i)).toBeInTheDocument();
+        expect(screen.getByText("TC")).toBeInTheDocument();
+    });
+
+    it("does not render the TC badge for regular debit transactions", () => {
+        render(<TransactionCard transaction={{
+            ...TRANSACTION,
+            paidWithCredit: false,
+            description: "Compra de combustible",
+            notes: "Pago con débito directo",
+        }} />);
+
+        expect(screen.queryByText("TC")).not.toBeInTheDocument();
+    });
 });

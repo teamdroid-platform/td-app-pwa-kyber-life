@@ -450,15 +450,20 @@ describe("FinancialTransactionService", () => {
             const tx = { id: mockTransactionId, ownerUserId: mockUserId };
             transactionRepoMock.findPaginated.mockResolvedValue({
                 data: [tx],
-                total: 1,
-                page: 1,
-                pageSize: 20
+                pagination: {
+                    page: 1,
+                    pageSize: 20,
+                    totalItems: 1,
+                    totalPages: 1,
+                    hasNextPage: false,
+                    hasPreviousPage: false,
+                },
             });
             const filters = { query: "test" };
             
             const result = await service.searchPaginated(mockUserId, filters, { page: 1, pageSize: 20 });
             expect(result.data).toHaveLength(1);
-            expect(result.total).toBe(1);
+            expect(result.pagination.totalItems).toBe(1);
             expect(transactionRepoMock.findPaginated).toHaveBeenCalled();
         });
 

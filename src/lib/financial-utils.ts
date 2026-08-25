@@ -48,3 +48,58 @@ export function buildFallbackTitle(type?: string | null, merchant?: string | nul
     const typeLabel = TYPE_LABELS[type ?? ""] ?? type ?? "Movimiento";
     return merchant?.trim() ? `${typeLabel} – ${merchant.trim()}` : typeLabel;
 }
+
+/**
+ * Checks whether a text string mentions credit card payment keywords.
+ */
+export function hasCreditCardKeywords(text: string | null | undefined): boolean {
+    if (!text || typeof text !== "string") return false;
+    return /\b(?:tarjeta[s]?\s+(?:de\s+)?cr[eé]dito|credit\s*card)\b/i.test(text);
+}
+
+/**
+ * Detects if a transaction or scanner transaction represents a credit card payment/expense.
+ *
+ * Evaluates:
+ * 1. Explicit `paidWithCredit === true`
+ * 2. Origin stats flags (`is_credit_card`, `isCreditCard`, `paidWithCredit`)
+ * 3. Text content in `summary`, `description`, `notes`, or `originStats` (emailBody, subject, snippet)
+ */
+export function isTransactionPaidWithCredit(tx: {
+    type?: string | null;
+    paidWithCredit?: boolean | null;
+    notes?: string | null;
+    description?: string | null;
+    summary?: string | null;
+    originStats?: Record<string, unknown> | null;
+} | null | undefined): boolean {
+    if (!tx) return false;
+    if (tx.paidWithCredit === true) return true;
+
+    // Only expense-like transactions or unassigned types can be paid with credit
+    const normalizedType = tx.type?.toUpperCase();
+    if (normalizedType && normalizedType !== "EXPENSE" && normalizedType !== "PAYMENT" && normalizedType !== "OTHER") {
+        return false;
+    }
+
+    const stats = tx.originStats;
+    if (stats && typeof stats === "object") {
+        if (stats.is_credit_card === true || stats.isCreditCard === true || stats.paidWithCredit === true) {
+            return true;
+        }
+        const emailBody = typeof stats.emailBody === "string" ? stats.emailBody : "";
+        const subject = typeof stats.subject === "string" ? stats.subject : "";
+        const snippet = typeof stats.snippet === "string" ? stats.snippet : "";
+        const statsCombined = `${emailBody} ${subject} ${snippet}`;
+        if (hasCreditCardKeywords(statsCombined)) {
+            return true;
+        }
+    }
+
+    if (tx.summary && hasCreditCardKeywords(tx.summary)) return true;
+    if (tx.notes && hasCreditCardKeywords(tx.notes)) return true;
+    if (tx.description && hasCreditCardKeywords(tx.description)) return true;
+
+    return false;
+}
+

@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { isoToWallClockInput, wallClockInputToISO } from "@/lib/date-range";
+import { isTransactionPaidWithCredit } from "@/lib/financial-utils";
 import { mapInboxTransactionAction, dismissInboxTransactionAction } from "@/app/actions/financial-inbox";
 import type { FinancialScannerTransaction } from "@/domain/entities/financial";
 import type { InstitutionMatchInfo } from "@/lib/institution-match";
@@ -65,21 +66,31 @@ export function TransactionScanWizard({
     const router = useRouter();
     const [isDismissing, setIsDismissing] = useState(false);
 
-    const initialValues = useMemo<WizardValues>(() => ({
-        type: normalizeTransactionType(initialData.type, SCANNER_TRANSACTION_TYPES),
-        amount: initialData.amount !== null && initialData.amount !== undefined ? String(initialData.amount) : "",
-        description: initialData.description || "",
-        institutionName: resolvedInstitutionName || initialData.merchant || "",
-        bankInstitutionKind: null,
-        categoryName: initialData.category || "",
-        paidWithCredit: false,
-        bankSourceAccountId: null,
-        bankDestinationAccountId: null,
-        bankCardId: null,
-        date: isoToWallClockInput(initialData.date) ?? "",
-        notes: extractSummary(initialData),
-        tags: [],
-    }), [initialData, resolvedInstitutionName]);
+    const initialValues = useMemo<WizardValues>(() => {
+        const detectedCredit = isTransactionPaidWithCredit({
+            type: initialData.type,
+            summary: initialData.summary,
+            description: initialData.description,
+            originStats: initialData.originStats as Record<string, unknown> | null,
+            notes: (initialData.originStats as Record<string, string>)?.emailBody,
+        }) || scannedAccounts.some(a => a.role === "SOURCE" && a.kind === "CARD" && a.match?.typeAcronym === "TCR");
+
+        return {
+            type: normalizeTransactionType(initialData.type, SCANNER_TRANSACTION_TYPES),
+            amount: initialData.amount !== null && initialData.amount !== undefined ? String(initialData.amount) : "",
+            description: initialData.description || "",
+            institutionName: resolvedInstitutionName || initialData.merchant || "",
+            bankInstitutionKind: null,
+            categoryName: initialData.category || "",
+            paidWithCredit: detectedCredit,
+            bankSourceAccountId: null,
+            bankDestinationAccountId: null,
+            bankCardId: null,
+            date: isoToWallClockInput(initialData.date) ?? "",
+            notes: extractSummary(initialData),
+            tags: [],
+        };
+    }, [initialData, resolvedInstitutionName, scannedAccounts]);
 
     const handleSubmit = async (values: WizardValues): Promise<boolean> => {
         try {

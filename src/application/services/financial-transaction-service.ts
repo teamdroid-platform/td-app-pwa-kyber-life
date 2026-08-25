@@ -3,6 +3,7 @@ import { FinancialTransaction, FinancialTransactionType, FinancialTransactionSta
 import { IFinancialTransactionRepository, IFinancialTransactionAuditLogRepository } from "../../domain/repositories/financial";
 import { findDuplicates } from "../../domain/services/financial-deduplication";
 import { PaginationParams, PaginatedResult, TransactionSearchFilters } from "../../domain/pagination";
+import { isTransactionPaidWithCredit } from "../../lib/financial-utils";
 
 export interface CreateFinancialTransactionDTO {
     ownerUserId: UUID;
@@ -464,6 +465,7 @@ export class FinancialTransactionService {
             return transactions.map(tx => {
                 const category = tx.categoryId ? categoryMap.get(tx.categoryId) : undefined;
                 const institution = tx.institutionId ? institutionMap.get(tx.institutionId) : undefined;
+                const isPaidWithCredit = Boolean(tx.paidWithCredit || isTransactionPaidWithCredit(tx));
                 return {
                     ...tx,
                     categoryName: category?.name ?? tx.categoryName,
@@ -471,11 +473,15 @@ export class FinancialTransactionService {
                     // Resolve the institution name from its id so the UI can always
                     // prioritize it over the stored merchant.
                     institutionName: institution?.name ?? tx.institutionName,
+                    paidWithCredit: isPaidWithCredit,
                 };
             });
         } catch (e) {
             console.error("Failed to enrich transactions", e);
-            return transactions;
+            return transactions.map(tx => ({
+                ...tx,
+                paidWithCredit: Boolean(tx.paidWithCredit || isTransactionPaidWithCredit(tx)),
+            }));
         }
     }
 
