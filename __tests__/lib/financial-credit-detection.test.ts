@@ -2,15 +2,27 @@ import { hasCreditCardKeywords, isTransactionPaidWithCredit } from "@/lib/financ
 
 describe("financial-credit-detection", () => {
     describe("hasCreditCardKeywords", () => {
-        it("detects 'tarjeta de crédito' with and without accents", () => {
+        it("detects 'tarjeta de crédito' with and without accents when paid WITH card", () => {
             expect(hasCreditCardKeywords("Pago con tarjeta de crédito en Supermaxi")).toBe(true);
             expect(hasCreditCardKeywords("Consumo con tarjeta de credito")).toBe(true);
             expect(hasCreditCardKeywords("Uso de tarjeta credito")).toBe(true);
-            expect(hasCreditCardKeywords("Resumen de tarjetas de crédito")).toBe(true);
+            expect(hasCreditCardKeywords("Compra con tarjeta de crédito")).toBe(true);
+            expect(hasCreditCardKeywords("Pago realizado en KYWI con tarjeta de crédito, correspondiente al gasto por productos adquiridos.")).toBe(true);
+            expect(hasCreditCardKeywords("💳 RESUMEN DE GASTOS Y USO DE TARJETAS Banco Pichincha: Tarjeta de Crédito (terminada en 620 ): Consumo por $186.50 USD en KYWI a las 14:58.")).toBe(true);
         });
 
-        it("detects 'credit card'", () => {
+        it("detects 'credit card' purchase", () => {
             expect(hasCreditCardKeywords("Payment made via credit card at store")).toBe(true);
+            expect(hasCreditCardKeywords("Purchase on credit card")).toBe(true);
+        });
+
+        it("does NOT detect bill payments TO a credit card as a credit card expense", () => {
+            expect(hasCreditCardKeywords("Pago a tarjeta de crédito")).toBe(false);
+            expect(hasCreditCardKeywords("Pago de tarjeta de crédito")).toBe(false);
+            expect(hasCreditCardKeywords("Pago de tarjeta de crédito nacional")).toBe(false);
+            expect(hasCreditCardKeywords("Abono a tarjeta de crédito")).toBe(false);
+            expect(hasCreditCardKeywords("Transferencia para pago de tarjeta de crédito")).toBe(false);
+            expect(hasCreditCardKeywords("Pago a mi tarjeta de crédito")).toBe(false);
         });
 
         it("does not match regular debit or non-card transactions", () => {
@@ -31,17 +43,26 @@ describe("financial-credit-detection", () => {
             })).toBe(true);
         });
 
-        it("detects credit card payment from scan email body (like Consumo en KYWI)", () => {
-            const kywiTx = {
+        it("detects credit card payment from scan notes/emailBody even when paidWithCredit is false in legacy DB row", () => {
+            expect(isTransactionPaidWithCredit({
                 type: "EXPENSE",
                 paidWithCredit: false,
                 description: "Consumo en KYWI",
-                summary: "Pago realizado en KYWI con tarjeta de crédito, correspondiente al gasto por productos adquiridos.",
+                notes: "Consumo en KYWI con tarjeta de crédito",
+            })).toBe(true);
+        });
+
+        it("detects credit card payment from scan email body when paidWithCredit is null (legacy/scanner row)", () => {
+            const kywiTx = {
+                type: "EXPENSE",
+                paidWithCredit: null,
+                description: "Consumo en KYWI",
+                summary: "Consumo en KYWI con tarjeta de crédito, correspondiente al gasto por productos adquiridos.",
                 originStats: {
                     emailBody: "💳 RESUMEN DE GASTOS Y USO DE TARJETAS Banco Pichincha: Tarjeta de Crédito (terminada en 620 ): Consumo por $186.50 USD en KYWI a las 14:58.",
                     subject: "Resumen de gastos",
                 },
-                notes: "Pago realizado en KYWI con tarjeta de crédito, correspondiente al gasto por productos adquiridos.",
+                notes: "Consumo en KYWI con tarjeta de crédito, correspondiente al gasto por productos adquiridos.",
             };
 
             expect(isTransactionPaidWithCredit(kywiTx)).toBe(true);
@@ -59,10 +80,10 @@ describe("financial-credit-detection", () => {
             })).toBe(true);
         });
 
-        it("detects credit card payment from notes or summary even if originStats is null", () => {
+        it("detects credit card payment from notes or summary when originStats is null", () => {
             expect(isTransactionPaidWithCredit({
                 type: "EXPENSE",
-                paidWithCredit: false,
+                paidWithCredit: null,
                 notes: "Gasto diferido con tarjeta de credito",
             })).toBe(true);
 
@@ -70,6 +91,37 @@ describe("financial-credit-detection", () => {
                 type: "EXPENSE",
                 summary: "Compra en Amazon con Tarjeta de Crédito",
             })).toBe(true);
+        });
+
+        it("does NOT detect 'Pago a tarjeta de crédito' (bill payment to card)", () => {
+            // Simple case: all fields say "Pago a tarjeta"
+            expect(isTransactionPaidWithCredit({
+                type: "EXPENSE",
+                paidWithCredit: null,
+                description: "Pago a tarjeta de crédito",
+                merchant: "Banco del Pacifico",
+                notes: "Pago a tarjeta de crédito",
+                originStats: {
+                    subject: "Pago a tarjeta de crédito",
+                },
+            })).toBe(false);
+
+            // Real-world case: description is "Pago a tarjeta de crédito" BUT emailBody
+            // from the scanner mentions "Tarjeta de Crédito" generically (card identification).
+            // The description guard must short-circuit before emailBody is ever checked.
+            expect(isTransactionPaidWithCredit({
+                type: "EXPENSE",
+                paidWithCredit: null,
+                description: "Pago a tarjeta de crédito",
+                merchant: "Banco del Pacífico",
+                summary: "Se realizó un pago de $236.40 a la tarjeta de crédito Visa del Banco del Pacífico.",
+                notes: "Pago realizado desde cuenta de ahorros",
+                originStats: {
+                    emailBody: "Estimado cliente, le informamos que se ha registrado el pago a su Tarjeta de Crédito Visa terminada en 4520 por USD 236.40.",
+                    subject: "Confirmación de pago - Tarjeta de Crédito",
+                    snippet: "Pago recibido en su Tarjeta de Crédito",
+                },
+            })).toBe(false);
         });
 
         it("returns false for income, transfer, or withdrawal even if words match in notes", () => {

@@ -465,7 +465,7 @@ export class FinancialTransactionService {
             return transactions.map(tx => {
                 const category = tx.categoryId ? categoryMap.get(tx.categoryId) : undefined;
                 const institution = tx.institutionId ? institutionMap.get(tx.institutionId) : undefined;
-                const isPaidWithCredit = Boolean(tx.paidWithCredit || isTransactionPaidWithCredit(tx));
+                const isPaidWithCredit = isTransactionPaidWithCredit(tx);
                 return {
                     ...tx,
                     categoryName: category?.name ?? tx.categoryName,
@@ -480,7 +480,7 @@ export class FinancialTransactionService {
             console.error("Failed to enrich transactions", e);
             return transactions.map(tx => ({
                 ...tx,
-                paidWithCredit: Boolean(tx.paidWithCredit || isTransactionPaidWithCredit(tx)),
+                paidWithCredit: isTransactionPaidWithCredit(tx),
             }));
         }
     }

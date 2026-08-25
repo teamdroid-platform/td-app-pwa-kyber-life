@@ -50,20 +50,53 @@ export function buildFallbackTitle(type?: string | null, merchant?: string | nul
 }
 
 /**
- * Checks whether a text string mentions credit card payment keywords.
+ * Checks whether a text string mentions credit card payment keywords (paying WITH credit card),
+ * while distinguishing from bill payments TO a credit card (paying off card debt from savings/checking).
  */
 export function hasCreditCardKeywords(text: string | null | undefined): boolean {
     if (!text || typeof text !== "string") return false;
-    return /\b(?:tarjeta[s]?\s+(?:de\s+)?cr[eé]dito|credit\s*card)\b/i.test(text);
+
+    // Bill payments TO/OF a credit card (e.g. paying card debt from savings) are NOT expenses paid with credit card.
+    const isPaymentToCard = /\b(?:pago|abono|cancelaci[oó]n|transferencia)\s+(?:a|de|a\s+la|de\s+la|a\s+mi|de\s+mi|a\s+su|de\s+su)?\s*tarjeta[s]?\s+(?:de\s+)?cr[eé]dito\b/i.test(text);
+
+    // Explicit indicators of purchase or consumption WITH credit card (e.g. "pago con tarjeta de crédito")
+    const isPaidWithCard =
+        /\b(?:con|mediante|por|v[ií]a)\s+tarjeta[s]?\s+(?:de\s+)?cr[eé]dito\b/i.test(text) ||
+        /\b(?:consumo|compra|cargo|gasto|autorizaci[oó]n|uso)\s+(?:con|de|en|por)?\s*tarjeta[s]?\s+(?:de\s+)?cr[eé]dito\b/i.test(text) ||
+        /\bcredit\s*card\s*(?:purchase|expense|charge|transaction)\b/i.test(text) ||
+        /\b(?:paid|payment)\s+with\s+credit\s*card\b/i.test(text);
+
+    if (isPaymentToCard && !isPaidWithCard) {
+        return false;
+    }
+
+    return (
+        isPaidWithCard ||
+        (/\b(?:tarjeta[s]?\s+(?:de\s+)?cr[eé]dito|credit\s*card)\b/i.test(text) && !isPaymentToCard)
+    );
 }
 
 /**
- * Detects if a transaction or scanner transaction represents a credit card payment/expense.
+ * Returns `true` when the text describes a bill payment TO/FOR a credit card
+ * (paying off card debt), e.g. "Pago a tarjeta de crédito",
+ * "Pago realizado a la tarjeta de crédito", "Abono a tarjeta".
  *
- * Evaluates:
- * 1. Explicit `paidWithCredit === true`
- * 2. Origin stats flags (`is_credit_card`, `isCreditCard`, `paidWithCredit`)
- * 3. Text content in `summary`, `description`, `notes`, or `originStats` (emailBody, subject, snippet)
+ * This is intentionally broader than the regex in `hasCreditCardKeywords`:
+ * it catches rephrased AI summaries where extra words appear between
+ * the verb and "tarjeta de crédito".
+ */
+function isPaymentToCardDescription(text: string | null | undefined): boolean {
+    if (!text || typeof text !== "string") return false;
+    return /\b(?:pago|abono|cancelaci[oó]n|transferencia)[\s\w]{0,30}(?:a|de|hacia|para|por)\s+(?:la\s+)?tarjeta[s]?\s+(?:de\s+)?cr[eé]dito\b/i.test(text);
+}
+
+/**
+ * Detects if a transaction represents a credit card payment/expense.
+ *
+ * Decision priority:
+ * 1. Explicit `paidWithCredit` boolean (set by user in wizard) → trusted directly.
+ * 2. When `paidWithCredit` is `null` or `undefined` (scanner inbox / legacy rows):
+ *    uses heuristics on originStats flags, emailBody, summary, notes, description.
  */
 export function isTransactionPaidWithCredit(tx: {
     type?: string | null;
@@ -74,7 +107,12 @@ export function isTransactionPaidWithCredit(tx: {
     originStats?: Record<string, unknown> | null;
 } | null | undefined): boolean {
     if (!tx) return false;
+    // Explicit true is always respected immediately
     if (tx.paidWithCredit === true) return true;
+
+    // If the description explicitly says it's a payment TO a credit card (debt repayment),
+    // this is NOT an expense paid WITH credit, regardless of what emailBody/notes say.
+    if (isPaymentToCardDescription(tx.description)) return false;
 
     // Only expense-like transactions or unassigned types can be paid with credit
     const normalizedType = tx.type?.toUpperCase();
@@ -102,4 +140,3 @@ export function isTransactionPaidWithCredit(tx: {
 
     return false;
 }
-

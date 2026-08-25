@@ -32,7 +32,7 @@ export class SupabaseFinancialTransactionRepository implements IFinancialTransac
             possible_duplicate: entity.possibleDuplicate,
             execution_id: entity.executionId,
             origin_stats: entity.originStats,
-            paid_with_credit: entity.paidWithCredit ?? false,
+            paid_with_credit: entity.paidWithCredit ?? null,
             created_at: entity.createdAt,
             updated_at: entity.updatedAt
         };
@@ -86,7 +86,7 @@ export class SupabaseFinancialTransactionRepository implements IFinancialTransac
             description: entity.description,
             notes: entity.notes,
             possible_duplicate: entity.possibleDuplicate,
-            paid_with_credit: entity.paidWithCredit ?? false,
+            paid_with_credit: entity.paidWithCredit ?? null,
             updated_at: new Date().toISOString()
         };
 
@@ -405,7 +405,7 @@ export class SupabaseFinancialTransactionRepository implements IFinancialTransac
             possibleDuplicate: row.possible_duplicate,
             executionId: row.execution_id,
             originStats: row.origin_stats,
-            paidWithCredit: row.paid_with_credit ?? false,
+            paidWithCredit: row.paid_with_credit ?? null,
             createdAt: row.created_at,
             updatedAt: row.updated_at,
             isDeleted: false,
