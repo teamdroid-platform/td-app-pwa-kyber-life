@@ -59,10 +59,10 @@ const SCAN_ITEM_WITH_ACCOUNTS: FinancialScannerTransaction = {
     type: "TRANSFER",
     category: "Transferencias",
     description: "Transferencia directa enviada",
-    summary: "Transferencia de $25.00 a Juan Pérez",
+    summary: "Transferencia de $25.00 a Juan Pérez con Visa",
     accounts: [
-        { type: "origen", account: "•••• 4321" },
-        { type: "destino", account: "•••• 9876" },
+        { type: "origen", account: "4234567890126287" },
+        { type: "destino", account: "5134567890123159" },
     ],
     status: "DETECTED",
     createdAt: now,
@@ -116,8 +116,8 @@ describe("FinancialInbox", () => {
         expect(screen.getByText("Alimentación")).toBeInTheDocument();
 
         // When accounts are absent, badges are omitted
-        expect(screen.queryByText(/Origen:/i)).not.toBeInTheDocument();
-        expect(screen.queryByText(/Destino:/i)).not.toBeInTheDocument();
+        expect(screen.queryByText(/ORIGEN/i)).not.toBeInTheDocument();
+        expect(screen.queryByText(/DESTINO/i)).not.toBeInTheDocument();
 
         // Tap the card to open detail form
         const cardLink = titleEl.closest("[role='link']")!;
@@ -126,7 +126,7 @@ describe("FinancialInbox", () => {
         expect(mockPush).toHaveBeenCalledWith("/financial/scans/scan-item-1");
     });
 
-    it("renders origin and destination accounts when present", async () => {
+    it("renders origin and destination accounts and brand badges when present", async () => {
         (getUnprocessedInboxTransactionsAction as jest.Mock).mockResolvedValue({
             success: true,
             data: [SCAN_ITEM_WITH_ACCOUNTS],
@@ -135,10 +135,11 @@ describe("FinancialInbox", () => {
         render(<FinancialInbox />);
 
         expect(await screen.findByText("Transferencia directa enviada")).toBeInTheDocument();
-        expect(screen.getByText("Origen:")).toBeInTheDocument();
-        expect(screen.getByText("•••• 4321")).toBeInTheDocument();
-        expect(screen.getByText("Destino:")).toBeInTheDocument();
-        expect(screen.getByText("•••• 9876")).toBeInTheDocument();
+        expect(screen.getByText("ORIGEN")).toBeInTheDocument();
+        expect(screen.getByText("**** **** **** 6287")).toBeInTheDocument();
+        expect(screen.getByText("DESTINO")).toBeInTheDocument();
+        expect(screen.getByText("**** **** **** 3159")).toBeInTheDocument();
+        expect(screen.getAllByText("VISA").length).toBeGreaterThan(0);
     });
 
     it("opens the detail form via Enter key", async () => {
@@ -156,7 +157,7 @@ describe("FinancialInbox", () => {
         expect(mockPush).toHaveBeenCalledWith("/financial/scans/scan-item-1");
     });
 
-    it("confirms a scan transaction directly via quick action button without navigating", async () => {
+    it("approves/confirms a scan transaction directly via quick action button without navigating", async () => {
         (getUnprocessedInboxTransactionsAction as jest.Mock).mockResolvedValue({
             success: true,
             data: [SCAN_ITEM],
@@ -165,14 +166,14 @@ describe("FinancialInbox", () => {
 
         render(<FinancialInbox />);
 
-        const confirmButton = await screen.findByTitle("Confirmar");
-        fireEvent.click(confirmButton);
+        const approveButton = await screen.findByTitle("Aprobar");
+        fireEvent.click(approveButton);
 
         await waitFor(() => expect(mapInboxTransactionAction).toHaveBeenCalledTimes(1));
         expect(mockPush).not.toHaveBeenCalled();
     });
 
-    it("discards a scan transaction directly via quick action button without navigating", async () => {
+    it("rejects/discards a scan transaction directly via quick action button without navigating", async () => {
         (getUnprocessedInboxTransactionsAction as jest.Mock).mockResolvedValue({
             success: true,
             data: [SCAN_ITEM],
@@ -181,8 +182,8 @@ describe("FinancialInbox", () => {
 
         render(<FinancialInbox />);
 
-        const discardButton = await screen.findByTitle("Descartar");
-        fireEvent.click(discardButton);
+        const rejectButton = await screen.findByTitle("Rechazar");
+        fireEvent.click(rejectButton);
 
         await waitFor(() => expect(dismissInboxTransactionAction).toHaveBeenCalledWith("scan-item-1"));
         expect(mockPush).not.toHaveBeenCalled();

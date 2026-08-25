@@ -30,6 +30,7 @@ import {
     CreditCard,
     ArrowUpRight,
     ArrowDownLeft,
+    Calendar,
 } from "lucide-react";
 import {
     getUnprocessedInboxTransactionsAction,
@@ -101,7 +102,7 @@ function getCategoryVisualConfig(category?: string | null, txType?: string | nul
     ) {
         return {
             icon: Utensils,
-            containerClass: "border-[#FFB020]/40 bg-[#FFB020]/10 text-[#FFB020] shadow-[0_0_14px_rgba(255,176,32,0.25)]",
+            containerClass: "border-[#FFB020]/50 bg-[#FFB020]/10 text-[#FFB020] shadow-[0_0_16px_rgba(255,176,32,0.25)]",
         };
     }
     if (
@@ -116,7 +117,30 @@ function getCategoryVisualConfig(category?: string | null, txType?: string | nul
     ) {
         return {
             icon: Car,
-            containerClass: "border-[#00B4D8]/40 bg-[#00B4D8]/10 text-[#00B4D8] shadow-[0_0_14px_rgba(0,180,216,0.25)]",
+            containerClass: "border-cyan-500/50 bg-cyan-500/10 text-cyan-400 shadow-[0_0_16px_rgba(6,182,212,0.25)]",
+        };
+    }
+    if (
+        cat.includes("ropa") ||
+        cat.includes("calzado") ||
+        cat.includes("compra") ||
+        cat.includes("shop") ||
+        cat.includes("tienda") ||
+        cat.includes("mall") ||
+        cat.includes("amazon")
+    ) {
+        return {
+            icon: ShoppingCart,
+            containerClass: "border-emerald-500/50 bg-emerald-500/10 text-emerald-400 shadow-[0_0_16px_rgba(16,185,129,0.25)]",
+        };
+    }
+    if (
+        cat.includes("transfer") ||
+        type === "TRANSFER"
+    ) {
+        return {
+            icon: ArrowRightLeft,
+            containerClass: "border-purple-500/50 bg-purple-500/10 text-purple-400 shadow-[0_0_16px_rgba(168,85,247,0.25)]",
         };
     }
     if (
@@ -128,7 +152,7 @@ function getCategoryVisualConfig(category?: string | null, txType?: string | nul
     ) {
         return {
             icon: HeartPulse,
-            containerClass: "border-rose-500/40 bg-rose-500/10 text-rose-400 shadow-[0_0_14px_rgba(244,63,94,0.22)]",
+            containerClass: "border-rose-500/50 bg-rose-500/10 text-rose-400 shadow-[0_0_16px_rgba(244,63,94,0.25)]",
         };
     }
     if (
@@ -141,7 +165,7 @@ function getCategoryVisualConfig(category?: string | null, txType?: string | nul
     ) {
         return {
             icon: Lightbulb,
-            containerClass: "border-yellow-500/40 bg-yellow-500/10 text-yellow-400 shadow-[0_0_14px_rgba(234,179,8,0.22)]",
+            containerClass: "border-yellow-500/50 bg-yellow-500/10 text-yellow-400 shadow-[0_0_16px_rgba(234,179,8,0.25)]",
         };
     }
     if (
@@ -155,20 +179,7 @@ function getCategoryVisualConfig(category?: string | null, txType?: string | nul
     ) {
         return {
             icon: Ticket,
-            containerClass: "border-purple-500/40 bg-purple-500/10 text-purple-400 shadow-[0_0_14px_rgba(168,85,247,0.22)]",
-        };
-    }
-    if (
-        cat.includes("compra") ||
-        cat.includes("shop") ||
-        cat.includes("ropa") ||
-        cat.includes("tienda") ||
-        cat.includes("mall") ||
-        cat.includes("amazon")
-    ) {
-        return {
-            icon: ShoppingCart,
-            containerClass: "border-emerald-500/40 bg-emerald-500/10 text-emerald-400 shadow-[0_0_14px_rgba(16,185,129,0.22)]",
+            containerClass: "border-purple-500/50 bg-purple-500/10 text-purple-400 shadow-[0_0_16px_rgba(168,85,247,0.25)]",
         };
     }
     if (
@@ -180,7 +191,7 @@ function getCategoryVisualConfig(category?: string | null, txType?: string | nul
     ) {
         return {
             icon: GraduationCap,
-            containerClass: "border-blue-500/40 bg-blue-500/10 text-blue-400 shadow-[0_0_14px_rgba(59,130,246,0.22)]",
+            containerClass: "border-blue-500/50 bg-blue-500/10 text-blue-400 shadow-[0_0_16px_rgba(59,130,246,0.25)]",
         };
     }
     if (
@@ -192,7 +203,7 @@ function getCategoryVisualConfig(category?: string | null, txType?: string | nul
     ) {
         return {
             icon: Home,
-            containerClass: "border-teal-500/40 bg-teal-500/10 text-teal-400 shadow-[0_0_14px_rgba(20,184,166,0.22)]",
+            containerClass: "border-teal-500/50 bg-teal-500/10 text-teal-400 shadow-[0_0_16px_rgba(20,184,166,0.25)]",
         };
     }
     if (
@@ -203,32 +214,26 @@ function getCategoryVisualConfig(category?: string | null, txType?: string | nul
     ) {
         return {
             icon: Dog,
-            containerClass: "border-orange-500/40 bg-orange-500/10 text-orange-400 shadow-[0_0_14px_rgba(249,115,22,0.22)]",
+            containerClass: "border-orange-500/50 bg-orange-500/10 text-orange-400 shadow-[0_0_16px_rgba(249,115,22,0.25)]",
         };
     }
 
     if (type === "INCOME") {
         return {
             icon: TrendingUp,
-            containerClass: "border-emerald-500/40 bg-emerald-500/10 text-emerald-400 shadow-[0_0_14px_rgba(16,185,129,0.25)]",
-        };
-    }
-    if (type === "TRANSFER") {
-        return {
-            icon: ArrowRightLeft,
-            containerClass: "border-indigo-500/40 bg-indigo-500/10 text-indigo-400 shadow-[0_0_14px_rgba(99,102,241,0.22)]",
+            containerClass: "border-emerald-500/50 bg-emerald-500/10 text-emerald-400 shadow-[0_0_16px_rgba(16,185,129,0.25)]",
         };
     }
     if (type === "WITHDRAWAL") {
         return {
             icon: Wallet,
-            containerClass: "border-sky-500/40 bg-sky-500/10 text-sky-400 shadow-[0_0_14px_rgba(14,165,233,0.22)]",
+            containerClass: "border-sky-500/50 bg-sky-500/10 text-sky-400 shadow-[0_0_16px_rgba(14,165,233,0.25)]",
         };
     }
 
     return {
         icon: Receipt,
-        containerClass: "border-[#FFB020]/30 bg-[#FFB020]/10 text-[#FFB020] shadow-[0_0_12px_rgba(255,176,32,0.18)]",
+        containerClass: "border-[#FFB020]/40 bg-[#FFB020]/10 text-[#FFB020] shadow-[0_0_16px_rgba(255,176,32,0.2)]",
     };
 }
 
@@ -291,6 +296,76 @@ function extractScannedAccounts(tx: FinancialScannerTransaction): ScannedAccount
     return { source, destination };
 }
 
+function detectCardBrand(accountStr?: string | null, rawContext?: string | null): "VISA" | "MASTERCARD" | "AMEX" | "DINERS" | null {
+    const combined = `${accountStr || ""} ${rawContext || ""}`.toUpperCase();
+    if (combined.includes("VISA")) return "VISA";
+    if (combined.includes("MASTERCARD") || combined.includes("MASTER") || combined.includes("MC")) return "MASTERCARD";
+    if (combined.includes("AMEX") || combined.includes("AMERICAN")) return "AMEX";
+    if (combined.includes("DINERS")) return "DINERS";
+
+    // Clean digits
+    const digits = (accountStr || "").replace(/\D/g, "");
+    if (digits.length >= 4) {
+        if (digits.startsWith("4")) return "VISA";
+        if (/^(5[1-5]|2[2-7])/.test(digits)) return "MASTERCARD";
+        if (/^(34|37)/.test(digits)) return "AMEX";
+        if (/^(30|36|38)/.test(digits)) return "DINERS";
+    }
+    return null;
+}
+
+function formatMaskedNumber(acc: string): string {
+    const trimmed = acc.trim();
+    const digitsMatch = trimmed.match(/\d{4}$/);
+    if (digitsMatch) {
+        return `**** **** **** ${digitsMatch[0]}`;
+    }
+    if (trimmed.includes("*") || trimmed.includes("•")) {
+        const lastDigits = trimmed.replace(/\D/g, "").slice(-4);
+        if (lastDigits) {
+            return `**** **** **** ${lastDigits}`;
+        }
+    }
+    return trimmed;
+}
+
+function BrandBadge({ brand }: { brand: "VISA" | "MASTERCARD" | "AMEX" | "DINERS" | null }) {
+    if (!brand) return null;
+
+    if (brand === "VISA") {
+        return (
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded border border-blue-400/30 bg-blue-500/10 text-[9px] font-black italic tracking-widest text-blue-300 select-none">
+                VISA
+            </span>
+        );
+    }
+
+    if (brand === "MASTERCARD") {
+        return (
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-orange-400/30 bg-orange-500/10 text-[9px] font-bold text-orange-200 select-none">
+                <span className="inline-flex -space-x-1">
+                    <span className="h-2 w-2 rounded-full bg-red-500" />
+                    <span className="h-2 w-2 rounded-full bg-amber-400" />
+                </span>
+            </span>
+        );
+    }
+
+    if (brand === "AMEX") {
+        return (
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded border border-sky-400/30 bg-sky-500/10 text-[9px] font-bold tracking-wider text-sky-300 select-none">
+                AMEX
+            </span>
+        );
+    }
+
+    return (
+        <span className="inline-flex items-center px-1.5 py-0.5 rounded border border-zinc-400/30 bg-zinc-500/10 text-[9px] font-bold tracking-wider text-zinc-300 select-none">
+            {brand}
+        </span>
+    );
+}
+
 /**
  * Extract the best available summary from a scanner transaction.
  * Priority: summary → originStats.emailBody → originStats.snippet
@@ -324,14 +399,13 @@ function formatTime(value?: string | null) {
 
 function formatDateLabel(dateStr: string): string {
     const date = new Date(dateStr);
-    const today = new Date();
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
+    if (isNaN(date.getTime())) return "Fecha no detectada";
 
-    if (date.toDateString() === today.toDateString()) return "Hoy";
-    if (date.toDateString() === yesterday.toDateString()) return "Ayer";
-
-    return date.toLocaleDateString("es-ES", { month: "long", day: "numeric", year: "numeric" });
+    return date.toLocaleDateString("es-ES", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+    });
 }
 
 function groupTransactionsByDate(transactions: FinancialScannerTransaction[]) {
@@ -670,16 +744,17 @@ export function FinancialInbox() {
     const groupedTransactions = groupTransactionsByDate(filteredTransactions);
 
     return (
-        <div className="space-y-5">
-            <Card className="rounded-[1.75rem] border-border/60 bg-bg-secondary py-0 shadow-sm shadow-black/5">
-                <CardContent className="flex flex-col sm:flex-row sm:items-center gap-0 sm:gap-4 px-4 py-4 sm:px-5">
+        <div className="space-y-6">
+            {/* Header Summary Info */}
+            <Card className="rounded-2xl sm:rounded-[1.75rem] border-border/50 bg-bg-secondary/80 py-0 shadow-sm">
+                <CardContent className="flex flex-col sm:flex-row sm:items-center gap-0 sm:gap-4 px-4 py-3.5 sm:px-5">
                     <div
                         className="flex items-center justify-between cursor-pointer sm:cursor-default w-full sm:w-auto flex-1"
                         onClick={() => setIsHeaderExpanded(!isHeaderExpanded)}
                     >
                         <div className="space-y-1 flex-1">
                             {isPollingFallback && showPollingNotice && (
-                                <div className="flex flex-wrap items-center gap-2 mb-2">
+                                <div className="flex flex-wrap items-center gap-2 mb-1.5">
                                     <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-500/20 bg-sky-500/5 px-2 py-0.5 text-[10px] font-medium text-sky-700 dark:text-sky-300">
                                         <RefreshCw className="h-3 w-3 animate-spin" />
                                         ACTUALIZANDO
@@ -693,32 +768,32 @@ export function FinancialInbox() {
                         </div>
                     </div>
 
-                    <div className={cn("flex flex-col gap-3 w-full sm:w-auto mt-4 sm:mt-0", !isHeaderExpanded && "hidden sm:flex")}>
+                    <div className={cn("flex flex-col gap-3 w-full sm:w-auto mt-3 sm:mt-0", !isHeaderExpanded && "hidden sm:flex")}>
                         <div className="grid grid-cols-3 gap-2 w-full sm:w-auto">
-                            <div className="flex flex-col justify-between rounded-2xl border border-border/50 bg-bg-primary px-3 py-3 text-center sm:text-left">
-                                <div className="text-[10px] sm:text-[11px] uppercase tracking-wider text-muted-foreground break-words leading-tight">Pendientes</div>
-                                <div className="mt-1 text-lg sm:text-xl font-semibold tracking-tight">{filteredTransactions.length}</div>
+                            <div className="flex flex-col justify-between rounded-xl sm:rounded-2xl border border-border/40 bg-bg-primary/70 px-3 py-2 text-center sm:text-left">
+                                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Pendientes</div>
+                                <div className="mt-0.5 text-base sm:text-lg font-bold text-foreground">{filteredTransactions.length}</div>
                             </div>
-                            <div className="flex flex-col justify-between rounded-2xl border border-border/50 bg-bg-primary px-3 py-3 text-center sm:text-left">
-                                <div className="text-[10px] sm:text-[11px] uppercase tracking-wider text-muted-foreground break-words leading-tight">Con comercio</div>
-                                <div className="mt-1 text-lg sm:text-xl font-semibold tracking-tight">{filteredTransactions.filter((tx) => tx.merchant).length}</div>
+                            <div className="flex flex-col justify-between rounded-xl sm:rounded-2xl border border-border/40 bg-bg-primary/70 px-3 py-2 text-center sm:text-left">
+                                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Con comercio</div>
+                                <div className="mt-0.5 text-base sm:text-lg font-bold text-foreground">{filteredTransactions.filter((tx) => tx.merchant).length}</div>
                             </div>
-                            <div className="flex flex-col justify-between rounded-2xl border border-border/50 bg-bg-primary px-3 py-3 text-center sm:text-left">
-                                <div className="text-[10px] sm:text-[11px] uppercase tracking-wider text-muted-foreground break-words leading-tight">Con monto</div>
-                                <div className="mt-1 text-lg sm:text-xl font-semibold tracking-tight">{filteredTransactions.filter((tx) => tx.amount != null).length}</div>
+                            <div className="flex flex-col justify-between rounded-xl sm:rounded-2xl border border-border/40 bg-bg-primary/70 px-3 py-2 text-center sm:text-left">
+                                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Con monto</div>
+                                <div className="mt-0.5 text-base sm:text-lg font-bold text-foreground">{filteredTransactions.filter((tx) => tx.amount != null).length}</div>
                             </div>
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2 w-full sm:hidden mt-4">
+                    <div className="grid grid-cols-2 gap-2 w-full sm:hidden mt-3">
                         <Link href="/financial/transactions" className="w-full">
-                            <Button variant="outline" className="w-full rounded-xl gap-2 font-medium h-10">
+                            <Button variant="outline" className="w-full rounded-xl gap-2 font-medium h-9 text-xs">
                                 <Receipt className="w-4 h-4" />
                                 Transacciones
                             </Button>
                         </Link>
                         <Link href="/financial/scanner" className="w-full">
-                            <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl gap-2 font-medium shadow-sm transition-all h-10">
+                            <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl gap-2 font-medium shadow-sm transition-all h-9 text-xs">
                                 <Search className="w-4 h-4" />
                                 Escanear
                             </Button>
@@ -727,13 +802,18 @@ export function FinancialInbox() {
                 </CardContent>
             </Card>
 
+            {/* Transactions Grouped By Date - Clean Independent Cards without vertical timeline line */}
             <section className="flex flex-col gap-6">
                 {Object.entries(groupedTransactions).map(([dateLabel, items]) => (
-                    <div key={dateLabel} className="flex flex-col gap-3">
-                        <h3 className="text-sm font-medium text-muted-foreground tracking-tight sticky top-0 bg-background/80 backdrop-blur-sm py-2 z-10">
-                            {dateLabel}
-                        </h3>
-                        <div className="grid gap-4 items-start grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+                    <div key={dateLabel} className="flex flex-col gap-3.5">
+                        {/* Date Header with Purple Calendar Icon */}
+                        <div className="flex items-center gap-2 text-sm sm:text-base font-semibold text-slate-200 py-1">
+                            <Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-purple-400 shrink-0" />
+                            <span className="capitalize">{dateLabel}</span>
+                        </div>
+
+                        {/* Card List - Vertical Independent Spacing */}
+                        <div className="flex flex-col gap-3.5 sm:gap-4">
                             {items.map((tx) => {
                                 const isProcessing = processing?.id === tx.id;
                                 const isConfirming = isProcessing && processing?.action === "confirm";
@@ -767,9 +847,9 @@ export function FinancialInbox() {
                                     <Card
                                         key={tx.id}
                                         className={cn(
-                                            "group relative overflow-hidden rounded-[1.5rem] border-border/60 bg-bg-secondary/90 py-0 shadow-sm shadow-black/5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md",
-                                            "flex flex-col cursor-pointer active:scale-[0.985]",
-                                            isOpening && "scale-[0.985] border-accent-primary/50 ring-1 ring-accent-primary/30",
+                                            "group relative overflow-hidden rounded-2xl sm:rounded-[1.65rem] border border-indigo-500/20 bg-slate-900/60 backdrop-blur-sm py-0 shadow-lg shadow-black/25 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl hover:border-indigo-500/40",
+                                            "flex flex-col cursor-pointer active:scale-[0.988]",
+                                            isOpening && "scale-[0.988] border-indigo-400/60 ring-1 ring-indigo-400/40",
                                             isProcessing && "opacity-60 pointer-events-none"
                                         )}
                                         role="link"
@@ -783,33 +863,42 @@ export function FinancialInbox() {
                                             }
                                         }}
                                     >
+                                        {/* Top Accent Gradient Border */}
                                         <div
                                             className={cn(
-                                                "absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-accent-primary/60 to-transparent",
-                                                isOpening && "h-0.5 animate-pulse via-accent-primary"
+                                                "absolute inset-x-0 top-0 h-[1.5px] bg-gradient-to-r from-transparent via-indigo-500/40 to-transparent",
+                                                isOpening && "h-0.5 animate-pulse via-indigo-400"
                                             )}
                                             aria-hidden="true"
                                         />
 
-                                        <CardHeader className="flex flex-col !space-y-0 !p-4 sm:!p-5 select-none bg-bg-secondary/50 transition-colors">
+                                        <CardHeader className="flex flex-col !space-y-0 !p-4 sm:!p-5 select-none bg-slate-900/40 transition-colors">
                                             {/* TOP SECTION: Avatar Icon + Content Block */}
-                                            <div className="flex items-start gap-3.5 w-full">
+                                            <div className="flex items-start gap-3.5 sm:gap-4 w-full">
                                                 {/* Left: Circular Glowing Avatar */}
                                                 <div className="relative shrink-0 mt-0.5">
                                                     <div
                                                         className={cn(
-                                                            "flex items-center justify-center rounded-full w-12 h-12 sm:w-13 sm:h-13 border transition-transform duration-200 group-hover:scale-105",
+                                                            "flex items-center justify-center rounded-full w-12 h-12 sm:w-14 sm:h-14 border transition-transform duration-200 group-hover:scale-105",
                                                             categoryVisual.containerClass
                                                         )}
                                                     >
                                                         <CategoryIcon className="w-5 h-5 sm:w-6 sm:h-6" strokeWidth={2.2} />
                                                     </div>
-                                                    {isPaidWithCredit && (
+                                                    {/* Top badge on avatar (NUEVO or TC) */}
+                                                    {isPaidWithCredit ? (
                                                         <span
-                                                            className="absolute -top-1 -right-1 z-10 flex items-center gap-0.5 rounded-full border border-bg-secondary bg-amber-500 px-1 py-0.5 text-[8px] font-bold leading-none text-white shadow-sm shadow-black/20"
+                                                            className="absolute -top-1.5 -right-1 z-10 flex items-center gap-0.5 rounded-full bg-amber-500 px-1.5 py-0.5 text-[8.5px] font-extrabold uppercase leading-none text-slate-950 shadow-sm"
                                                             title="Pagado con tarjeta de crédito"
                                                         >
                                                             <CreditCard className="h-2 w-2" /> TC
+                                                        </span>
+                                                    ) : (
+                                                        <span
+                                                            className="absolute -top-1.5 -right-1 z-10 flex items-center rounded-full bg-amber-500 px-1.5 py-0.5 text-[8.5px] font-extrabold uppercase leading-none text-slate-950 shadow-sm"
+                                                            title="Nuevo escaneo"
+                                                        >
+                                                            NUEVO
                                                         </span>
                                                     )}
                                                 </div>
@@ -820,18 +909,18 @@ export function FinancialInbox() {
                                                     <div className="flex items-center justify-between gap-2 w-full min-w-0">
                                                         <div className="flex items-center gap-1.5 min-w-0">
                                                             <span
-                                                                className="inline-flex h-5 max-w-[150px] sm:max-w-[180px] items-center gap-1.5 rounded-md border border-[#FFB020]/25 bg-[#FFB020]/10 px-2 text-[11px] font-medium leading-none tracking-wide text-[#FFB020]"
+                                                                className="inline-flex h-5.5 max-w-[150px] sm:max-w-[190px] items-center gap-1.5 rounded-md border border-amber-500/30 bg-amber-500/10 px-2.5 py-0.5 text-[11px] font-semibold leading-none tracking-wide text-amber-400"
                                                                 title={tx.category || "Sin categoría"}
                                                             >
                                                                 <Tag className="h-3 w-3 shrink-0" />
                                                                 <span className="truncate">{tx.category || "Sin categoría"}</span>
                                                             </span>
-                                                            {tx.relatedTransactionHint && (
+                                                            {tx.relatedTransactionHint ? (
                                                                 <Popover>
                                                                     <PopoverTrigger asChild>
                                                                         <button
                                                                             type="button"
-                                                                            className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md border border-[#FFB020]/20 bg-[#FFB020]/10 text-[#FFB020] transition-colors hover:bg-[#FFB020]/20 focus-visible:outline-none"
+                                                                            className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md border border-amber-500/20 bg-amber-500/10 text-amber-400 transition-colors hover:bg-amber-500/20 focus-visible:outline-none"
                                                                             onClick={(e) => e.stopPropagation()}
                                                                         >
                                                                             <CircleAlert className="h-3 w-3" />
@@ -839,11 +928,11 @@ export function FinancialInbox() {
                                                                     </PopoverTrigger>
                                                                     <PopoverContent
                                                                         align="start"
-                                                                        className="w-72 rounded-xl border border-border/50 bg-bg-secondary p-3 text-sm shadow-xl shadow-black/40"
+                                                                        className="w-72 rounded-xl border border-border/50 bg-slate-900 p-3 text-sm shadow-xl shadow-black/50"
                                                                         onClick={(e) => e.stopPropagation()}
                                                                     >
                                                                         <div className="flex items-start gap-2">
-                                                                            <CircleAlert className="mt-0.5 h-4 w-4 shrink-0 text-[#FFB020]" />
+                                                                            <CircleAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
                                                                             <p className="text-muted-foreground">
                                                                                 Posible relación:{" "}
                                                                                 <span className="text-foreground font-medium">
@@ -853,24 +942,28 @@ export function FinancialInbox() {
                                                                         </div>
                                                                     </PopoverContent>
                                                                 </Popover>
+                                                            ) : (
+                                                                <span className="text-slate-500 text-xs" title="Información">
+                                                                    ⓘ
+                                                                </span>
                                                             )}
                                                         </div>
 
                                                         {/* Amount */}
                                                         <div className="flex items-center gap-1.5 shrink-0">
                                                             {isOpening && (
-                                                                <Loader2 className="h-3.5 w-3.5 animate-spin text-accent-primary" />
+                                                                <Loader2 className="h-3.5 w-3.5 animate-spin text-indigo-400" />
                                                             )}
                                                             <span
                                                                 className={cn(
-                                                                    "text-[15px] sm:text-base font-semibold tracking-tight whitespace-nowrap",
+                                                                    "text-[15px] sm:text-lg font-bold tracking-tight whitespace-nowrap",
                                                                     isIncome
-                                                                        ? "text-[#2EE59D]"
+                                                                        ? "text-emerald-400"
                                                                         : isExpense
-                                                                        ? "text-[#FF5252]"
+                                                                        ? "text-[#FF4D6D]"
                                                                         : isWithdrawal
                                                                         ? "text-sky-400"
-                                                                        : "text-[#FFB020]"
+                                                                        : "text-amber-400"
                                                                 )}
                                                                 title={formatAmount(tx.amount, tx.currency || "USD")}
                                                             >
@@ -882,14 +975,14 @@ export function FinancialInbox() {
 
                                                     {/* Title */}
                                                     <CardTitle
-                                                        className="text-sm sm:text-[15px] tracking-tight font-semibold line-clamp-2 leading-tight w-full mt-1.5 group-hover:text-accent-primary transition-colors text-foreground"
+                                                        className="text-sm sm:text-base tracking-tight font-bold line-clamp-2 leading-snug w-full mt-1.5 group-hover:text-indigo-300 transition-colors text-white"
                                                         title={tx.description || "Transacción"}
                                                     >
                                                         {tx.description || "Transacción"}
                                                     </CardTitle>
 
-                                                    {/* Institution / Merchant */}
-                                                    <div className="flex items-center min-w-0 w-full text-xs text-zinc-400 mt-0.5">
+                                                    {/* Institution / Merchant with Verification Badge */}
+                                                    <div className="flex items-center min-w-0 w-full text-xs text-slate-400 mt-0.5 font-medium">
                                                         <span
                                                             className="truncate min-w-0"
                                                             title={displayInstitution || "Institución por confirmar"}
@@ -907,29 +1000,29 @@ export function FinancialInbox() {
 
                                                     {/* Origin and Destination Accounts (Omitted if none) */}
                                                     {(accounts.source || accounts.destination) && (
-                                                        <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                                                        <div className="flex flex-col gap-1.5 mt-2.5">
                                                             {accounts.source && (
-                                                                <div
-                                                                    className="inline-flex items-center gap-1 rounded-md border border-rose-500/20 bg-rose-500/5 px-1.5 py-0.5 text-[10.5px] text-zinc-300"
-                                                                    title={`Cuenta origen: ${accounts.source}`}
-                                                                >
-                                                                    <ArrowUpRight className="h-3 w-3 text-rose-400 shrink-0" />
-                                                                    <span className="text-[9.5px] uppercase font-semibold text-rose-400/80">Origen:</span>
-                                                                    <span className="font-mono text-zinc-200 font-medium truncate max-w-[120px] sm:max-w-[160px]">
-                                                                        {accounts.source}
+                                                                <div className="flex items-center gap-2 flex-wrap">
+                                                                    <span className="inline-flex items-center gap-1 rounded-md border border-rose-500/30 bg-rose-500/10 px-1.5 py-0.5 text-[9.5px] font-bold uppercase tracking-wider text-rose-400 select-none">
+                                                                        <ArrowUpRight className="h-3 w-3 stroke-[2.5]" />
+                                                                        ORIGEN
                                                                     </span>
+                                                                    <span className="font-mono text-xs text-slate-300 font-medium tracking-wider">
+                                                                        {formatMaskedNumber(accounts.source)}
+                                                                    </span>
+                                                                    <BrandBadge brand={detectCardBrand(accounts.source, `${tx.merchant} ${tx.description} ${tx.summary}`)} />
                                                                 </div>
                                                             )}
                                                             {accounts.destination && (
-                                                                <div
-                                                                    className="inline-flex items-center gap-1 rounded-md border border-emerald-500/20 bg-emerald-500/5 px-1.5 py-0.5 text-[10.5px] text-zinc-300"
-                                                                    title={`Cuenta destino: ${accounts.destination}`}
-                                                                >
-                                                                    <ArrowDownLeft className="h-3 w-3 text-emerald-400 shrink-0" />
-                                                                    <span className="text-[9.5px] uppercase font-semibold text-emerald-400/80">Destino:</span>
-                                                                    <span className="font-mono text-zinc-200 font-medium truncate max-w-[120px] sm:max-w-[160px]">
-                                                                        {accounts.destination}
+                                                                <div className="flex items-center gap-2 flex-wrap">
+                                                                    <span className="inline-flex items-center gap-1 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 text-[9.5px] font-bold uppercase tracking-wider text-emerald-400 select-none">
+                                                                        <ArrowDownLeft className="h-3 w-3 stroke-[2.5]" />
+                                                                        DESTINO
                                                                     </span>
+                                                                    <span className="font-mono text-xs text-slate-300 font-medium tracking-wider">
+                                                                        {formatMaskedNumber(accounts.destination)}
+                                                                    </span>
+                                                                    <BrandBadge brand={detectCardBrand(accounts.destination, `${tx.merchant} ${tx.description} ${tx.summary}`)} />
                                                                 </div>
                                                             )}
                                                         </div>
@@ -938,9 +1031,9 @@ export function FinancialInbox() {
                                             </div>
 
                                             {/* BOTTOM BAR: Time & Quick Actions (Discard & Confirm) */}
-                                            <div className="flex w-full items-center justify-between pt-3 mt-3 border-t border-border/40 gap-3">
+                                            <div className="flex w-full items-center justify-between pt-3 mt-3.5 border-t border-slate-800/80 gap-3">
                                                 {/* Time */}
-                                                <div className="flex items-center gap-1.5 text-xs text-zinc-400 font-medium">
+                                                <div className="flex items-center gap-1.5 text-xs text-slate-400 font-medium">
                                                     <Clock className="h-3.5 w-3.5 opacity-70" />
                                                     <span>
                                                         {tx.date
@@ -951,18 +1044,18 @@ export function FinancialInbox() {
                                                     </span>
                                                 </div>
 
-                                                {/* Actions */}
+                                                {/* Actions: Squircle Reject / Approve Buttons */}
                                                 <div
-                                                    className="flex items-center gap-2 shrink-0"
+                                                    className="flex items-center gap-2.5 shrink-0"
                                                     onClick={(e) => e.stopPropagation()}
                                                 >
-                                                    {/* Discard Button */}
+                                                    {/* Reject (X) Button */}
                                                     <button
                                                         type="button"
                                                         onClick={() => handleDismiss(tx.id!)}
                                                         disabled={isProcessing}
-                                                        title="Descartar"
-                                                        className="flex items-center justify-center h-8 w-8 sm:h-9 sm:w-9 rounded-xl bg-[#2D161C] border border-rose-500/20 text-rose-400 hover:bg-rose-950/80 hover:text-rose-300 hover:border-rose-500/40 active:scale-95 transition-all shadow-sm"
+                                                        title="Rechazar"
+                                                        className="flex items-center justify-center h-9 w-9 rounded-xl bg-rose-950/30 border border-rose-500/25 text-rose-400 hover:bg-rose-900/50 hover:text-rose-300 hover:border-rose-500/40 active:scale-95 transition-all shadow-sm"
                                                     >
                                                         {isDismissing ? (
                                                             <Loader2 className="h-4 w-4 animate-spin text-rose-400" />
@@ -971,13 +1064,13 @@ export function FinancialInbox() {
                                                         )}
                                                     </button>
 
-                                                    {/* Confirm Button */}
+                                                    {/* Approve (Check) Button */}
                                                     <button
                                                         type="button"
                                                         onClick={() => handleConfirm(tx)}
                                                         disabled={isProcessing}
-                                                        title="Confirmar"
-                                                        className="flex items-center justify-center h-8 w-8 sm:h-9 sm:w-9 rounded-xl bg-[#112922] border border-emerald-500/20 text-emerald-400 hover:bg-emerald-950/80 hover:text-emerald-300 hover:border-emerald-500/40 active:scale-95 transition-all shadow-sm"
+                                                        title="Aprobar"
+                                                        className="flex items-center justify-center h-9 w-9 rounded-xl bg-emerald-950/30 border border-emerald-500/25 text-emerald-400 hover:bg-emerald-900/50 hover:text-emerald-300 hover:border-emerald-500/40 active:scale-95 transition-all shadow-sm"
                                                     >
                                                         {isConfirming ? (
                                                             <Loader2 className="h-4 w-4 animate-spin text-emerald-400" />
