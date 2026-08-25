@@ -1,32 +1,52 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { getUnprocessedInboxTransactionsAction, mapInboxTransactionAction, dismissInboxTransactionAction } from "@/app/actions/financial-inbox";
+import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
+import { toast } from "sonner";
+import {
+    Check,
+    CircleAlert,
+    Inbox as InboxIcon,
+    RefreshCw,
+    X,
+    Search,
+    Receipt,
+    Loader2,
+    Utensils,
+    Car,
+    HeartPulse,
+    Lightbulb,
+    Ticket,
+    ShoppingCart,
+    GraduationCap,
+    Home,
+    Dog,
+    TrendingUp,
+    ArrowRightLeft,
+    Wallet,
+    CreditCard,
+    ArrowUpRight,
+    ArrowDownLeft,
+    Calendar,
+} from "lucide-react";
+import {
+    getUnprocessedInboxTransactionsAction,
+    mapInboxTransactionAction,
+    dismissInboxTransactionAction,
+} from "@/app/actions/financial-inbox";
 import { getInstitutionsAction } from "@/app/actions/financial-settings";
 import { getInstitutionMatchInfo, INSTITUTION_MATCH_THRESHOLD } from "@/lib/institution-match";
+import { isTransactionPaidWithCredit } from "@/lib/financial-utils";
 import { InstitutionMatchBadge } from "./InstitutionMatchBadge";
 import { FinancialScannerTransaction } from "@/domain/entities/financial";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { toast } from "sonner";
-import { Check, CircleAlert, Inbox as InboxIcon, RefreshCw, FileText, X, Edit2, Search, Eye, ChevronDown, ChevronUp, Clock, Tag, Receipt } from "lucide-react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
-import Link from "next/link";
+import { RobotLoader } from "@/components/ui/RobotLoader";
 import { cn } from "@/lib/utils";
-import { isoToWallClockInput, wallClockInputToISO } from "@/lib/date-range";
+import { isoToWallClockInput } from "@/lib/date-range";
 import { useFinancialRealtime } from "../hooks/useFinancialRealtime";
-import { useSearchParams } from "next/navigation";
-
-interface EditState {
-    type: string;
-    merchant: string;
-    amount?: number | null;
-    date?: string | null;
-    summary?: string;
-}
 
 const TYPE_OPTIONS = [
     { value: "EXPENSE", label: "Gasto" },
@@ -61,6 +81,302 @@ function formatAmount(amount?: number | null, currency = "USD") {
     }).format(amount);
 }
 
+interface CategoryVisualConfig {
+    icon: React.ElementType;
+    containerClass: string;
+}
+
+function getCategoryVisualConfig(category?: string | null, txType?: string | null): CategoryVisualConfig {
+    const cat = (category || "").toLowerCase().trim();
+    const type = (txType || "").toUpperCase();
+
+    if (
+        cat.includes("aliment") ||
+        cat.includes("comida") ||
+        cat.includes("restauran") ||
+        cat.includes("food") ||
+        cat.includes("supermerc") ||
+        cat.includes("cafeter")
+    ) {
+        return {
+            icon: Utensils,
+            containerClass: "border-[#FFB020]/50 bg-[#FFB020]/10 text-[#FFB020] shadow-[0_0_14px_rgba(255,176,32,0.25)]",
+        };
+    }
+    if (
+        cat.includes("transpor") ||
+        cat.includes("viaje") ||
+        cat.includes("taxi") ||
+        cat.includes("uber") ||
+        cat.includes("cabify") ||
+        cat.includes("gasolin") ||
+        cat.includes("combust") ||
+        cat.includes("peaje")
+    ) {
+        return {
+            icon: Car,
+            containerClass: "border-cyan-500/50 bg-cyan-500/10 text-cyan-400 shadow-[0_0_14px_rgba(6,182,212,0.25)]",
+        };
+    }
+    if (
+        cat.includes("ropa") ||
+        cat.includes("calzado") ||
+        cat.includes("compra") ||
+        cat.includes("shop") ||
+        cat.includes("tienda") ||
+        cat.includes("mall") ||
+        cat.includes("amazon")
+    ) {
+        return {
+            icon: ShoppingCart,
+            containerClass: "border-emerald-500/50 bg-emerald-500/10 text-emerald-400 shadow-[0_0_14px_rgba(16,185,129,0.25)]",
+        };
+    }
+    if (
+        cat.includes("transfer") ||
+        type === "TRANSFER"
+    ) {
+        return {
+            icon: ArrowRightLeft,
+            containerClass: "border-purple-500/50 bg-purple-500/10 text-purple-400 shadow-[0_0_14px_rgba(168,85,247,0.25)]",
+        };
+    }
+    if (
+        cat.includes("salud") ||
+        cat.includes("farmac") ||
+        cat.includes("medic") ||
+        cat.includes("hospital") ||
+        cat.includes("dentist")
+    ) {
+        return {
+            icon: HeartPulse,
+            containerClass: "border-rose-500/50 bg-rose-500/10 text-rose-400 shadow-[0_0_14px_rgba(244,63,94,0.25)]",
+        };
+    }
+    if (
+        cat.includes("servici") ||
+        cat.includes("luz") ||
+        cat.includes("agua") ||
+        cat.includes("telef") ||
+        cat.includes("internet") ||
+        cat.includes("electric")
+    ) {
+        return {
+            icon: Lightbulb,
+            containerClass: "border-yellow-500/50 bg-yellow-500/10 text-yellow-400 shadow-[0_0_14px_rgba(234,179,8,0.25)]",
+        };
+    }
+    if (
+        cat.includes("entreten") ||
+        cat.includes("cine") ||
+        cat.includes("streaming") ||
+        cat.includes("netflix") ||
+        cat.includes("spotify") ||
+        cat.includes("juego") ||
+        cat.includes("ocio")
+    ) {
+        return {
+            icon: Ticket,
+            containerClass: "border-purple-500/50 bg-purple-500/10 text-purple-400 shadow-[0_0_14px_rgba(168,85,247,0.25)]",
+        };
+    }
+    if (
+        cat.includes("educa") ||
+        cat.includes("curso") ||
+        cat.includes("universid") ||
+        cat.includes("colegio") ||
+        cat.includes("libro")
+    ) {
+        return {
+            icon: GraduationCap,
+            containerClass: "border-blue-500/50 bg-blue-500/10 text-blue-400 shadow-[0_0_14px_rgba(59,130,246,0.25)]",
+        };
+    }
+    if (
+        cat.includes("hogar") ||
+        cat.includes("casa") ||
+        cat.includes("arriendo") ||
+        cat.includes("alquiler") ||
+        cat.includes("mueble")
+    ) {
+        return {
+            icon: Home,
+            containerClass: "border-teal-500/50 bg-teal-500/10 text-teal-400 shadow-[0_0_14px_rgba(20,184,166,0.25)]",
+        };
+    }
+    if (
+        cat.includes("mascot") ||
+        cat.includes("veterin") ||
+        cat.includes("perro") ||
+        cat.includes("gato")
+    ) {
+        return {
+            icon: Dog,
+            containerClass: "border-orange-500/50 bg-orange-500/10 text-orange-400 shadow-[0_0_14px_rgba(249,115,22,0.25)]",
+        };
+    }
+
+    if (type === "INCOME") {
+        return {
+            icon: TrendingUp,
+            containerClass: "border-emerald-500/50 bg-emerald-500/10 text-emerald-400 shadow-[0_0_14px_rgba(16,185,129,0.25)]",
+        };
+    }
+    if (type === "WITHDRAWAL") {
+        return {
+            icon: Wallet,
+            containerClass: "border-sky-500/50 bg-sky-500/10 text-sky-400 shadow-[0_0_14px_rgba(14,165,233,0.25)]",
+        };
+    }
+
+    return {
+        icon: Receipt,
+        containerClass: "border-[#FFB020]/40 bg-[#FFB020]/10 text-[#FFB020] shadow-[0_0_14px_rgba(255,176,32,0.2)]",
+    };
+}
+
+interface ScannedAccountDetails {
+    source?: string | null;
+    destination?: string | null;
+}
+
+/**
+ * Extracts origin and destination account numbers from a scanner transaction.
+ */
+function extractScannedAccounts(tx: FinancialScannerTransaction): ScannedAccountDetails {
+    let source: string | null = null;
+    let destination: string | null = null;
+
+    // 1. Direct accounts array
+    if (Array.isArray(tx.accounts) && tx.accounts.length > 0) {
+        for (const entry of tx.accounts) {
+            if (!entry || !entry.account) continue;
+            const t = (entry.type || "").toLowerCase().trim();
+            if (t.startsWith("orig") || t.startsWith("sourc") || t.includes("salid") || t.includes("desde")) {
+                if (!source) source = entry.account;
+            } else if (t.startsWith("dest") || t.startsWith("targ") || t.includes("entrad") || t.includes("hacia") || t.includes("para")) {
+                if (!destination) destination = entry.account;
+            } else {
+                if (!source) source = entry.account;
+                else if (!destination) destination = entry.account;
+            }
+        }
+    }
+
+    // 2. Fallback to originStats if missing
+    if (!source || !destination) {
+        const stats = tx.originStats as Record<string, unknown> | null | undefined;
+        if (stats) {
+            if (!source) {
+                const s = stats.sourceAccount || stats.accountSource || stats.originAccount || stats.cuentaOrigen || stats.cuenta_origen;
+                if (typeof s === "string" && s.trim() !== "") source = s.trim();
+            }
+            if (!destination) {
+                const d = stats.destinationAccount || stats.accountDestination || stats.targetAccount || stats.cuentaDestino || stats.cuenta_destino;
+                if (typeof d === "string" && d.trim() !== "") destination = d.trim();
+            }
+            if ((!source || !destination) && Array.isArray(stats.accounts)) {
+                for (const entry of stats.accounts) {
+                    if (!entry || typeof entry !== "object") continue;
+                    const acc = (entry as { account?: string; type?: string }).account;
+                    const typeStr = ((entry as { account?: string; type?: string }).type || "").toLowerCase();
+                    if (!acc) continue;
+                    if (typeStr.startsWith("orig") || typeStr.startsWith("sourc")) {
+                        if (!source) source = acc;
+                    } else if (typeStr.startsWith("dest") || typeStr.startsWith("targ")) {
+                        if (!destination) destination = acc;
+                    }
+                }
+            }
+        }
+    }
+
+    return { source, destination };
+}
+
+function formatMaskedNumber(acc: string): string {
+    const trimmed = acc.trim();
+    const digitsMatch = trimmed.match(/\d{4}$/);
+    if (digitsMatch) {
+        return `**** ${digitsMatch[0]}`;
+    }
+    const lastDigits = trimmed.replace(/\D/g, "").slice(-4);
+    if (lastDigits) {
+        return `**** ${lastDigits}`;
+    }
+    return trimmed.length > 8 ? `**** ${trimmed.slice(-4)}` : trimmed;
+}
+
+interface AccountBadgeInfo {
+    raw: string;
+    formattedNumber: string;
+    typeAcronym: "TCR" | "TDE" | "AHO" | "CTE" | "EFE" | "INV" | "CTA";
+    ownershipAcronym: "MIA" | "TER";
+}
+
+function resolveAccountBadgeInfo(
+    role: "SOURCE" | "DESTINATION",
+    accountNumber: string,
+    tx: FinancialScannerTransaction
+): AccountBadgeInfo {
+    const formatted = formatMaskedNumber(accountNumber);
+    const combinedContext = `${accountNumber} ${tx.merchant || ""} ${tx.description || ""} ${tx.summary || ""}`.toLowerCase();
+
+    // Type detection (TCR, TDE, AHO, CTE, CTA)
+    let typeAcronym: "TCR" | "TDE" | "AHO" | "CTE" | "EFE" | "INV" | "CTA" = "CTA";
+    if (
+        isTransactionPaidWithCredit(tx) ||
+        combinedContext.includes("crédito") ||
+        combinedContext.includes("credito") ||
+        combinedContext.includes("mastercard") ||
+        combinedContext.includes("visa") ||
+        combinedContext.includes("diners") ||
+        combinedContext.includes("amex") ||
+        combinedContext.includes("tcr") ||
+        combinedContext.includes("tc")
+    ) {
+        if (combinedContext.includes("débito") || combinedContext.includes("debito") || combinedContext.includes("tde") || combinedContext.includes("td")) {
+            typeAcronym = "TDE";
+        } else {
+            typeAcronym = "TCR";
+        }
+    } else if (combinedContext.includes("débito") || combinedContext.includes("debito") || combinedContext.includes("tde") || combinedContext.includes("td")) {
+        typeAcronym = "TDE";
+    } else if (combinedContext.includes("ahorro") || combinedContext.includes("aho")) {
+        typeAcronym = "AHO";
+    } else if (combinedContext.includes("corriente") || combinedContext.includes("cte")) {
+        typeAcronym = "CTE";
+    } else if (combinedContext.includes("efectivo") || combinedContext.includes("efe")) {
+        typeAcronym = "EFE";
+    } else if (combinedContext.includes("inversi") || combinedContext.includes("inv")) {
+        typeAcronym = "INV";
+    }
+
+    // Ownership detection:
+    // If source, almost always the user's own account -> MIA
+    // If destination, check if own transfer or third party -> TER
+    let ownershipAcronym: "MIA" | "TER" = role === "SOURCE" ? "MIA" : "TER";
+    if (role === "DESTINATION") {
+        if (
+            combinedContext.includes("entre mis cuentas") ||
+            combinedContext.includes("propia") ||
+            combinedContext.includes("mismo titular") ||
+            combinedContext.includes("ahorro personal") ||
+            combinedContext.includes("mía") ||
+            combinedContext.includes("mia")
+        ) {
+            ownershipAcronym = "MIA";
+        }
+    }
+
+    return {
+        raw: accountNumber,
+        formattedNumber: formatted,
+        typeAcronym,
+        ownershipAcronym,
+    };
+}
+
 /**
  * Extract the best available summary from a scanner transaction.
  * Priority: summary → originStats.emailBody → originStats.snippet
@@ -81,20 +397,6 @@ function extractSummary(tx: FinancialScannerTransaction): string {
     return "";
 }
 
-function formatDate(value?: string | null) {
-    if (!value) {
-        return "Fecha no detectada";
-    }
-
-    return new Intl.DateTimeFormat("es-ES", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-    }).format(new Date(value));
-}
-
 function formatTime(value?: string | null) {
     if (!value) {
         return "--:--";
@@ -108,21 +410,20 @@ function formatTime(value?: string | null) {
 
 function formatDateLabel(dateStr: string): string {
     const date = new Date(dateStr);
-    const today = new Date();
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
+    if (isNaN(date.getTime())) return "Fecha no detectada";
 
-    if (date.toDateString() === today.toDateString()) return "Hoy";
-    if (date.toDateString() === yesterday.toDateString()) return "Ayer";
-
-    return date.toLocaleDateString("es-ES", { month: "long", day: "numeric", year: "numeric" });
+    return date.toLocaleDateString("es-ES", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+    });
 }
 
-function groupTransactionsByDate(transactions: FinancialScannerTransaction[], editStates: Record<string, EditState>) {
+function groupTransactionsByDate(transactions: FinancialScannerTransaction[]) {
     const groups: Record<string, FinancialScannerTransaction[]> = {};
 
-    transactions.forEach(t => {
-        const dateStr = editStates[t.id!]?.date || isoToWallClockInput(t.date || t.createdAt);
+    transactions.forEach((t) => {
+        const dateStr = isoToWallClockInput(t.date || t.createdAt);
         const dateKey = dateStr ? formatDateLabel(dateStr) : "Fecha no detectada";
         if (!groups[dateKey]) {
             groups[dateKey] = [];
@@ -133,23 +434,8 @@ function groupTransactionsByDate(transactions: FinancialScannerTransaction[], ed
     return groups;
 }
 
-function InboxSkeleton() {
-    return (
-        <div className="space-y-4">
-            <div className="h-20 rounded-3xl border border-border/50 bg-gradient-to-r from-bg-secondary to-bg-tertiary animate-pulse" />
-            <div className="grid gap-4 lg:grid-cols-2">
-                {Array.from({ length: 4 }).map((_, index) => (
-                    <div
-                        key={index}
-                        className="h-[340px] rounded-3xl border border-border/50 bg-bg-secondary/80 animate-pulse"
-                    />
-                ))}
-            </div>
-        </div>
-    );
-}
-
 export function FinancialInbox() {
+    const router = useRouter();
     const searchParams = useSearchParams();
     const typeFilter = searchParams.get("type");
 
@@ -157,6 +443,8 @@ export function FinancialInbox() {
     const [institutionNames, setInstitutionNames] = useState<string[]>([]);
     const [institutionsLoaded, setInstitutionsLoaded] = useState(false);
     const [loading, setLoading] = useState(true);
+    const [openingId, setOpeningId] = useState<string | null>(null);
+
     // Which row is busy *and* what it's doing, so the spinner lands on the
     // button that was actually pressed (confirm vs dismiss).
     const [processing, setProcessing] = useState<{ id: string; action: "confirm" | "dismiss" } | null>(null);
@@ -165,60 +453,13 @@ export function FinancialInbox() {
     const transactionsRef = useRef<FinancialScannerTransaction[]>([]);
     const pollingNoticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    // Editing State per transaction
-    const [editStates, setEditStates] = useState<Record<string, EditState>>({});
-    const [isEditing, setIsEditing] = useState<Record<string, boolean>>({});
-    const [expandedStates, setExpandedStates] = useState<Record<string, boolean>>({});
     const [isHeaderExpanded, setIsHeaderExpanded] = useState(false);
 
-    const toggleExpanded = (txId: string, e?: React.MouseEvent) => {
-        if (e) e.stopPropagation();
-        setExpandedStates((prev) => ({ ...prev, [txId]: !prev[txId] }));
+    const openDetail = (txId: string) => {
+        if (openingId) return;
+        setOpeningId(txId);
+        router.push(`/financial/scans/${txId}`);
     };
-
-    const toggleEdit = (txId: string) => {
-        setIsEditing((prev) => ({ ...prev, [txId]: !prev[txId] }));
-        if (!isEditing[txId]) {
-            setExpandedStates((prev) => ({ ...prev, [txId]: true }));
-        }
-    };
-
-    const cancelEdit = (txId: string, tx: FinancialScannerTransaction) => {
-        setEditStates((prev) => ({
-            ...prev,
-            [txId]: {
-                type: normalizeTransactionType(tx.type),
-                merchant: tx.merchant || "",
-                amount: tx.amount ?? null,
-                date: isoToWallClockInput(tx.date || tx.createdAt),
-                summary: extractSummary(tx),
-            },
-        }));
-        setIsEditing((prev) => ({ ...prev, [txId]: false }));
-    };
-
-    const syncEditStates = useCallback((nextTransactions: FinancialScannerTransaction[]) => {
-        setEditStates((prev) => {
-            const nextState: Record<string, EditState> = {};
-
-            nextTransactions.forEach((tx) => {
-                const transactionId = tx.id;
-                if (!transactionId) {
-                    return;
-                }
-
-                nextState[transactionId] = prev[transactionId] ?? {
-                    type: normalizeTransactionType(tx.type),
-                    merchant: tx.merchant || "",
-                    amount: tx.amount ?? null,
-                    date: isoToWallClockInput(tx.date || tx.createdAt),
-                    summary: extractSummary(tx),
-                };
-            });
-
-            return nextState;
-        });
-    }, []);
 
     useEffect(() => {
         transactionsRef.current = transactions;
@@ -245,7 +486,9 @@ export function FinancialInbox() {
             .catch(() => {
                 if (mounted) setInstitutionsLoaded(true);
             });
-        return () => { mounted = false; };
+        return () => {
+            mounted = false;
+        };
     }, []);
 
     const loadInbox = useCallback(async (options?: { silent?: boolean; mergeNewOnly?: boolean }) => {
@@ -277,7 +520,6 @@ export function FinancialInbox() {
 
             transactionsRef.current = resolvedTransactions;
             setTransactions(resolvedTransactions);
-            syncEditStates(resolvedTransactions);
         } else {
             toast.error("No se pudo cargar la bandeja");
         }
@@ -287,7 +529,7 @@ export function FinancialInbox() {
         if (!silent) {
             setLoading(false);
         }
-    }, [syncEditStates]);
+    }, []);
 
     const pollInboxInBackground = useCallback(async () => {
         if (!hasLoadedOnceRef.current) {
@@ -313,16 +555,14 @@ export function FinancialInbox() {
 
     // ── Realtime: auto-reload inbox on new scanner transactions ──
     const subscriptions = useMemo(
-        () => [
-            { table: "financial_scanner_transactions", event: "INSERT" as const },
-        ],
+        () => [{ table: "financial_scanner_transactions", event: "INSERT" as const }],
         [],
     );
 
     const callbacks = useMemo(
         () => ({
             onInsert: () => {
-                toast("Nueva transaccion escaneada por N8N", {
+                toast("Nueva transacción escaneada por N8N", {
                     description: "Actualizando bandeja...",
                 });
                 void loadInbox({ silent: true, mergeNewOnly: true });
@@ -338,25 +578,15 @@ export function FinancialInbox() {
         onPollFallback: pollInboxInBackground,
     });
 
-
-
-
     const handleConfirm = async (tx: FinancialScannerTransaction) => {
-        const editState = editStates[tx.id!];
-        const type = (editState?.type as FinancialScannerTransaction["type"]) || DEFAULT_TRANSACTION_TYPE;
-        // Persist the resolved institution just like the detail form: when the
-        // merchant wasn't manually edited and confidently matches a stored
-        // institution (score ≥ threshold), save that institution's name (e.g.
-        // "PAYU*AR*UBER" → "Uber") so confirming from the card or the form agree.
-        const editedMerchant = editState?.merchant;
-        const rawMerchant = editedMerchant || tx.merchant;
+        const type = normalizeTransactionType(tx.type);
+        const rawMerchant = tx.merchant;
         const merchant = (() => {
-            if (editedMerchant) return editedMerchant;
             if (!institutionsLoaded || !rawMerchant) return rawMerchant;
             const info = getInstitutionMatchInfo(rawMerchant, institutionNames);
             return info.matchedName && info.score >= INSTITUTION_MATCH_THRESHOLD ? info.matchedName : rawMerchant;
         })();
-        const amount = editState?.amount !== undefined ? editState.amount : tx.amount;
+        const amount = tx.amount;
 
         if (!merchant || merchant.trim() === "") {
             toast.error("La institución es requerida para confirmar");
@@ -377,12 +607,15 @@ export function FinancialInbox() {
         try {
             const result = await mapInboxTransactionAction({
                 scannerTransactionId: tx.id!,
-                description: tx.description && tx.description.trim() !== "" ? tx.description.trim() : (merchant || "Transacción escaneada"),
+                description:
+                    tx.description && tx.description.trim() !== ""
+                        ? tx.description.trim()
+                        : merchant || "Transacción escaneada",
                 type: type,
                 merchant: merchant,
                 amount: amount,
-                date: wallClockInputToISO(editState?.date),
-                notes: editState?.summary || undefined,
+                date: tx.date || null,
+                notes: extractSummary(tx) || undefined,
             });
 
             if (result.success) {
@@ -421,40 +654,23 @@ export function FinancialInbox() {
         setProcessing(null);
     };
 
-    const updateEditState = <K extends keyof EditState>(txId: string, field: K, value: EditState[K]) => {
-        setEditStates(prev => ({
-            ...prev,
-            [txId]: {
-                ...prev[txId],
-                [field]: value
-            }
-        }));
-    };
-
     const filteredTransactions = useMemo(() => {
         let filtered = transactions;
         if (typeFilter && typeFilter !== "ALL") {
-            const activeTypes = typeFilter.split(',').filter(Boolean);
-            filtered = transactions.filter(tx => {
-                // Use the raw DB type for filtering to avoid defaulting null/unsupported
-                // types to EXPENSE (which editStates does via normalizeTransactionType).
-                // Only use the editState type if the user explicitly changed it (i.e. it
-                // differs from what the raw DB type normalizes to, including null → null).
+            const activeTypes = typeFilter.split(",").filter(Boolean);
+            filtered = transactions.filter((tx) => {
                 const rawType = tx.type ? tx.type.toUpperCase() : null;
-                const editedType = editStates[tx.id!]?.type;
                 const normalizedRaw = rawType
-                    ? (TYPE_OPTIONS.find(o => o.value === rawType)?.value ?? null)
+                    ? (TYPE_OPTIONS.find((o) => o.value === rawType)?.value ?? null)
                     : null;
-                const isExplicitUserEdit = editedType !== undefined && editedType !== normalizedRaw;
-                const currentType = isExplicitUserEdit ? editedType : rawType;
-                if (!currentType) return false;
-                return activeTypes.includes(currentType);
+                if (!normalizedRaw) return false;
+                return activeTypes.includes(normalizedRaw);
             });
         }
 
         return [...filtered].sort((a, b) => {
-            const dateA = editStates[a.id!]?.date || a.date || a.createdAt;
-            const dateB = editStates[b.id!]?.date || b.date || b.createdAt;
+            const dateA = a.date || a.createdAt;
+            const dateB = b.date || b.createdAt;
 
             const timeA = dateA ? new Date(dateA).getTime() : 0;
             const timeB = dateB ? new Date(dateB).getTime() : 0;
@@ -468,10 +684,14 @@ export function FinancialInbox() {
 
             return createdB - createdA;
         });
-    }, [transactions, typeFilter, editStates]);
+    }, [transactions, typeFilter]);
 
     if (loading) {
-        return <InboxSkeleton />;
+        return (
+            <div className="flex min-h-[45vh] w-full items-center justify-center py-12">
+                <RobotLoader size={96} text="Cargando datos..." />
+            </div>
+        );
     }
 
     if (transactions.length === 0) {
@@ -532,62 +752,60 @@ export function FinancialInbox() {
         );
     }
 
-    const groupedTransactions = groupTransactionsByDate(filteredTransactions, editStates);
+    const groupedTransactions = groupTransactionsByDate(filteredTransactions);
 
     return (
         <div className="space-y-5">
-            <Card className="rounded-[1.75rem] border-border/60 bg-bg-secondary py-0 shadow-sm shadow-black/5">
-                <CardContent className="flex flex-col sm:flex-row sm:items-center gap-0 sm:gap-4 px-4 py-4 sm:px-5">
+            {/* Header Summary Info */}
+            <Card className="rounded-2xl border-border/50 bg-bg-secondary/80 py-0 shadow-sm">
+                <CardContent className="flex flex-col sm:flex-row sm:items-center gap-0 sm:gap-4 px-4 py-3 sm:px-5">
                     <div
                         className="flex items-center justify-between cursor-pointer sm:cursor-default w-full sm:w-auto flex-1"
                         onClick={() => setIsHeaderExpanded(!isHeaderExpanded)}
                     >
-                        <div className="space-y-1 flex-1">
+                        <div className="space-y-0.5 flex-1">
                             {isPollingFallback && showPollingNotice && (
-                                <div className="flex flex-wrap items-center gap-2 mb-2">
+                                <div className="flex flex-wrap items-center gap-2 mb-1">
                                     <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-500/20 bg-sky-500/5 px-2 py-0.5 text-[10px] font-medium text-sky-700 dark:text-sky-300">
                                         <RefreshCw className="h-3 w-3 animate-spin" />
                                         ACTUALIZANDO
                                     </span>
                                 </div>
                             )}
-                            <h3 className="text-base font-semibold tracking-tight sm:text-lg">Escaneos por confirmar</h3>
-                            <p className="max-w-md text-xs text-muted-foreground sm:text-sm">
+                            <h3 className="text-base font-semibold tracking-tight">Escaneos por confirmar</h3>
+                            <p className="max-w-md text-xs text-muted-foreground">
                                 Revisa y confirma o ejecuta un nuevo escaneo.
                             </p>
                         </div>
-                        <div className="sm:hidden text-muted-foreground flex-shrink-0 ml-4">
-                            {isHeaderExpanded ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
-                        </div>
                     </div>
 
-                    <div className={cn("flex flex-col gap-3 w-full sm:w-auto mt-4 sm:mt-0", !isHeaderExpanded && "hidden sm:flex")}>
+                    <div className={cn("flex flex-col gap-2.5 w-full sm:w-auto mt-2.5 sm:mt-0", !isHeaderExpanded && "hidden sm:flex")}>
                         <div className="grid grid-cols-3 gap-2 w-full sm:w-auto">
-                            <div className="flex flex-col justify-between rounded-2xl border border-border/50 bg-bg-primary px-3 py-3 text-center sm:text-left">
-                                <div className="text-[10px] sm:text-[11px] uppercase tracking-wider text-muted-foreground break-words leading-tight">Pendientes</div>
-                                <div className="mt-1 text-lg sm:text-xl font-semibold tracking-tight">{filteredTransactions.length}</div>
+                            <div className="flex flex-col justify-between rounded-xl border border-border/40 bg-bg-primary/70 px-3 py-1.5 text-center sm:text-left">
+                                <div className="text-[9.5px] uppercase tracking-wider text-muted-foreground">Pendientes</div>
+                                <div className="text-base font-bold text-foreground">{filteredTransactions.length}</div>
                             </div>
-                            <div className="flex flex-col justify-between rounded-2xl border border-border/50 bg-bg-primary px-3 py-3 text-center sm:text-left">
-                                <div className="text-[10px] sm:text-[11px] uppercase tracking-wider text-muted-foreground break-words leading-tight">Con comercio</div>
-                                <div className="mt-1 text-lg sm:text-xl font-semibold tracking-tight">{filteredTransactions.filter((tx) => tx.merchant).length}</div>
+                            <div className="flex flex-col justify-between rounded-xl border border-border/40 bg-bg-primary/70 px-3 py-1.5 text-center sm:text-left">
+                                <div className="text-[9.5px] uppercase tracking-wider text-muted-foreground">Con comercio</div>
+                                <div className="text-base font-bold text-foreground">{filteredTransactions.filter((tx) => tx.merchant).length}</div>
                             </div>
-                            <div className="flex flex-col justify-between rounded-2xl border border-border/50 bg-bg-primary px-3 py-3 text-center sm:text-left">
-                                <div className="text-[10px] sm:text-[11px] uppercase tracking-wider text-muted-foreground break-words leading-tight">Con monto</div>
-                                <div className="mt-1 text-lg sm:text-xl font-semibold tracking-tight">{filteredTransactions.filter((tx) => tx.amount != null).length}</div>
+                            <div className="flex flex-col justify-between rounded-xl border border-border/40 bg-bg-primary/70 px-3 py-1.5 text-center sm:text-left">
+                                <div className="text-[9.5px] uppercase tracking-wider text-muted-foreground">Con monto</div>
+                                <div className="text-base font-bold text-foreground">{filteredTransactions.filter((tx) => tx.amount != null).length}</div>
                             </div>
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2 w-full sm:hidden mt-4">
+                    <div className="grid grid-cols-2 gap-2 w-full sm:hidden mt-2.5">
                         <Link href="/financial/transactions" className="w-full">
-                            <Button variant="outline" className="w-full rounded-xl gap-2 font-medium h-10">
-                                <Receipt className="w-4 h-4" />
+                            <Button variant="outline" className="w-full rounded-xl gap-2 font-medium h-8 text-xs">
+                                <Receipt className="w-3.5 h-3.5" />
                                 Transacciones
                             </Button>
                         </Link>
                         <Link href="/financial/scanner" className="w-full">
-                            <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl gap-2 font-medium shadow-sm transition-all h-10">
-                                <Search className="w-4 h-4" />
+                            <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl gap-2 font-medium shadow-sm transition-all h-8 text-xs">
+                                <Search className="w-3.5 h-3.5" />
                                 Escanear
                             </Button>
                         </Link>
@@ -595,33 +813,39 @@ export function FinancialInbox() {
                 </CardContent>
             </Card>
 
-            <section className="flex flex-col gap-6">
+            {/* Transactions Grouped By Date - Compact Fintech Cards without vertical timeline */}
+            <section className="flex flex-col gap-5">
                 {Object.entries(groupedTransactions).map(([dateLabel, items]) => (
-                    <div key={dateLabel} className="flex flex-col gap-3">
-                        <h3 className="text-sm font-medium text-muted-foreground tracking-tight sticky top-0 bg-background/80 backdrop-blur-sm py-2 z-10">
-                            {dateLabel}
-                        </h3>
-                        <div className="grid gap-4 items-start grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-                            {items.map((tx, index) => {
+                    <div key={dateLabel} className="flex flex-col gap-2.5">
+                        {/* Date Header with Purple Calendar Icon */}
+                        <div className="flex items-center gap-2 text-sm sm:text-base font-semibold text-slate-200 py-0.5">
+                            <Calendar className="h-4 w-4 text-purple-400 shrink-0" />
+                            <span className="capitalize">{dateLabel}</span>
+                        </div>
+
+                        {/* Card List - Compact Vertical Spacing */}
+                        <div className="flex flex-col gap-2.5 sm:gap-3">
+                            {items.map((tx) => {
                                 const isProcessing = processing?.id === tx.id;
                                 const isConfirming = isProcessing && processing?.action === "confirm";
                                 const isDismissing = isProcessing && processing?.action === "dismiss";
-                                const editing = isEditing[tx.id!] || false;
-                                const expanded = expandedStates[tx.id!] || false;
+                                const isOpening = openingId === tx.id;
 
-                                const txType = editStates[tx.id!]?.type || normalizeTransactionType(tx.type);
+                                const txType = normalizeTransactionType(tx.type);
                                 const isIncome = txType === "INCOME";
                                 const isExpense = txType === "EXPENSE";
                                 const isWithdrawal = txType === "WITHDRAWAL";
-                                const typeLabel = TYPE_OPTIONS.find(o => o.value === txType)?.label || "Gasto";
-                                const displaySummary = editStates[tx.id!]?.summary || "Sin resumen disponible para este escaneo.";
+
+                                const categoryVisual = getCategoryVisualConfig(tx.category, tx.type);
+                                const CategoryIcon = categoryVisual.icon;
+                                const isPaidWithCredit = isTransactionPaidWithCredit(tx);
+                                const accounts = extractScannedAccounts(tx);
 
                                 // Institution shown on the card. Mirror the detail form's server-side
                                 // resolution: when the scanned merchant confidently matches a stored
                                 // institution (score ≥ threshold), show that institution's name (e.g.
-                                // "PAYU*AR*UBER" → "Uber") so the card and the form agree. Otherwise
-                                // fall back to the raw merchant. The badge still reflects the match.
-                                const rawMerchantValue = editStates[tx.id!]?.merchant || tx.merchant || "";
+                                // "PAYU*AR*UBER" → "Uber") so the card and the form agree.
+                                const rawMerchantValue = tx.merchant || "";
                                 const institutionMatchInfo = institutionsLoaded
                                     ? getInstitutionMatchInfo(rawMerchantValue, institutionNames)
                                     : null;
@@ -630,249 +854,269 @@ export function FinancialInbox() {
                                         ? institutionMatchInfo.matchedName
                                         : rawMerchantValue;
 
-
                                 return (
                                     <Card
                                         key={tx.id}
                                         className={cn(
-                                            "group relative overflow-hidden rounded-[1.75rem] border-border/60 bg-bg-secondary py-0 shadow-sm shadow-black/5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md",
-                                            "flex flex-col",
+                                            "group relative overflow-hidden rounded-2xl border border-indigo-500/20 bg-slate-900/60 backdrop-blur-sm py-0 shadow-md shadow-black/20 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:border-indigo-500/40",
+                                            "flex flex-col cursor-pointer active:scale-[0.99]",
+                                            isOpening && "scale-[0.99] border-indigo-400/60 ring-1 ring-indigo-400/40",
                                             isProcessing && "opacity-60 pointer-events-none"
                                         )}
+                                        role="link"
+                                        tabIndex={0}
+                                        aria-busy={isOpening}
+                                        onClick={() => openDetail(tx.id!)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === "Enter" || e.key === " ") {
+                                                e.preventDefault();
+                                                openDetail(tx.id!);
+                                            }
+                                        }}
                                     >
-                                        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-accent-primary/60 to-transparent" aria-hidden="true" />
-
-                                        <CardHeader
+                                        {/* Top Accent Gradient Line */}
+                                        <div
                                             className={cn(
-                                                "flex flex-col !space-y-0 !px-4 !pt-4 !pb-2.5 sm:!px-5 select-none bg-bg-secondary/50 transition-colors",
-                                                (expanded || editing) && "border-b border-border/50",
-                                                !editing && "cursor-pointer hover:bg-bg-secondary"
+                                                "absolute inset-x-0 top-0 h-[1.5px] bg-gradient-to-r from-transparent via-indigo-500/40 to-transparent",
+                                                isOpening && "h-0.5 animate-pulse via-indigo-400"
                                             )}
-                                            onClick={() => { if (!editing) toggleExpanded(tx.id!) }}
-                                        >
-                                            <div className="flex flex-col w-full gap-3">
-                                                <div className="flex flex-col w-full gap-2">
-                                                    {/* TOP ROW: Badge + Amount */}
-                                                    <div className="flex w-full items-start justify-between gap-3 min-w-0">
-                                                        <div className="flex items-center gap-2 min-w-0">
+                                            aria-hidden="true"
+                                        />
+
+                                        <CardHeader className="flex flex-col !space-y-0 !p-3 sm:!p-3.5 select-none bg-slate-900/40 transition-colors">
+                                            {/* TOP SECTION: Left Column (Avatar + Time) + Content Block */}
+                                            <div className="flex items-start gap-3 w-full">
+                                                {/* Left Column: Circular Glowing Avatar + Time placed directly below (without clock icon) */}
+                                                <div className="flex flex-col items-center gap-1 shrink-0 pt-0.5">
+                                                    <div className="relative">
+                                                        <div
+                                                            className={cn(
+                                                                "flex items-center justify-center rounded-full w-11 h-11 border transition-transform duration-200 group-hover:scale-105",
+                                                                categoryVisual.containerClass
+                                                            )}
+                                                        >
+                                                            <CategoryIcon className="w-5 h-5" strokeWidth={2.2} />
+                                                        </div>
+                                                        {/* Top badge on avatar (TC if credit) */}
+                                                        {isPaidWithCredit && (
                                                             <span
-                                                                className="inline-flex h-5 max-w-[180px] items-center gap-1 rounded-md border border-[#FFB020]/20 bg-[#FFB020]/10 px-2 text-[11px] font-medium leading-none tracking-wide text-[#FFB020]"
+                                                                className="absolute -top-1 -right-1 z-10 flex items-center gap-0.5 rounded-full bg-amber-500 px-1.5 py-0.5 text-[8px] font-extrabold uppercase leading-none text-slate-950 shadow-sm"
+                                                                title="Pagado con tarjeta de crédito"
+                                                            >
+                                                                <CreditCard className="h-2 w-2" /> TC
+                                                            </span>
+                                                        )}
+                                                    </div>
+
+                                                    {/* Time placed right under category icon without clock icon */}
+                                                    <span className="text-[11px] text-slate-400 font-medium tracking-tight">
+                                                        {tx.date
+                                                            ? formatTime(tx.date)
+                                                            : tx.createdAt
+                                                            ? formatTime(tx.createdAt)
+                                                            : "--:--"}
+                                                    </span>
+                                                </div>
+
+                                                {/* Right: Category, Amount, Title, Institution, Accounts */}
+                                                <div className="flex flex-col flex-1 min-w-0">
+                                                    {/* Top Row: Category pill badge (no tag icon) + Amount */}
+                                                    <div className="flex items-center justify-between gap-2 w-full min-w-0">
+                                                        <div className="flex items-center gap-1.5 min-w-0">
+                                                            <span
+                                                                className="inline-flex h-5 max-w-[150px] sm:max-w-[190px] items-center rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[11px] font-semibold leading-none tracking-wide text-amber-400"
                                                                 title={tx.category || "Sin categoría"}
                                                             >
-                                                                <Tag className="h-3 w-3 shrink-0" />
                                                                 <span className="truncate">{tx.category || "Sin categoría"}</span>
                                                             </span>
-                                                            {tx.relatedTransactionHint && (
+                                                            {tx.relatedTransactionHint ? (
                                                                 <Popover>
                                                                     <PopoverTrigger asChild>
                                                                         <button
                                                                             type="button"
-                                                                            className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md border border-[#FFB020]/20 bg-[#FFB020]/10 text-[#FFB020] transition-colors hover:bg-[#FFB020]/20 focus-visible:outline-none"
+                                                                            className="inline-flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-md border border-amber-500/20 bg-amber-500/10 text-amber-400 transition-colors hover:bg-amber-500/20 focus-visible:outline-none"
                                                                             onClick={(e) => e.stopPropagation()}
                                                                         >
                                                                             <CircleAlert className="h-3 w-3" />
                                                                         </button>
                                                                     </PopoverTrigger>
-                                                                    <PopoverContent align="start" className="w-72 rounded-xl border border-border/50 bg-bg-secondary p-3 text-sm shadow-xl shadow-black/40">
+                                                                    <PopoverContent
+                                                                        align="start"
+                                                                        className="w-72 rounded-xl border border-border/50 bg-slate-900 p-3 text-sm shadow-xl shadow-black/50"
+                                                                        onClick={(e) => e.stopPropagation()}
+                                                                    >
                                                                         <div className="flex items-start gap-2">
-                                                                            <CircleAlert className="mt-0.5 h-4 w-4 shrink-0 text-[#FFB020]" />
-                                                                            <p className="text-muted-foreground">Posible relación: <span className="text-foreground font-medium">{tx.relatedTransactionHint}</span></p>
+                                                                            <CircleAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
+                                                                            <p className="text-muted-foreground">
+                                                                                Posible relación:{" "}
+                                                                                <span className="text-foreground font-medium">
+                                                                                    {tx.relatedTransactionHint}
+                                                                                </span>
+                                                                            </p>
                                                                         </div>
                                                                     </PopoverContent>
                                                                 </Popover>
-                                                            )}
-                                                        </div>
-
-                                                        <div className="flex flex-col items-end shrink-0">
-                                                            {editing ? (
-                                                                <div className="flex items-center justify-end gap-1 overflow-hidden max-w-[120px]">
-                                                                    <Input
-                                                                        type="number"
-                                                                        step="0.01"
-                                                                        value={editStates[tx.id!]?.amount ?? ""}
-                                                                        onChange={(e) => updateEditState(tx.id!, "amount", e.target.value ? parseFloat(e.target.value) : null)}
-                                                                        className="h-7 w-20 text-right font-medium text-xs border-border/40 bg-white/5 rounded-md px-2 focus-visible:ring-1 focus-visible:ring-white/20"
-                                                                        onClick={(e) => e.stopPropagation()}
-                                                                    />
-                                                                </div>
                                                             ) : (
-                                                                <span
-                                                                    className={cn(
-                                                                        "text-[15px] sm:text-[17px] font-semibold tracking-tight whitespace-nowrap",
-                                                                        isIncome ? "text-[#2EE59D]" : isExpense ? "text-rose-400" : isWithdrawal ? "text-sky-400" : "text-[#FFB020]"
-                                                                    )}
-                                                                    title={formatAmount(editStates[tx.id!]?.amount, tx.currency || "USD")}
-                                                                >
-                                                                    {isIncome ? "+" : isExpense ? "-" : ""}
-                                                                    {formatAmount(editStates[tx.id!]?.amount, tx.currency || "USD")}
+                                                                <span className="text-slate-500 text-xs select-none" title="Información">
+                                                                    ⓘ
                                                                 </span>
                                                             )}
                                                         </div>
-                                                    </div>
 
-                                                    {/* TITLE & MERCHANT (Full Width) */}
-                                                    <div className="flex flex-col w-full">
-                                                        <CardTitle
-                                                            className="text-sm sm:text-base tracking-tight font-semibold line-clamp-2 leading-tight w-full mb-0.5"
-                                                            title={tx.description || "Transacción"}
-                                                        >
-                                                            {tx.description || "Transacción"}
-                                                        </CardTitle>
-                                                        <div className="flex items-center min-w-0 w-full text-xs text-zinc-400">
-                                                            {editing ? (
-                                                                <Input
-                                                                    value={editStates[tx.id!]?.merchant || ""}
-                                                                    onChange={(event) => updateEditState(tx.id!, "merchant", event.target.value)}
-                                                                    placeholder="Institución"
-                                                                    className="h-7 text-xs font-medium border-white/10 bg-white/5 rounded-md px-2 w-full focus-visible:ring-1 focus-visible:ring-white/20 mt-1"
-                                                                    onClick={(e) => e.stopPropagation()}
-                                                                />
-                                                            ) : (
-                                                                <>
-                                                                    <span className="truncate min-w-0" title={displayInstitution || "Institución por confirmar"}>
-                                                                        {displayInstitution || "Institución por confirmar"}
-                                                                    </span>
-                                                                    {institutionMatchInfo && rawMerchantValue && (
-                                                                        <InstitutionMatchBadge
-                                                                            info={institutionMatchInfo}
-                                                                            size={13}
-                                                                            className="ml-1"
-                                                                        />
-                                                                    )}
-                                                                </>
+                                                        {/* Amount */}
+                                                        <div className="flex items-center gap-1.5 shrink-0">
+                                                            {isOpening && (
+                                                                <Loader2 className="h-3.5 w-3.5 animate-spin text-indigo-400" />
                                                             )}
-                                                        </div>
-                                                    </div>
-                                                </div>
-
-                                                {/* BOTTOM SIDE (Time, Context & Actions) */}
-                                                <div className="flex w-full items-center justify-between pt-3 mt-1 border-t border-border/40 gap-3">
-                                                    <div className="flex items-center gap-3 min-w-0">
-                                                        <span className="flex items-center justify-center gap-1.5 text-[11px] sm:text-xs shrink-0 bg-transparent text-zinc-400 hover:text-zinc-200 px-2 h-7 sm:h-8 rounded-sm border border-transparent font-medium transition-colors">
-                                                            <Clock className="h-3.5 w-3.5 opacity-70" />
-                                                            {editing ? (
-                                                                <Input
-                                                                    type="datetime-local"
-                                                                    value={editStates[tx.id!]?.date || ""}
-                                                                    onChange={(e) => updateEditState(tx.id!, "date", e.target.value)}
-                                                                    className="h-6 text-[10px] py-0 px-2 border-white/10 bg-white/5 text-zinc-200 rounded-md w-32 focus-visible:ring-1 focus-visible:ring-white/20"
-                                                                    onClick={(e) => e.stopPropagation()}
-                                                                />
-                                                            ) : (
-                                                                <span className="truncate">
-                                                                    {editStates[tx.id!]?.date ? formatTime(editStates[tx.id!]!.date) : "--:--"}
-                                                                </span>
-                                                            )}
-                                                        </span>
-                                                    </div>
-
-                                                    {/* Actions */}
-                                                    <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
-                                                        {!editing && (
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => toggleExpanded(tx.id!)}
-                                                                title={expanded ? "Ocultar detalles" : "Ver detalles"}
-                                                                className="flex items-center justify-center h-7 w-7 sm:h-8 sm:w-8 rounded-md transition-all shrink-0 active:scale-95 bg-gradient-to-br from-indigo-500/10 to-indigo-600/5 text-indigo-400 hover:from-indigo-500/20 hover:to-indigo-600/10 hover:text-indigo-300 border border-indigo-500/10 hover:border-indigo-500/20 shadow-sm"
-                                                            >
-                                                                {expanded ? (
-                                                                    <ChevronUp className="h-4 w-4 shrink-0" />
-                                                                ) : (
-                                                                    <ChevronDown className="h-4 w-4 shrink-0" />
+                                                            <span
+                                                                className={cn(
+                                                                    "text-[15px] sm:text-base font-bold tracking-tight whitespace-nowrap",
+                                                                    isIncome
+                                                                        ? "text-emerald-400"
+                                                                        : isExpense
+                                                                        ? "text-[#FF4D6D]"
+                                                                        : isWithdrawal
+                                                                        ? "text-sky-400"
+                                                                        : "text-amber-400"
                                                                 )}
-                                                            </button>
-                                                        )}
+                                                                title={formatAmount(tx.amount, tx.currency || "USD")}
+                                                            >
+                                                                {isIncome ? "+" : isExpense ? "-" : ""}
+                                                                {formatAmount(tx.amount, tx.currency || "USD")}
+                                                            </span>
+                                                        </div>
+                                                    </div>
 
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            className="h-7 w-7 sm:h-8 sm:w-8 rounded-md bg-gradient-to-br from-zinc-500/10 to-zinc-600/5 text-zinc-400 border border-zinc-500/10 hover:from-zinc-500/20 hover:to-zinc-600/10 hover:text-zinc-300 hover:border-zinc-500/20 hover:shadow-sm shrink-0 transition-all"
-                                                            disabled={isProcessing}
-                                                            asChild
+                                                    {/* Title */}
+                                                    <CardTitle
+                                                        className="text-sm sm:text-[15px] tracking-tight font-bold line-clamp-2 leading-snug w-full mt-1 group-hover:text-indigo-300 transition-colors text-white"
+                                                        title={tx.description || "Transacción"}
+                                                    >
+                                                        {tx.description || "Transacción"}
+                                                    </CardTitle>
+
+                                                    {/* Institution / Merchant with Verification Badge */}
+                                                    <div className="flex items-center min-w-0 w-full text-xs text-slate-400 mt-0.5 font-medium">
+                                                        <span
+                                                            className="truncate min-w-0"
+                                                            title={displayInstitution || "Institución por confirmar"}
                                                         >
-                                                            <Link href={`/financial/scans/${tx.id}`}>
-                                                                <Eye className="h-4 w-4 opacity-70" />
-                                                                <span className="sr-only">Detalles</span>
-                                                            </Link>
-                                                        </Button>
-
-                                                        {editing ? (
-                                                            <>
-                                                                <Button
-                                                                    variant="ghost"
-                                                                    size="sm"
-                                                                    className="h-7 sm:h-8 px-3 rounded-md text-xs font-medium text-zinc-400 hover:text-zinc-200 hover:bg-white/5 transition-colors"
-                                                                    onClick={() => cancelEdit(tx.id!, tx)}
-                                                                    disabled={isProcessing}
-                                                                >
-                                                                    Cancelar
-                                                                </Button>
-                                                                <Button
-                                                                    size="sm"
-                                                                    className="h-7 sm:h-8 px-3 rounded-md text-xs font-medium bg-zinc-100 text-zinc-900 hover:bg-white shadow-sm transition-colors"
-                                                                    onClick={() => toggleEdit(tx.id!)}
-                                                                    disabled={isProcessing}
-                                                                >
-                                                                    <Check className="h-3.5 w-3.5 mr-1" />
-                                                                    Listo
-                                                                </Button>
-                                                            </>
-                                                        ) : (
-                                                            <>
-                                                                <Button
-                                                                    variant="ghost"
-                                                                    size="icon"
-                                                                    className="h-7 w-7 sm:h-8 sm:w-8 rounded-md bg-gradient-to-br from-rose-500/10 to-rose-600/5 text-rose-400 border border-rose-500/10 hover:from-rose-500/20 hover:to-rose-600/10 hover:text-rose-300 hover:border-rose-500/20 hover:shadow-sm shrink-0 transition-all"
-                                                                    onClick={() => handleDismiss(tx.id!)}
-                                                                    disabled={isProcessing}
-                                                                    title="Descartar"
-                                                                >
-                                                                    {isDismissing ? (
-                                                                        <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                                                                    ) : (
-                                                                        <X className="h-4 w-4" />
-                                                                    )}
-                                                                </Button>
-                                                                <Button
-                                                                    size="icon"
-                                                                    className="h-7 w-7 sm:h-8 sm:w-8 rounded-md bg-gradient-to-br from-emerald-500/10 to-emerald-600/5 text-emerald-400 border border-emerald-500/10 hover:from-emerald-500/20 hover:to-emerald-600/10 hover:text-emerald-300 hover:border-emerald-500/20 hover:shadow-sm shrink-0 transition-all"
-                                                                    onClick={() => handleConfirm(tx)}
-                                                                    disabled={isProcessing}
-                                                                    title="Confirmar"
-                                                                >
-                                                                    {isConfirming ? (
-                                                                        <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                                                                    ) : (
-                                                                        <Check className="h-4 w-4" />
-                                                                    )}
-                                                                </Button>
-                                                            </>
+                                                            {displayInstitution || "Institución por confirmar"}
+                                                        </span>
+                                                        {institutionMatchInfo && rawMerchantValue && (
+                                                            <InstitutionMatchBadge
+                                                                info={institutionMatchInfo}
+                                                                size={13}
+                                                                className="ml-1 shrink-0"
+                                                            />
                                                         )}
                                                     </div>
-                                                </div>
-                                            </div>
-                                        </CardHeader>
 
-                                        {/* Expanded Area for Resumen */}
-                                        {(expanded || editing) && (
-                                            <CardContent className="space-y-4 px-4 pb-3 pt-2.5 sm:px-5 animate-in slide-in-from-top-2 duration-200">
-                                                <div className="rounded-xl bg-white/[0.02] p-3.5 border border-white/5 flex flex-col gap-2">
-                                                    <span className="text-xs font-semibold text-zinc-300 uppercase tracking-wider">Resumen</span>
-                                                    {editing ? (
-                                                        <textarea
-                                                            value={editStates[tx.id!]?.summary || ""}
-                                                            onChange={(e) => updateEditState(tx.id!, "summary", e.target.value)}
-                                                            className="w-full min-h-[60px] rounded-lg border border-white/10 bg-white/5 p-2.5 text-xs sm:text-sm leading-relaxed text-zinc-200 focus:outline-none focus:ring-2 focus:ring-white/20 resize-y"
-                                                            placeholder="No hay resumen disponible para este escaneo."
-                                                        />
-                                                    ) : (
-                                                        <p className="text-xs sm:text-sm leading-relaxed text-zinc-400 whitespace-pre-wrap break-words [word-break:break-word]">
-                                                            {displaySummary}
-                                                        </p>
+                                                    {/* Origin and Destination Accounts (Individual badges for icon, number, type TCR/TDE/AHO/CTE/CTA, ownership MIA/TER) */}
+                                                    {(accounts.source || accounts.destination) && (
+                                                        <div className="flex flex-col gap-1.5 mt-2">
+                                                            {accounts.source && (() => {
+                                                                const info = resolveAccountBadgeInfo("SOURCE", accounts.source, tx);
+                                                                return (
+                                                                    <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                                                                        {/* Origin Arrow Icon Badge */}
+                                                                        <span
+                                                                            className="inline-flex items-center justify-center h-5 w-5 rounded-md border border-rose-500/30 bg-rose-500/10 text-rose-400 shrink-0 select-none"
+                                                                            title="Origen"
+                                                                        >
+                                                                            <ArrowUpRight className="h-3 w-3 stroke-[2.5]" />
+                                                                        </span>
+
+                                                                        {/* Account Number Badge */}
+                                                                        <span className="inline-flex items-center h-5 px-1.5 rounded-md border border-slate-700/60 bg-slate-800/50 font-mono text-[11px] text-slate-200 font-medium tracking-wide shrink-0 select-none">
+                                                                            {info.formattedNumber}
+                                                                        </span>
+
+                                                                        {/* Account Type Acronym Badge (TCR, TDE, AHO, CTE, CTA) */}
+                                                                        <span className="inline-flex items-center h-5 px-1.5 rounded-md border border-indigo-500/30 bg-indigo-500/10 text-[9.5px] font-bold text-indigo-300 shrink-0 select-none">
+                                                                            {info.typeAcronym}
+                                                                        </span>
+
+                                                                        {/* Ownership Acronym Badge (MIA for own, TER for third party) */}
+                                                                        <span className="inline-flex items-center h-5 px-1.5 rounded-md border border-slate-600/40 bg-slate-800/40 text-[9px] font-bold text-slate-400 shrink-0 select-none">
+                                                                            {info.ownershipAcronym}
+                                                                        </span>
+                                                                    </div>
+                                                                );
+                                                            })()}
+
+                                                            {accounts.destination && (() => {
+                                                                const info = resolveAccountBadgeInfo("DESTINATION", accounts.destination, tx);
+                                                                return (
+                                                                    <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                                                                        {/* Destination Arrow Icon Badge */}
+                                                                        <span
+                                                                            className="inline-flex items-center justify-center h-5 w-5 rounded-md border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 shrink-0 select-none"
+                                                                            title="Destino"
+                                                                        >
+                                                                            <ArrowDownLeft className="h-3 w-3 stroke-[2.5]" />
+                                                                        </span>
+
+                                                                        {/* Account Number Badge */}
+                                                                        <span className="inline-flex items-center h-5 px-1.5 rounded-md border border-slate-700/60 bg-slate-800/50 font-mono text-[11px] text-slate-200 font-medium tracking-wide shrink-0 select-none">
+                                                                            {info.formattedNumber}
+                                                                        </span>
+
+                                                                        {/* Account Type Acronym Badge */}
+                                                                        <span className="inline-flex items-center h-5 px-1.5 rounded-md border border-indigo-500/30 bg-indigo-500/10 text-[9.5px] font-bold text-indigo-300 shrink-0 select-none">
+                                                                            {info.typeAcronym}
+                                                                        </span>
+
+                                                                        {/* Ownership Acronym Badge */}
+                                                                        <span className="inline-flex items-center h-5 px-1.5 rounded-md border border-slate-600/40 bg-slate-800/40 text-[9px] font-bold text-slate-400 shrink-0 select-none">
+                                                                            {info.ownershipAcronym}
+                                                                        </span>
+                                                                    </div>
+                                                                );
+                                                            })()}
+                                                        </div>
                                                     )}
                                                 </div>
-                                            </CardContent>
-                                        )}
+                                            </div>
+
+                                            {/* BOTTOM BAR: Subtle Full-Width Action Buttons */}
+                                            <div
+                                                className="grid grid-cols-2 gap-2.5 w-full pt-2.5 mt-2.5 border-t border-slate-800/80"
+                                                onClick={(e) => e.stopPropagation()}
+                                            >
+                                                {/* Reject Button */}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleDismiss(tx.id!)}
+                                                    disabled={isProcessing}
+                                                    title="Rechazar"
+                                                    className="flex items-center justify-center gap-1.5 h-8.5 rounded-xl bg-rose-950/20 border border-rose-500/20 text-rose-400 hover:bg-rose-900/40 hover:text-rose-300 hover:border-rose-500/35 text-xs font-semibold active:scale-[0.98] transition-all shadow-sm"
+                                                >
+                                                    {isDismissing ? (
+                                                        <Loader2 className="h-3.5 w-3.5 animate-spin text-rose-400" />
+                                                    ) : (
+                                                        <X className="h-3.5 w-3.5 stroke-[2.5]" />
+                                                    )}
+                                                    <span>Rechazar</span>
+                                                </button>
+
+                                                {/* Approve Button */}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleConfirm(tx)}
+                                                    disabled={isProcessing}
+                                                    title="Aprobar"
+                                                    className="flex items-center justify-center gap-1.5 h-8.5 rounded-xl bg-emerald-950/20 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-900/40 hover:text-emerald-300 hover:border-emerald-500/35 text-xs font-semibold active:scale-[0.98] transition-all shadow-sm"
+                                                >
+                                                    {isConfirming ? (
+                                                        <Loader2 className="h-3.5 w-3.5 animate-spin text-emerald-400" />
+                                                    ) : (
+                                                        <Check className="h-3.5 w-3.5 stroke-[2.5]" />
+                                                    )}
+                                                    <span>Aprobar</span>
+                                                </button>
+                                            </div>
+                                        </CardHeader>
                                     </Card>
                                 );
                             })}

@@ -5,6 +5,7 @@ import { Inbox as InboxIcon, Search, Receipt } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { TransactionTabs } from "@/presentation/financial/components/TransactionTabs";
+import { RobotLoader } from "@/components/ui/RobotLoader";
 
 export const metadata: Metadata = {
     title: "Bandeja de escaneos financieros - KyberLife",
@@ -42,7 +43,11 @@ export default async function ScansInboxPage() {
             </div>
 
             <div className="mb-4 mt-2">
-                <Suspense fallback={<div className="p-8 text-center animate-pulse">Cargando bandeja...</div>}>
+                <Suspense fallback={
+                    <div className="flex min-h-[45vh] w-full items-center justify-center py-12">
+                        <RobotLoader size={96} text="Cargando datos..." />
+                    </div>
+                }>
                     <TransactionTabs>
                         <FinancialInbox />
                     </TransactionTabs>
