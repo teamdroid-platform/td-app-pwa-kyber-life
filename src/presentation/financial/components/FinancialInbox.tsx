@@ -15,6 +15,19 @@ import {
     Tag,
     Receipt,
     Loader2,
+    Utensils,
+    Car,
+    HeartPulse,
+    Lightbulb,
+    Ticket,
+    ShoppingCart,
+    GraduationCap,
+    Home,
+    Dog,
+    TrendingUp,
+    ArrowRightLeft,
+    Wallet,
+    CreditCard,
 } from "lucide-react";
 import {
     getUnprocessedInboxTransactionsAction,
@@ -23,6 +36,7 @@ import {
 } from "@/app/actions/financial-inbox";
 import { getInstitutionsAction } from "@/app/actions/financial-settings";
 import { getInstitutionMatchInfo, INSTITUTION_MATCH_THRESHOLD } from "@/lib/institution-match";
+import { isTransactionPaidWithCredit } from "@/lib/financial-utils";
 import { InstitutionMatchBadge } from "./InstitutionMatchBadge";
 import { FinancialScannerTransaction } from "@/domain/entities/financial";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -64,6 +78,156 @@ function formatAmount(amount?: number | null, currency = "USD") {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
     }).format(amount);
+}
+
+interface CategoryVisualConfig {
+    icon: React.ElementType;
+    containerClass: string;
+}
+
+function getCategoryVisualConfig(category?: string | null, txType?: string | null): CategoryVisualConfig {
+    const cat = (category || "").toLowerCase().trim();
+    const type = (txType || "").toUpperCase();
+
+    if (
+        cat.includes("aliment") ||
+        cat.includes("comida") ||
+        cat.includes("restauran") ||
+        cat.includes("food") ||
+        cat.includes("supermerc") ||
+        cat.includes("cafeter")
+    ) {
+        return {
+            icon: Utensils,
+            containerClass: "border-[#FFB020]/40 bg-[#FFB020]/10 text-[#FFB020] shadow-[0_0_14px_rgba(255,176,32,0.25)]",
+        };
+    }
+    if (
+        cat.includes("transpor") ||
+        cat.includes("viaje") ||
+        cat.includes("taxi") ||
+        cat.includes("uber") ||
+        cat.includes("cabify") ||
+        cat.includes("gasolin") ||
+        cat.includes("combust") ||
+        cat.includes("peaje")
+    ) {
+        return {
+            icon: Car,
+            containerClass: "border-[#00B4D8]/40 bg-[#00B4D8]/10 text-[#00B4D8] shadow-[0_0_14px_rgba(0,180,216,0.25)]",
+        };
+    }
+    if (
+        cat.includes("salud") ||
+        cat.includes("farmac") ||
+        cat.includes("medic") ||
+        cat.includes("hospital") ||
+        cat.includes("dentist")
+    ) {
+        return {
+            icon: HeartPulse,
+            containerClass: "border-rose-500/40 bg-rose-500/10 text-rose-400 shadow-[0_0_14px_rgba(244,63,94,0.22)]",
+        };
+    }
+    if (
+        cat.includes("servici") ||
+        cat.includes("luz") ||
+        cat.includes("agua") ||
+        cat.includes("telef") ||
+        cat.includes("internet") ||
+        cat.includes("electric")
+    ) {
+        return {
+            icon: Lightbulb,
+            containerClass: "border-yellow-500/40 bg-yellow-500/10 text-yellow-400 shadow-[0_0_14px_rgba(234,179,8,0.22)]",
+        };
+    }
+    if (
+        cat.includes("entreten") ||
+        cat.includes("cine") ||
+        cat.includes("streaming") ||
+        cat.includes("netflix") ||
+        cat.includes("spotify") ||
+        cat.includes("juego") ||
+        cat.includes("ocio")
+    ) {
+        return {
+            icon: Ticket,
+            containerClass: "border-purple-500/40 bg-purple-500/10 text-purple-400 shadow-[0_0_14px_rgba(168,85,247,0.22)]",
+        };
+    }
+    if (
+        cat.includes("compra") ||
+        cat.includes("shop") ||
+        cat.includes("ropa") ||
+        cat.includes("tienda") ||
+        cat.includes("mall") ||
+        cat.includes("amazon")
+    ) {
+        return {
+            icon: ShoppingCart,
+            containerClass: "border-emerald-500/40 bg-emerald-500/10 text-emerald-400 shadow-[0_0_14px_rgba(16,185,129,0.22)]",
+        };
+    }
+    if (
+        cat.includes("educa") ||
+        cat.includes("curso") ||
+        cat.includes("universid") ||
+        cat.includes("colegio") ||
+        cat.includes("libro")
+    ) {
+        return {
+            icon: GraduationCap,
+            containerClass: "border-blue-500/40 bg-blue-500/10 text-blue-400 shadow-[0_0_14px_rgba(59,130,246,0.22)]",
+        };
+    }
+    if (
+        cat.includes("hogar") ||
+        cat.includes("casa") ||
+        cat.includes("arriendo") ||
+        cat.includes("alquiler") ||
+        cat.includes("mueble")
+    ) {
+        return {
+            icon: Home,
+            containerClass: "border-teal-500/40 bg-teal-500/10 text-teal-400 shadow-[0_0_14px_rgba(20,184,166,0.22)]",
+        };
+    }
+    if (
+        cat.includes("mascot") ||
+        cat.includes("veterin") ||
+        cat.includes("perro") ||
+        cat.includes("gato")
+    ) {
+        return {
+            icon: Dog,
+            containerClass: "border-orange-500/40 bg-orange-500/10 text-orange-400 shadow-[0_0_14px_rgba(249,115,22,0.22)]",
+        };
+    }
+
+    if (type === "INCOME") {
+        return {
+            icon: TrendingUp,
+            containerClass: "border-emerald-500/40 bg-emerald-500/10 text-emerald-400 shadow-[0_0_14px_rgba(16,185,129,0.25)]",
+        };
+    }
+    if (type === "TRANSFER") {
+        return {
+            icon: ArrowRightLeft,
+            containerClass: "border-indigo-500/40 bg-indigo-500/10 text-indigo-400 shadow-[0_0_14px_rgba(99,102,241,0.22)]",
+        };
+    }
+    if (type === "WITHDRAWAL") {
+        return {
+            icon: Wallet,
+            containerClass: "border-sky-500/40 bg-sky-500/10 text-sky-400 shadow-[0_0_14px_rgba(14,165,233,0.22)]",
+        };
+    }
+
+    return {
+        icon: Receipt,
+        containerClass: "border-[#FFB020]/30 bg-[#FFB020]/10 text-[#FFB020] shadow-[0_0_12px_rgba(255,176,32,0.18)]",
+    };
 }
 
 /**
@@ -520,6 +684,10 @@ export function FinancialInbox() {
                                 const isExpense = txType === "EXPENSE";
                                 const isWithdrawal = txType === "WITHDRAWAL";
 
+                                const categoryVisual = getCategoryVisualConfig(tx.category, tx.type);
+                                const CategoryIcon = categoryVisual.icon;
+                                const isPaidWithCredit = isTransactionPaidWithCredit(tx);
+
                                 // Institution shown on the card. Mirror the detail form's server-side
                                 // resolution: when the scanned merchant confidently matches a stored
                                 // institution (score ≥ threshold), show that institution's name (e.g.
@@ -537,7 +705,7 @@ export function FinancialInbox() {
                                     <Card
                                         key={tx.id}
                                         className={cn(
-                                            "group relative overflow-hidden rounded-[1.75rem] border-border/60 bg-bg-secondary py-0 shadow-sm shadow-black/5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md",
+                                            "group relative overflow-hidden rounded-[1.5rem] border-border/60 bg-bg-secondary/90 py-0 shadow-sm shadow-black/5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md",
                                             "flex flex-col cursor-pointer active:scale-[0.985]",
                                             isOpening && "scale-[0.985] border-accent-primary/50 ring-1 ring-accent-primary/30",
                                             isProcessing && "opacity-60 pointer-events-none"
@@ -561,14 +729,36 @@ export function FinancialInbox() {
                                             aria-hidden="true"
                                         />
 
-                                        <CardHeader className="flex flex-col !space-y-0 !px-4 !pt-4 !pb-3 sm:!px-5 select-none bg-bg-secondary/50 transition-colors">
-                                            <div className="flex flex-col w-full gap-3">
-                                                <div className="flex flex-col w-full gap-2">
-                                                    {/* TOP ROW: Badge + Amount */}
-                                                    <div className="flex w-full items-start justify-between gap-3 min-w-0">
-                                                        <div className="flex items-center gap-2 min-w-0">
+                                        <CardHeader className="flex flex-col !space-y-0 !p-4 sm:!p-5 select-none bg-bg-secondary/50 transition-colors">
+                                            {/* TOP SECTION: Avatar Icon + Content Block */}
+                                            <div className="flex items-start gap-3.5 w-full">
+                                                {/* Left: Circular Glowing Avatar */}
+                                                <div className="relative shrink-0 mt-0.5">
+                                                    <div
+                                                        className={cn(
+                                                            "flex items-center justify-center rounded-full w-12 h-12 sm:w-13 sm:h-13 border transition-transform duration-200 group-hover:scale-105",
+                                                            categoryVisual.containerClass
+                                                        )}
+                                                    >
+                                                        <CategoryIcon className="w-5 h-5 sm:w-6 sm:h-6" strokeWidth={2.2} />
+                                                    </div>
+                                                    {isPaidWithCredit && (
+                                                        <span
+                                                            className="absolute -top-1 -right-1 z-10 flex items-center gap-0.5 rounded-full border border-bg-secondary bg-amber-500 px-1 py-0.5 text-[8px] font-bold leading-none text-white shadow-sm shadow-black/20"
+                                                            title="Pagado con tarjeta de crédito"
+                                                        >
+                                                            <CreditCard className="h-2 w-2" /> TC
+                                                        </span>
+                                                    )}
+                                                </div>
+
+                                                {/* Right: Category, Amount, Title, Institution */}
+                                                <div className="flex flex-col flex-1 min-w-0">
+                                                    {/* Top Row: Category pill badge + Amount */}
+                                                    <div className="flex items-center justify-between gap-2 w-full min-w-0">
+                                                        <div className="flex items-center gap-1.5 min-w-0">
                                                             <span
-                                                                className="inline-flex h-5 max-w-[180px] items-center gap-1 rounded-md border border-[#FFB020]/20 bg-[#FFB020]/10 px-2 text-[11px] font-medium leading-none tracking-wide text-[#FFB020]"
+                                                                className="inline-flex h-5 max-w-[150px] sm:max-w-[180px] items-center gap-1.5 rounded-md border border-[#FFB020]/25 bg-[#FFB020]/10 px-2 text-[11px] font-medium leading-none tracking-wide text-[#FFB020]"
                                                                 title={tx.category || "Sin categoría"}
                                                             >
                                                                 <Tag className="h-3 w-3 shrink-0" />
@@ -604,17 +794,18 @@ export function FinancialInbox() {
                                                             )}
                                                         </div>
 
+                                                        {/* Amount */}
                                                         <div className="flex items-center gap-1.5 shrink-0">
                                                             {isOpening && (
                                                                 <Loader2 className="h-3.5 w-3.5 animate-spin text-accent-primary" />
                                                             )}
                                                             <span
                                                                 className={cn(
-                                                                    "text-[15px] sm:text-[17px] font-semibold tracking-tight whitespace-nowrap",
+                                                                    "text-[15px] sm:text-base font-semibold tracking-tight whitespace-nowrap",
                                                                     isIncome
                                                                         ? "text-[#2EE59D]"
                                                                         : isExpense
-                                                                        ? "text-rose-400"
+                                                                        ? "text-[#FF5252]"
                                                                         : isWithdrawal
                                                                         ? "text-sky-400"
                                                                         : "text-[#FFB020]"
@@ -627,80 +818,81 @@ export function FinancialInbox() {
                                                         </div>
                                                     </div>
 
-                                                    {/* TITLE & MERCHANT (Full Width) */}
-                                                    <div className="flex flex-col w-full">
-                                                        <CardTitle
-                                                            className="text-sm sm:text-base tracking-tight font-semibold line-clamp-2 leading-tight w-full mb-0.5 group-hover:text-accent-primary transition-colors"
-                                                            title={tx.description || "Transacción"}
+                                                    {/* Title */}
+                                                    <CardTitle
+                                                        className="text-sm sm:text-[15px] tracking-tight font-semibold line-clamp-2 leading-tight w-full mt-1.5 group-hover:text-accent-primary transition-colors text-foreground"
+                                                        title={tx.description || "Transacción"}
+                                                    >
+                                                        {tx.description || "Transacción"}
+                                                    </CardTitle>
+
+                                                    {/* Institution / Merchant */}
+                                                    <div className="flex items-center min-w-0 w-full text-xs text-zinc-400 mt-0.5">
+                                                        <span
+                                                            className="truncate min-w-0"
+                                                            title={displayInstitution || "Institución por confirmar"}
                                                         >
-                                                            {tx.description || "Transacción"}
-                                                        </CardTitle>
-                                                        <div className="flex items-center min-w-0 w-full text-xs text-zinc-400">
-                                                            <span
-                                                                className="truncate min-w-0"
-                                                                title={displayInstitution || "Institución por confirmar"}
-                                                            >
-                                                                {displayInstitution || "Institución por confirmar"}
-                                                            </span>
-                                                            {institutionMatchInfo && rawMerchantValue && (
-                                                                <InstitutionMatchBadge
-                                                                    info={institutionMatchInfo}
-                                                                    size={13}
-                                                                    className="ml-1"
-                                                                />
-                                                            )}
-                                                        </div>
+                                                            {displayInstitution || "Institución por confirmar"}
+                                                        </span>
+                                                        {institutionMatchInfo && rawMerchantValue && (
+                                                            <InstitutionMatchBadge
+                                                                info={institutionMatchInfo}
+                                                                size={13}
+                                                                className="ml-1 shrink-0"
+                                                            />
+                                                        )}
                                                     </div>
                                                 </div>
+                                            </div>
 
-                                                {/* BOTTOM SIDE (Time & Actions) */}
-                                                <div className="flex w-full items-center justify-between pt-3 mt-1 border-t border-border/40 gap-3">
-                                                    <div className="flex items-center gap-3 min-w-0">
-                                                        <span className="flex items-center justify-center gap-1.5 text-[11px] sm:text-xs shrink-0 bg-transparent text-zinc-400 px-2 h-7 sm:h-8 rounded-sm font-medium">
-                                                            <Clock className="h-3.5 w-3.5 opacity-70" />
-                                                            <span className="truncate">
-                                                                {tx.date
-                                                                    ? formatTime(tx.date)
-                                                                    : tx.createdAt
-                                                                    ? formatTime(tx.createdAt)
-                                                                    : "--:--"}
-                                                            </span>
-                                                        </span>
-                                                    </div>
+                                            {/* BOTTOM BAR: Time & Quick Actions (Discard & Confirm) */}
+                                            <div className="flex w-full items-center justify-between pt-3 mt-3 border-t border-border/40 gap-3">
+                                                {/* Time */}
+                                                <div className="flex items-center gap-1.5 text-xs text-zinc-400 font-medium">
+                                                    <Clock className="h-3.5 w-3.5 opacity-70" />
+                                                    <span>
+                                                        {tx.date
+                                                            ? formatTime(tx.date)
+                                                            : tx.createdAt
+                                                            ? formatTime(tx.createdAt)
+                                                            : "--:--"}
+                                                    </span>
+                                                </div>
 
-                                                    {/* Actions: Discard & Confirm */}
-                                                    <div
-                                                        className="flex items-center gap-2 shrink-0"
-                                                        onClick={(e) => e.stopPropagation()}
+                                                {/* Actions */}
+                                                <div
+                                                    className="flex items-center gap-2 shrink-0"
+                                                    onClick={(e) => e.stopPropagation()}
+                                                >
+                                                    {/* Discard Button */}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleDismiss(tx.id!)}
+                                                        disabled={isProcessing}
+                                                        title="Descartar"
+                                                        className="flex items-center justify-center h-8 w-8 sm:h-9 sm:w-9 rounded-xl bg-[#2D161C] border border-rose-500/20 text-rose-400 hover:bg-rose-950/80 hover:text-rose-300 hover:border-rose-500/40 active:scale-95 transition-all shadow-sm"
                                                     >
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            className="h-7 w-7 sm:h-8 sm:w-8 rounded-md bg-gradient-to-br from-rose-500/10 to-rose-600/5 text-rose-400 border border-rose-500/10 hover:from-rose-500/20 hover:to-rose-600/10 hover:text-rose-300 hover:border-rose-500/20 hover:shadow-sm shrink-0 transition-all"
-                                                            onClick={() => handleDismiss(tx.id!)}
-                                                            disabled={isProcessing}
-                                                            title="Descartar"
-                                                        >
-                                                            {isDismissing ? (
-                                                                <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                                                            ) : (
-                                                                <X className="h-4 w-4" />
-                                                            )}
-                                                        </Button>
-                                                        <Button
-                                                            size="icon"
-                                                            className="h-7 w-7 sm:h-8 sm:w-8 rounded-md bg-gradient-to-br from-emerald-500/10 to-emerald-600/5 text-emerald-400 border border-emerald-500/10 hover:from-emerald-500/20 hover:to-emerald-600/10 hover:text-emerald-300 hover:border-emerald-500/20 hover:shadow-sm shrink-0 transition-all"
-                                                            onClick={() => handleConfirm(tx)}
-                                                            disabled={isProcessing}
-                                                            title="Confirmar"
-                                                        >
-                                                            {isConfirming ? (
-                                                                <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                                                            ) : (
-                                                                <Check className="h-4 w-4" />
-                                                            )}
-                                                        </Button>
-                                                    </div>
+                                                        {isDismissing ? (
+                                                            <Loader2 className="h-4 w-4 animate-spin text-rose-400" />
+                                                        ) : (
+                                                            <X className="h-4 w-4 stroke-[2.5]" />
+                                                        )}
+                                                    </button>
+
+                                                    {/* Confirm Button */}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleConfirm(tx)}
+                                                        disabled={isProcessing}
+                                                        title="Confirmar"
+                                                        className="flex items-center justify-center h-8 w-8 sm:h-9 sm:w-9 rounded-xl bg-[#112922] border border-emerald-500/20 text-emerald-400 hover:bg-emerald-950/80 hover:text-emerald-300 hover:border-emerald-500/40 active:scale-95 transition-all shadow-sm"
+                                                    >
+                                                        {isConfirming ? (
+                                                            <Loader2 className="h-4 w-4 animate-spin text-emerald-400" />
+                                                        ) : (
+                                                            <Check className="h-4 w-4 stroke-[2.5]" />
+                                                        )}
+                                                    </button>
                                                 </div>
                                             </div>
                                         </CardHeader>
