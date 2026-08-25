@@ -295,24 +295,6 @@ function extractScannedAccounts(tx: FinancialScannerTransaction): ScannedAccount
     return { source, destination };
 }
 
-function detectCardBrand(accountStr?: string | null, rawContext?: string | null): "VISA" | "MASTERCARD" | "AMEX" | "DINERS" | null {
-    const combined = `${accountStr || ""} ${rawContext || ""}`.toUpperCase();
-    if (combined.includes("VISA")) return "VISA";
-    if (combined.includes("MASTERCARD") || combined.includes("MASTER") || combined.includes("MC")) return "MASTERCARD";
-    if (combined.includes("AMEX") || combined.includes("AMERICAN")) return "AMEX";
-    if (combined.includes("DINERS")) return "DINERS";
-
-    // Clean digits
-    const digits = (accountStr || "").replace(/\D/g, "");
-    if (digits.length >= 4) {
-        if (digits.startsWith("4")) return "VISA";
-        if (/^(5[1-5]|2[2-7])/.test(digits)) return "MASTERCARD";
-        if (/^(34|37)/.test(digits)) return "AMEX";
-        if (/^(30|36|38)/.test(digits)) return "DINERS";
-    }
-    return null;
-}
-
 function formatMaskedNumber(acc: string): string {
     const trimmed = acc.trim();
     const digitsMatch = trimmed.match(/\d{4}$/);
@@ -326,41 +308,67 @@ function formatMaskedNumber(acc: string): string {
     return trimmed.length > 8 ? `**** ${trimmed.slice(-4)}` : trimmed;
 }
 
-function BrandBadge({ brand }: { brand: "VISA" | "MASTERCARD" | "AMEX" | "DINERS" | null }) {
-    if (!brand) return null;
+interface AccountBadgeInfo {
+    raw: string;
+    formattedNumber: string;
+    typeAcronym: "TC" | "TD" | "AHO" | "CTE" | "CTA";
+    ownershipAcronym: "TIT" | "TER";
+}
 
-    if (brand === "VISA") {
-        return (
-            <span className="inline-flex items-center px-1.5 py-0.5 rounded border border-blue-400/30 bg-blue-500/10 text-[9px] font-black italic tracking-widest text-blue-300 shrink-0 select-none">
-                VISA
-            </span>
-        );
+function resolveAccountBadgeInfo(
+    role: "SOURCE" | "DESTINATION",
+    accountNumber: string,
+    tx: FinancialScannerTransaction
+): AccountBadgeInfo {
+    const formatted = formatMaskedNumber(accountNumber);
+    const combinedContext = `${accountNumber} ${tx.merchant || ""} ${tx.description || ""} ${tx.summary || ""}`.toLowerCase();
+
+    // Type detection
+    let typeAcronym: "TC" | "TD" | "AHO" | "CTE" | "CTA" = "CTA";
+    if (
+        isTransactionPaidWithCredit(tx) ||
+        combinedContext.includes("crédito") ||
+        combinedContext.includes("credito") ||
+        combinedContext.includes("mastercard") ||
+        combinedContext.includes("visa") ||
+        combinedContext.includes("diners") ||
+        combinedContext.includes("amex") ||
+        combinedContext.includes("tc")
+    ) {
+        if (combinedContext.includes("débito") || combinedContext.includes("debito") || combinedContext.includes("td")) {
+            typeAcronym = "TD";
+        } else {
+            typeAcronym = "TC";
+        }
+    } else if (combinedContext.includes("débito") || combinedContext.includes("debito") || combinedContext.includes("td")) {
+        typeAcronym = "TD";
+    } else if (combinedContext.includes("ahorro") || combinedContext.includes("aho")) {
+        typeAcronym = "AHO";
+    } else if (combinedContext.includes("corriente") || combinedContext.includes("cte")) {
+        typeAcronym = "CTE";
     }
 
-    if (brand === "MASTERCARD") {
-        return (
-            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-orange-400/30 bg-orange-500/10 text-[9px] font-bold text-orange-200 shrink-0 select-none">
-                <span className="inline-flex -space-x-1">
-                    <span className="h-2 w-2 rounded-full bg-red-500" />
-                    <span className="h-2 w-2 rounded-full bg-amber-400" />
-                </span>
-            </span>
-        );
+    // Ownership detection:
+    // If source, almost always the user's own account -> TIT
+    // If destination, check if own transfer or third party
+    let ownershipAcronym: "TIT" | "TER" = role === "SOURCE" ? "TIT" : "TER";
+    if (role === "DESTINATION") {
+        if (
+            combinedContext.includes("entre mis cuentas") ||
+            combinedContext.includes("propia") ||
+            combinedContext.includes("mismo titular") ||
+            combinedContext.includes("ahorro personal")
+        ) {
+            ownershipAcronym = "TIT";
+        }
     }
 
-    if (brand === "AMEX") {
-        return (
-            <span className="inline-flex items-center px-1.5 py-0.5 rounded border border-sky-400/30 bg-sky-500/10 text-[9px] font-bold tracking-wider text-sky-300 shrink-0 select-none">
-                AMEX
-            </span>
-        );
-    }
-
-    return (
-        <span className="inline-flex items-center px-1.5 py-0.5 rounded border border-zinc-400/30 bg-zinc-500/10 text-[9px] font-bold tracking-wider text-zinc-300 shrink-0 select-none">
-            {brand}
-        </span>
-    );
+    return {
+        raw: accountNumber,
+        formattedNumber: formatted,
+        typeAcronym,
+        ownershipAcronym,
+    };
 }
 
 /**
@@ -870,27 +878,41 @@ export function FinancialInbox() {
                                         />
 
                                         <CardHeader className="flex flex-col !space-y-0 !p-3 sm:!p-3.5 select-none bg-slate-900/40 transition-colors">
-                                            {/* TOP SECTION: Avatar Icon + Content Block */}
+                                            {/* TOP SECTION: Left Column (Avatar + Time) + Content Block */}
                                             <div className="flex items-start gap-3 w-full">
-                                                {/* Left: Circular Glowing Avatar */}
-                                                <div className="relative shrink-0 mt-0.5">
-                                                    <div
-                                                        className={cn(
-                                                            "flex items-center justify-center rounded-full w-11 h-11 sm:w-12 sm:h-12 border transition-transform duration-200 group-hover:scale-105",
-                                                            categoryVisual.containerClass
-                                                        )}
-                                                    >
-                                                        <CategoryIcon className="w-5 h-5" strokeWidth={2.2} />
-                                                    </div>
-                                                    {/* Top badge on avatar (Only TC if credit, NUEVO is omitted) */}
-                                                    {isPaidWithCredit && (
-                                                        <span
-                                                            className="absolute -top-1 -right-1 z-10 flex items-center gap-0.5 rounded-full bg-amber-500 px-1.5 py-0.5 text-[8px] font-extrabold uppercase leading-none text-slate-950 shadow-sm"
-                                                            title="Pagado con tarjeta de crédito"
+                                                {/* Left Column: Circular Glowing Avatar + Time placed directly below */}
+                                                <div className="flex flex-col items-center gap-1.5 shrink-0 pt-0.5">
+                                                    <div className="relative">
+                                                        <div
+                                                            className={cn(
+                                                                "flex items-center justify-center rounded-full w-11 h-11 border transition-transform duration-200 group-hover:scale-105",
+                                                                categoryVisual.containerClass
+                                                            )}
                                                         >
-                                                            <CreditCard className="h-2 w-2" /> TC
+                                                            <CategoryIcon className="w-5 h-5" strokeWidth={2.2} />
+                                                        </div>
+                                                        {/* Top badge on avatar (TC if credit) */}
+                                                        {isPaidWithCredit && (
+                                                            <span
+                                                                className="absolute -top-1 -right-1 z-10 flex items-center gap-0.5 rounded-full bg-amber-500 px-1.5 py-0.5 text-[8px] font-extrabold uppercase leading-none text-slate-950 shadow-sm"
+                                                                title="Pagado con tarjeta de crédito"
+                                                            >
+                                                                <CreditCard className="h-2 w-2" /> TC
+                                                            </span>
+                                                        )}
+                                                    </div>
+
+                                                    {/* Time placed right under category icon */}
+                                                    <div className="flex items-center gap-1 text-[11px] text-slate-400 font-medium">
+                                                        <Clock className="h-3 w-3 opacity-60" />
+                                                        <span>
+                                                            {tx.date
+                                                                ? formatTime(tx.date)
+                                                                : tx.createdAt
+                                                                ? formatTime(tx.createdAt)
+                                                                : "--:--"}
                                                         </span>
-                                                    )}
+                                                    </div>
                                                 </div>
 
                                                 {/* Right: Category, Amount, Title, Institution, Accounts */}
@@ -987,87 +1009,109 @@ export function FinancialInbox() {
                                                         )}
                                                     </div>
 
-                                                    {/* Origin and Destination Accounts (Always 1 single line per account) */}
+                                                    {/* Origin and Destination Accounts (Individual badges for icon, number, type, ownership) */}
                                                     {(accounts.source || accounts.destination) && (
-                                                        <div className="flex flex-col gap-1 mt-1.5">
-                                                            {accounts.source && (
-                                                                <div className="flex items-center gap-1.5 flex-nowrap min-w-0">
-                                                                    <span className="inline-flex items-center gap-0.5 rounded-md border border-rose-500/30 bg-rose-500/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-rose-400 shrink-0 select-none">
-                                                                        <ArrowUpRight className="h-2.5 w-2.5 stroke-[2.5]" />
-                                                                        ORIGEN
-                                                                    </span>
-                                                                    <span className="font-mono text-[11.5px] text-slate-300 font-medium tracking-wide shrink-0">
-                                                                        {formatMaskedNumber(accounts.source)}
-                                                                    </span>
-                                                                    <BrandBadge brand={detectCardBrand(accounts.source, `${tx.merchant} ${tx.description} ${tx.summary}`)} />
-                                                                </div>
-                                                            )}
-                                                            {accounts.destination && (
-                                                                <div className="flex items-center gap-1.5 flex-nowrap min-w-0">
-                                                                    <span className="inline-flex items-center gap-0.5 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-emerald-400 shrink-0 select-none">
-                                                                        <ArrowDownLeft className="h-2.5 w-2.5 stroke-[2.5]" />
-                                                                        DESTINO
-                                                                    </span>
-                                                                    <span className="font-mono text-[11.5px] text-slate-300 font-medium tracking-wide shrink-0">
-                                                                        {formatMaskedNumber(accounts.destination)}
-                                                                    </span>
-                                                                    <BrandBadge brand={detectCardBrand(accounts.destination, `${tx.merchant} ${tx.description} ${tx.summary}`)} />
-                                                                </div>
-                                                            )}
+                                                        <div className="flex flex-col gap-1.5 mt-2">
+                                                            {accounts.source && (() => {
+                                                                const info = resolveAccountBadgeInfo("SOURCE", accounts.source, tx);
+                                                                return (
+                                                                    <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                                                                        {/* Origin Arrow Icon Badge */}
+                                                                        <span
+                                                                            className="inline-flex items-center justify-center h-5 w-5 rounded-md border border-rose-500/30 bg-rose-500/10 text-rose-400 shrink-0 select-none"
+                                                                            title="Origen"
+                                                                        >
+                                                                            <ArrowUpRight className="h-3 w-3 stroke-[2.5]" />
+                                                                        </span>
+
+                                                                        {/* Account Number Badge */}
+                                                                        <span className="inline-flex items-center h-5 px-1.5 rounded-md border border-slate-700/60 bg-slate-800/50 font-mono text-[11px] text-slate-200 font-medium tracking-wide shrink-0 select-none">
+                                                                            {info.formattedNumber}
+                                                                        </span>
+
+                                                                        {/* Account Type Acronym Badge */}
+                                                                        <span className="inline-flex items-center h-5 px-1.5 rounded-md border border-indigo-500/30 bg-indigo-500/10 text-[9.5px] font-bold text-indigo-300 shrink-0 select-none">
+                                                                            {info.typeAcronym}
+                                                                        </span>
+
+                                                                        {/* Ownership Acronym Badge */}
+                                                                        <span className="inline-flex items-center h-5 px-1.5 rounded-md border border-slate-600/40 bg-slate-800/40 text-[9px] font-bold text-slate-400 shrink-0 select-none">
+                                                                            {info.ownershipAcronym}
+                                                                        </span>
+                                                                    </div>
+                                                                );
+                                                            })()}
+
+                                                            {accounts.destination && (() => {
+                                                                const info = resolveAccountBadgeInfo("DESTINATION", accounts.destination, tx);
+                                                                return (
+                                                                    <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                                                                        {/* Destination Arrow Icon Badge */}
+                                                                        <span
+                                                                            className="inline-flex items-center justify-center h-5 w-5 rounded-md border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 shrink-0 select-none"
+                                                                            title="Destino"
+                                                                        >
+                                                                            <ArrowDownLeft className="h-3 w-3 stroke-[2.5]" />
+                                                                        </span>
+
+                                                                        {/* Account Number Badge */}
+                                                                        <span className="inline-flex items-center h-5 px-1.5 rounded-md border border-slate-700/60 bg-slate-800/50 font-mono text-[11px] text-slate-200 font-medium tracking-wide shrink-0 select-none">
+                                                                            {info.formattedNumber}
+                                                                        </span>
+
+                                                                        {/* Account Type Acronym Badge */}
+                                                                        <span className="inline-flex items-center h-5 px-1.5 rounded-md border border-indigo-500/30 bg-indigo-500/10 text-[9.5px] font-bold text-indigo-300 shrink-0 select-none">
+                                                                            {info.typeAcronym}
+                                                                        </span>
+
+                                                                        {/* Ownership Acronym Badge */}
+                                                                        <span className="inline-flex items-center h-5 px-1.5 rounded-md border border-slate-600/40 bg-slate-800/40 text-[9px] font-bold text-slate-400 shrink-0 select-none">
+                                                                            {info.ownershipAcronym}
+                                                                        </span>
+                                                                    </div>
+                                                                );
+                                                            })()}
                                                         </div>
                                                     )}
                                                 </div>
                                             </div>
 
-                                            {/* BOTTOM BAR: Time & Quick Actions (Discard & Confirm) */}
-                                            <div className="flex w-full items-center justify-between pt-2.5 mt-2.5 border-t border-slate-800/80 gap-3">
-                                                {/* Time */}
-                                                <div className="flex items-center gap-1.5 text-xs text-slate-400 font-medium">
-                                                    <Clock className="h-3.5 w-3.5 opacity-70" />
-                                                    <span>
-                                                        {tx.date
-                                                            ? formatTime(tx.date)
-                                                            : tx.createdAt
-                                                            ? formatTime(tx.createdAt)
-                                                            : "--:--"}
-                                                    </span>
-                                                </div>
-
-                                                {/* Actions: Squircle Reject / Approve Buttons */}
-                                                <div
-                                                    className="flex items-center gap-2 shrink-0"
-                                                    onClick={(e) => e.stopPropagation()}
+                                            {/* BOTTOM BAR: Subtle Full-Width Action Buttons */}
+                                            <div
+                                                className="grid grid-cols-2 gap-2.5 w-full pt-2.5 mt-2.5 border-t border-slate-800/80"
+                                                onClick={(e) => e.stopPropagation()}
+                                            >
+                                                {/* Reject Button */}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleDismiss(tx.id!)}
+                                                    disabled={isProcessing}
+                                                    title="Rechazar"
+                                                    className="flex items-center justify-center gap-1.5 h-8.5 rounded-xl bg-rose-950/20 border border-rose-500/20 text-rose-400 hover:bg-rose-900/40 hover:text-rose-300 hover:border-rose-500/35 text-xs font-semibold active:scale-[0.98] transition-all shadow-sm"
                                                 >
-                                                    {/* Reject (X) Button */}
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleDismiss(tx.id!)}
-                                                        disabled={isProcessing}
-                                                        title="Rechazar"
-                                                        className="flex items-center justify-center h-8 w-8 rounded-xl bg-rose-950/30 border border-rose-500/25 text-rose-400 hover:bg-rose-900/50 hover:text-rose-300 hover:border-rose-500/40 active:scale-95 transition-all shadow-sm"
-                                                    >
-                                                        {isDismissing ? (
-                                                            <Loader2 className="h-3.5 w-3.5 animate-spin text-rose-400" />
-                                                        ) : (
-                                                            <X className="h-3.5 w-3.5 stroke-[2.5]" />
-                                                        )}
-                                                    </button>
+                                                    {isDismissing ? (
+                                                        <Loader2 className="h-3.5 w-3.5 animate-spin text-rose-400" />
+                                                    ) : (
+                                                        <X className="h-3.5 w-3.5 stroke-[2.5]" />
+                                                    )}
+                                                    <span>Rechazar</span>
+                                                </button>
 
-                                                    {/* Approve (Check) Button */}
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleConfirm(tx)}
-                                                        disabled={isProcessing}
-                                                        title="Aprobar"
-                                                        className="flex items-center justify-center h-8 w-8 rounded-xl bg-emerald-950/30 border border-emerald-500/25 text-emerald-400 hover:bg-emerald-900/50 hover:text-emerald-300 hover:border-emerald-500/40 active:scale-95 transition-all shadow-sm"
-                                                    >
-                                                        {isConfirming ? (
-                                                            <Loader2 className="h-3.5 w-3.5 animate-spin text-emerald-400" />
-                                                        ) : (
-                                                            <Check className="h-3.5 w-3.5 stroke-[2.5]" />
-                                                        )}
-                                                    </button>
-                                                </div>
+                                                {/* Approve Button */}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleConfirm(tx)}
+                                                    disabled={isProcessing}
+                                                    title="Aprobar"
+                                                    className="flex items-center justify-center gap-1.5 h-8.5 rounded-xl bg-emerald-950/20 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-900/40 hover:text-emerald-300 hover:border-emerald-500/35 text-xs font-semibold active:scale-[0.98] transition-all shadow-sm"
+                                                >
+                                                    {isConfirming ? (
+                                                        <Loader2 className="h-3.5 w-3.5 animate-spin text-emerald-400" />
+                                                    ) : (
+                                                        <Check className="h-3.5 w-3.5 stroke-[2.5]" />
+                                                    )}
+                                                    <span>Aprobar</span>
+                                                </button>
                                             </div>
                                         </CardHeader>
                                     </Card>

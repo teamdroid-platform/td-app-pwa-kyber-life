@@ -135,11 +135,12 @@ describe("FinancialInbox", () => {
         render(<FinancialInbox />);
 
         expect(await screen.findByText("Transferencia directa enviada")).toBeInTheDocument();
-        expect(screen.getByText("ORIGEN")).toBeInTheDocument();
+        expect(screen.getByTitle("Origen")).toBeInTheDocument();
         expect(screen.getByText("**** 6287")).toBeInTheDocument();
-        expect(screen.getByText("DESTINO")).toBeInTheDocument();
+        expect(screen.getByTitle("Destino")).toBeInTheDocument();
         expect(screen.getByText("**** 3159")).toBeInTheDocument();
-        expect(screen.getAllByText("VISA").length).toBeGreaterThan(0);
+        expect(screen.getByText("TIT")).toBeInTheDocument();
+        expect(screen.getByText("TER")).toBeInTheDocument();
     });
 
     it("opens the detail form via Enter key", async () => {
