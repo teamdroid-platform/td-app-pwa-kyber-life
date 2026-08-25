@@ -85,6 +85,7 @@ describe("financial-credit-detection", () => {
         });
 
         it("does NOT detect 'Pago a tarjeta de crédito' (bill payment to card)", () => {
+            // Simple case: all fields say "Pago a tarjeta"
             expect(isTransactionPaidWithCredit({
                 type: "EXPENSE",
                 paidWithCredit: false,
@@ -93,6 +94,23 @@ describe("financial-credit-detection", () => {
                 notes: "Pago a tarjeta de crédito",
                 originStats: {
                     subject: "Pago a tarjeta de crédito",
+                },
+            })).toBe(false);
+
+            // Real-world case: description is "Pago a tarjeta de crédito" BUT emailBody
+            // from the scanner mentions "Tarjeta de Crédito" generically (card identification).
+            // The description guard must short-circuit before emailBody is ever checked.
+            expect(isTransactionPaidWithCredit({
+                type: "EXPENSE",
+                paidWithCredit: false,
+                description: "Pago a tarjeta de crédito",
+                merchant: "Banco del Pacífico",
+                summary: "Se realizó un pago de $236.40 a la tarjeta de crédito Visa del Banco del Pacífico.",
+                notes: "Pago realizado desde cuenta de ahorros",
+                originStats: {
+                    emailBody: "Estimado cliente, le informamos que se ha registrado el pago a su Tarjeta de Crédito Visa terminada en 4520 por USD 236.40.",
+                    subject: "Confirmación de pago - Tarjeta de Crédito",
+                    snippet: "Pago recibido en su Tarjeta de Crédito",
                 },
             })).toBe(false);
         });

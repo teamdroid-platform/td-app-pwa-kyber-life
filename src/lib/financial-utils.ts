@@ -77,6 +77,20 @@ export function hasCreditCardKeywords(text: string | null | undefined): boolean 
 }
 
 /**
+ * Returns `true` when the text describes a bill payment TO/FOR a credit card
+ * (paying off card debt), e.g. "Pago a tarjeta de crédito",
+ * "Pago realizado a la tarjeta de crédito", "Abono a tarjeta".
+ *
+ * This is intentionally broader than the regex in `hasCreditCardKeywords`:
+ * it catches rephrased AI summaries where extra words appear between
+ * the verb and "tarjeta de crédito".
+ */
+function isPaymentToCardDescription(text: string | null | undefined): boolean {
+    if (!text || typeof text !== "string") return false;
+    return /\b(?:pago|abono|cancelaci[oó]n|transferencia)[\s\w]{0,30}(?:a|de|hacia|para|por)\s+(?:la\s+)?tarjeta[s]?\s+(?:de\s+)?cr[eé]dito\b/i.test(text);
+}
+
+/**
  * Detects if a transaction or scanner transaction represents a credit card payment/expense.
  *
  * Evaluates:
@@ -94,6 +108,10 @@ export function isTransactionPaidWithCredit(tx: {
 } | null | undefined): boolean {
     if (!tx) return false;
     if (tx.paidWithCredit === true) return true;
+
+    // If the description explicitly says it's a payment TO a credit card (debt repayment),
+    // this is NOT an expense paid WITH credit, regardless of what emailBody/notes say.
+    if (isPaymentToCardDescription(tx.description)) return false;
 
     // Only expense-like transactions or unassigned types can be paid with credit
     const normalizedType = tx.type?.toUpperCase();
