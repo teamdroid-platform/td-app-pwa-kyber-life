@@ -28,6 +28,8 @@ import {
     ArrowRightLeft,
     Wallet,
     CreditCard,
+    ArrowUpRight,
+    ArrowDownLeft,
 } from "lucide-react";
 import {
     getUnprocessedInboxTransactionsAction,
@@ -228,6 +230,65 @@ function getCategoryVisualConfig(category?: string | null, txType?: string | nul
         icon: Receipt,
         containerClass: "border-[#FFB020]/30 bg-[#FFB020]/10 text-[#FFB020] shadow-[0_0_12px_rgba(255,176,32,0.18)]",
     };
+}
+
+interface ScannedAccountDetails {
+    source?: string | null;
+    destination?: string | null;
+}
+
+/**
+ * Extracts origin and destination account numbers from a scanner transaction.
+ */
+function extractScannedAccounts(tx: FinancialScannerTransaction): ScannedAccountDetails {
+    let source: string | null = null;
+    let destination: string | null = null;
+
+    // 1. Direct accounts array
+    if (Array.isArray(tx.accounts) && tx.accounts.length > 0) {
+        for (const entry of tx.accounts) {
+            if (!entry || !entry.account) continue;
+            const t = (entry.type || "").toLowerCase().trim();
+            if (t.startsWith("orig") || t.startsWith("sourc") || t.includes("salid") || t.includes("desde")) {
+                if (!source) source = entry.account;
+            } else if (t.startsWith("dest") || t.startsWith("targ") || t.includes("entrad") || t.includes("hacia") || t.includes("para")) {
+                if (!destination) destination = entry.account;
+            } else {
+                if (!source) source = entry.account;
+                else if (!destination) destination = entry.account;
+            }
+        }
+    }
+
+    // 2. Fallback to originStats if missing
+    if (!source || !destination) {
+        const stats = tx.originStats as Record<string, unknown> | null | undefined;
+        if (stats) {
+            if (!source) {
+                const s = stats.sourceAccount || stats.accountSource || stats.originAccount || stats.cuentaOrigen || stats.cuenta_origen;
+                if (typeof s === "string" && s.trim() !== "") source = s.trim();
+            }
+            if (!destination) {
+                const d = stats.destinationAccount || stats.accountDestination || stats.targetAccount || stats.cuentaDestino || stats.cuenta_destino;
+                if (typeof d === "string" && d.trim() !== "") destination = d.trim();
+            }
+            if ((!source || !destination) && Array.isArray(stats.accounts)) {
+                for (const entry of stats.accounts) {
+                    if (!entry || typeof entry !== "object") continue;
+                    const acc = (entry as { account?: string; type?: string }).account;
+                    const typeStr = ((entry as { account?: string; type?: string }).type || "").toLowerCase();
+                    if (!acc) continue;
+                    if (typeStr.startsWith("orig") || typeStr.startsWith("sourc")) {
+                        if (!source) source = acc;
+                    } else if (typeStr.startsWith("dest") || typeStr.startsWith("targ")) {
+                        if (!destination) destination = acc;
+                    }
+                }
+            }
+        }
+    }
+
+    return { source, destination };
 }
 
 /**
@@ -687,6 +748,7 @@ export function FinancialInbox() {
                                 const categoryVisual = getCategoryVisualConfig(tx.category, tx.type);
                                 const CategoryIcon = categoryVisual.icon;
                                 const isPaidWithCredit = isTransactionPaidWithCredit(tx);
+                                const accounts = extractScannedAccounts(tx);
 
                                 // Institution shown on the card. Mirror the detail form's server-side
                                 // resolution: when the scanned merchant confidently matches a stored
@@ -752,7 +814,7 @@ export function FinancialInbox() {
                                                     )}
                                                 </div>
 
-                                                {/* Right: Category, Amount, Title, Institution */}
+                                                {/* Right: Category, Amount, Title, Institution, Accounts */}
                                                 <div className="flex flex-col flex-1 min-w-0">
                                                     {/* Top Row: Category pill badge + Amount */}
                                                     <div className="flex items-center justify-between gap-2 w-full min-w-0">
@@ -842,6 +904,36 @@ export function FinancialInbox() {
                                                             />
                                                         )}
                                                     </div>
+
+                                                    {/* Origin and Destination Accounts (Omitted if none) */}
+                                                    {(accounts.source || accounts.destination) && (
+                                                        <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                                                            {accounts.source && (
+                                                                <div
+                                                                    className="inline-flex items-center gap-1 rounded-md border border-rose-500/20 bg-rose-500/5 px-1.5 py-0.5 text-[10.5px] text-zinc-300"
+                                                                    title={`Cuenta origen: ${accounts.source}`}
+                                                                >
+                                                                    <ArrowUpRight className="h-3 w-3 text-rose-400 shrink-0" />
+                                                                    <span className="text-[9.5px] uppercase font-semibold text-rose-400/80">Origen:</span>
+                                                                    <span className="font-mono text-zinc-200 font-medium truncate max-w-[120px] sm:max-w-[160px]">
+                                                                        {accounts.source}
+                                                                    </span>
+                                                                </div>
+                                                            )}
+                                                            {accounts.destination && (
+                                                                <div
+                                                                    className="inline-flex items-center gap-1 rounded-md border border-emerald-500/20 bg-emerald-500/5 px-1.5 py-0.5 text-[10.5px] text-zinc-300"
+                                                                    title={`Cuenta destino: ${accounts.destination}`}
+                                                                >
+                                                                    <ArrowDownLeft className="h-3 w-3 text-emerald-400 shrink-0" />
+                                                                    <span className="text-[9.5px] uppercase font-semibold text-emerald-400/80">Destino:</span>
+                                                                    <span className="font-mono text-zinc-200 font-medium truncate max-w-[120px] sm:max-w-[160px]">
+                                                                        {accounts.destination}
+                                                                    </span>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
 

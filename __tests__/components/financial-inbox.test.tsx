@@ -49,6 +49,27 @@ const SCAN_ITEM: FinancialScannerTransaction = {
     isDeleted: false,
 };
 
+const SCAN_ITEM_WITH_ACCOUNTS: FinancialScannerTransaction = {
+    id: "scan-item-2",
+    ownerUserId: "user-1",
+    amount: 25.0,
+    currency: "USD",
+    merchant: "BANCO PICHINCHA",
+    date: now,
+    type: "TRANSFER",
+    category: "Transferencias",
+    description: "Transferencia directa enviada",
+    summary: "Transferencia de $25.00 a Juan Pérez",
+    accounts: [
+        { type: "origen", account: "•••• 4321" },
+        { type: "destino", account: "•••• 9876" },
+    ],
+    status: "DETECTED",
+    createdAt: now,
+    updatedAt: now,
+    isDeleted: false,
+};
+
 describe("FinancialInbox", () => {
     const mockPush = jest.fn();
 
@@ -94,14 +115,30 @@ describe("FinancialInbox", () => {
         expect(screen.getByText("MOTES DE LA MAGDALENA")).toBeInTheDocument();
         expect(screen.getByText("Alimentación")).toBeInTheDocument();
 
-        // Eye icon is no longer present
-        expect(screen.queryByText("Detalles")).not.toBeInTheDocument();
+        // When accounts are absent, badges are omitted
+        expect(screen.queryByText(/Origen:/i)).not.toBeInTheDocument();
+        expect(screen.queryByText(/Destino:/i)).not.toBeInTheDocument();
 
         // Tap the card to open detail form
         const cardLink = titleEl.closest("[role='link']")!;
         fireEvent.click(cardLink);
 
         expect(mockPush).toHaveBeenCalledWith("/financial/scans/scan-item-1");
+    });
+
+    it("renders origin and destination accounts when present", async () => {
+        (getUnprocessedInboxTransactionsAction as jest.Mock).mockResolvedValue({
+            success: true,
+            data: [SCAN_ITEM_WITH_ACCOUNTS],
+        });
+
+        render(<FinancialInbox />);
+
+        expect(await screen.findByText("Transferencia directa enviada")).toBeInTheDocument();
+        expect(screen.getByText("Origen:")).toBeInTheDocument();
+        expect(screen.getByText("•••• 4321")).toBeInTheDocument();
+        expect(screen.getByText("Destino:")).toBeInTheDocument();
+        expect(screen.getByText("•••• 9876")).toBeInTheDocument();
     });
 
     it("opens the detail form via Enter key", async () => {
