@@ -11,7 +11,6 @@ import {
     RefreshCw,
     X,
     Search,
-    Clock,
     Receipt,
     Loader2,
     Utensils,
@@ -311,8 +310,8 @@ function formatMaskedNumber(acc: string): string {
 interface AccountBadgeInfo {
     raw: string;
     formattedNumber: string;
-    typeAcronym: "TC" | "TD" | "AHO" | "CTE" | "CTA";
-    ownershipAcronym: "TIT" | "TER";
+    typeAcronym: "TCR" | "TDE" | "AHO" | "CTE" | "EFE" | "INV" | "CTA";
+    ownershipAcronym: "MIA" | "TER";
 }
 
 function resolveAccountBadgeInfo(
@@ -323,8 +322,8 @@ function resolveAccountBadgeInfo(
     const formatted = formatMaskedNumber(accountNumber);
     const combinedContext = `${accountNumber} ${tx.merchant || ""} ${tx.description || ""} ${tx.summary || ""}`.toLowerCase();
 
-    // Type detection
-    let typeAcronym: "TC" | "TD" | "AHO" | "CTE" | "CTA" = "CTA";
+    // Type detection (TCR, TDE, AHO, CTE, CTA)
+    let typeAcronym: "TCR" | "TDE" | "AHO" | "CTE" | "EFE" | "INV" | "CTA" = "CTA";
     if (
         isTransactionPaidWithCredit(tx) ||
         combinedContext.includes("crédito") ||
@@ -333,33 +332,40 @@ function resolveAccountBadgeInfo(
         combinedContext.includes("visa") ||
         combinedContext.includes("diners") ||
         combinedContext.includes("amex") ||
+        combinedContext.includes("tcr") ||
         combinedContext.includes("tc")
     ) {
-        if (combinedContext.includes("débito") || combinedContext.includes("debito") || combinedContext.includes("td")) {
-            typeAcronym = "TD";
+        if (combinedContext.includes("débito") || combinedContext.includes("debito") || combinedContext.includes("tde") || combinedContext.includes("td")) {
+            typeAcronym = "TDE";
         } else {
-            typeAcronym = "TC";
+            typeAcronym = "TCR";
         }
-    } else if (combinedContext.includes("débito") || combinedContext.includes("debito") || combinedContext.includes("td")) {
-        typeAcronym = "TD";
+    } else if (combinedContext.includes("débito") || combinedContext.includes("debito") || combinedContext.includes("tde") || combinedContext.includes("td")) {
+        typeAcronym = "TDE";
     } else if (combinedContext.includes("ahorro") || combinedContext.includes("aho")) {
         typeAcronym = "AHO";
     } else if (combinedContext.includes("corriente") || combinedContext.includes("cte")) {
         typeAcronym = "CTE";
+    } else if (combinedContext.includes("efectivo") || combinedContext.includes("efe")) {
+        typeAcronym = "EFE";
+    } else if (combinedContext.includes("inversi") || combinedContext.includes("inv")) {
+        typeAcronym = "INV";
     }
 
     // Ownership detection:
-    // If source, almost always the user's own account -> TIT
-    // If destination, check if own transfer or third party
-    let ownershipAcronym: "TIT" | "TER" = role === "SOURCE" ? "TIT" : "TER";
+    // If source, almost always the user's own account -> MIA
+    // If destination, check if own transfer or third party -> TER
+    let ownershipAcronym: "MIA" | "TER" = role === "SOURCE" ? "MIA" : "TER";
     if (role === "DESTINATION") {
         if (
             combinedContext.includes("entre mis cuentas") ||
             combinedContext.includes("propia") ||
             combinedContext.includes("mismo titular") ||
-            combinedContext.includes("ahorro personal")
+            combinedContext.includes("ahorro personal") ||
+            combinedContext.includes("mía") ||
+            combinedContext.includes("mia")
         ) {
-            ownershipAcronym = "TIT";
+            ownershipAcronym = "MIA";
         }
     }
 
@@ -880,8 +886,8 @@ export function FinancialInbox() {
                                         <CardHeader className="flex flex-col !space-y-0 !p-3 sm:!p-3.5 select-none bg-slate-900/40 transition-colors">
                                             {/* TOP SECTION: Left Column (Avatar + Time) + Content Block */}
                                             <div className="flex items-start gap-3 w-full">
-                                                {/* Left Column: Circular Glowing Avatar + Time placed directly below */}
-                                                <div className="flex flex-col items-center gap-1.5 shrink-0 pt-0.5">
+                                                {/* Left Column: Circular Glowing Avatar + Time placed directly below (without clock icon) */}
+                                                <div className="flex flex-col items-center gap-1 shrink-0 pt-0.5">
                                                     <div className="relative">
                                                         <div
                                                             className={cn(
@@ -902,17 +908,14 @@ export function FinancialInbox() {
                                                         )}
                                                     </div>
 
-                                                    {/* Time placed right under category icon */}
-                                                    <div className="flex items-center gap-1 text-[11px] text-slate-400 font-medium">
-                                                        <Clock className="h-3 w-3 opacity-60" />
-                                                        <span>
-                                                            {tx.date
-                                                                ? formatTime(tx.date)
-                                                                : tx.createdAt
-                                                                ? formatTime(tx.createdAt)
-                                                                : "--:--"}
-                                                        </span>
-                                                    </div>
+                                                    {/* Time placed right under category icon without clock icon */}
+                                                    <span className="text-[11px] text-slate-400 font-medium tracking-tight">
+                                                        {tx.date
+                                                            ? formatTime(tx.date)
+                                                            : tx.createdAt
+                                                            ? formatTime(tx.createdAt)
+                                                            : "--:--"}
+                                                    </span>
                                                 </div>
 
                                                 {/* Right: Category, Amount, Title, Institution, Accounts */}
@@ -1009,7 +1012,7 @@ export function FinancialInbox() {
                                                         )}
                                                     </div>
 
-                                                    {/* Origin and Destination Accounts (Individual badges for icon, number, type, ownership) */}
+                                                    {/* Origin and Destination Accounts (Individual badges for icon, number, type TCR/TDE/AHO/CTE/CTA, ownership MIA/TER) */}
                                                     {(accounts.source || accounts.destination) && (
                                                         <div className="flex flex-col gap-1.5 mt-2">
                                                             {accounts.source && (() => {
@@ -1029,12 +1032,12 @@ export function FinancialInbox() {
                                                                             {info.formattedNumber}
                                                                         </span>
 
-                                                                        {/* Account Type Acronym Badge */}
+                                                                        {/* Account Type Acronym Badge (TCR, TDE, AHO, CTE, CTA) */}
                                                                         <span className="inline-flex items-center h-5 px-1.5 rounded-md border border-indigo-500/30 bg-indigo-500/10 text-[9.5px] font-bold text-indigo-300 shrink-0 select-none">
                                                                             {info.typeAcronym}
                                                                         </span>
 
-                                                                        {/* Ownership Acronym Badge */}
+                                                                        {/* Ownership Acronym Badge (MIA for own, TER for third party) */}
                                                                         <span className="inline-flex items-center h-5 px-1.5 rounded-md border border-slate-600/40 bg-slate-800/40 text-[9px] font-bold text-slate-400 shrink-0 select-none">
                                                                             {info.ownershipAcronym}
                                                                         </span>

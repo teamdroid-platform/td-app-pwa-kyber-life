@@ -139,7 +139,7 @@ describe("FinancialInbox", () => {
         expect(screen.getByText("**** 6287")).toBeInTheDocument();
         expect(screen.getByTitle("Destino")).toBeInTheDocument();
         expect(screen.getByText("**** 3159")).toBeInTheDocument();
-        expect(screen.getByText("TIT")).toBeInTheDocument();
+        expect(screen.getByText("MIA")).toBeInTheDocument();
         expect(screen.getByText("TER")).toBeInTheDocument();
     });
 
