@@ -9,10 +9,10 @@ import { cn } from "@/lib/utils";
  * cuanto una tiene otro radio u otro borde, salta a la vista antes que su
  * contenido.
  */
-export const CARD = "rounded-2xl border border-border-base bg-bg-secondary/70 backdrop-blur-[2px]";
+export const CARD = "relative overflow-hidden rounded-2xl border border-indigo-500/20 bg-slate-900/60 backdrop-blur-sm shadow-md shadow-black/20";
 
 /** Tarjeta que además reacciona al cursor: se usa cuando lleva a algún sitio. */
-export const CARD_LINK = cn(CARD, "transition-colors hover:border-border-strong hover:bg-bg-secondary");
+export const CARD_LINK = cn(CARD, "transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:border-indigo-500/40 active:scale-[0.99]");
 
 /** Los tintes de cada módulo, para que el color diga de qué habla la ficha. */
 export const TINT = {
