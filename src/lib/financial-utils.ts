@@ -50,6 +50,19 @@ export function buildFallbackTitle(type?: string | null, merchant?: string | nul
 }
 
 /**
+ * Ids of the user's CREDIT cards, ready to hand to
+ * {@link isTransactionPaidWithCredit}. Cards with no id (or a DEBIT type) are
+ * skipped, so a transaction linked to a debit card resolves to "not credit".
+ */
+export function creditCardIdSet(cards: readonly { id?: string | null; cardType?: string | null }[]): ReadonlySet<string> {
+    const ids = new Set<string>();
+    for (const card of cards) {
+        if (card.id && card.cardType === "CREDIT") ids.add(card.id);
+    }
+    return ids;
+}
+
+/**
  * Checks whether a text string mentions credit card payment keywords (paying WITH credit card),
  * while distinguishing from bill payments TO a credit card (paying off card debt from savings/checking).
  */
@@ -94,9 +107,23 @@ function isPaymentToCardDescription(text: string | null | undefined): boolean {
  * Detects if a transaction represents a credit card payment/expense.
  *
  * Decision priority:
- * 1. Explicit `paidWithCredit` boolean (set by user in wizard) → trusted directly.
- * 2. When `paidWithCredit` is `null` or `undefined` (scanner inbox / legacy rows):
- *    uses heuristics on originStats flags, emailBody, summary, notes, description.
+ * 1. Explicit `paidWithCredit === true` (set by the user in the wizard) → trusted directly.
+ * 2. The card the transaction is linked to, when `creditCardIds` is supplied:
+ *    `bankCardId` is structured evidence written by the bank-identification
+ *    service (BIN / last four), so it beats any wording in the e-mail — a DEBIT
+ *    card settles it as `false` even if the text says "tarjeta de crédito".
+ * 3. Otherwise — including an explicit `false` — heuristics on originStats flags,
+ *    emailBody, summary, notes and description decide. A stored `false` is *not*
+ *    authoritative: scanner-imported and legacy rows default the column to
+ *    `false`/`null` even when the source e-mail describes a credit-card purchase.
+ *
+ * This is the single source of truth for "was this paid with credit" — the
+ * transactions list (`enrichTransactions`) and the financial dashboard
+ * (`resolvePaidWithCredit`) both run every transaction through it, so the
+ * balance and the "Incluir TC" toggle agree on both screens.
+ *
+ * `creditCardIds` holds the ids of the user's CREDIT cards. Omit it and rules
+ * 1 and 3 still apply, so callers without a card repository keep working.
  */
 export function isTransactionPaidWithCredit(tx: {
     type?: string | null;
@@ -104,8 +131,9 @@ export function isTransactionPaidWithCredit(tx: {
     notes?: string | null;
     description?: string | null;
     summary?: string | null;
+    bankCardId?: string | null;
     originStats?: Record<string, unknown> | null;
-} | null | undefined): boolean {
+} | null | undefined, creditCardIds?: ReadonlySet<string>): boolean {
     if (!tx) return false;
     // Explicit true is always respected immediately
     if (tx.paidWithCredit === true) return true;
@@ -119,6 +147,10 @@ export function isTransactionPaidWithCredit(tx: {
     if (normalizedType && normalizedType !== "EXPENSE" && normalizedType !== "PAYMENT" && normalizedType !== "OTHER") {
         return false;
     }
+
+    // A known card decides on its own: it was matched against the real card by
+    // BIN/last four, which is firmer than whatever the notification worded.
+    if (creditCardIds && tx.bankCardId) return creditCardIds.has(tx.bankCardId);
 
     const stats = tx.originStats;
     if (stats && typeof stats === "object") {

@@ -1,0 +1,56 @@
+import { render, screen } from "@testing-library/react";
+import { TransactionSummary } from "@/presentation/financial/components/TransactionSummary";
+import type { FinancialTransaction } from "@/domain/entities/financial";
+
+/**
+ * The list shows every transaction that isn't deleted or archived, so pending
+ * scanner detections, rejected and duplicate rows reach this summary too. They
+ * are not real money: counting them made this balance drift from the financial
+ * overview, which only ever counts CONFIRMED / REVIEWED / MANUAL.
+ */
+describe("TransactionSummary", () => {
+    const base: Omit<FinancialTransaction, "id"> = {
+        ownerUserId: "user-1",
+        amount: 0,
+        currency: "USD",
+        date: "2026-08-23T10:00:00Z",
+        type: "EXPENSE",
+        status: "CONFIRMED",
+        categoryId: null,
+        institutionId: null,
+        merchant: "Test",
+        description: "Test",
+        notes: null,
+        possibleDuplicate: false,
+        isDeleted: false,
+        tags: [],
+        createdAt: "2026-08-23T10:00:00Z",
+        updatedAt: "2026-08-23T10:00:00Z",
+    };
+
+    it("leaves pending, rejected and duplicate rows out of the balance", () => {
+        const transactions: FinancialTransaction[] = [
+            { ...base, id: "1", type: "INCOME", amount: 1000, status: "CONFIRMED" },
+            { ...base, id: "2", amount: 100, status: "MANUAL" },
+            { ...base, id: "3", amount: 500, status: "DETECTED" },
+            { ...base, id: "4", amount: 700, status: "REJECTED" },
+            { ...base, id: "5", amount: 300, status: "DUPLICATE" },
+        ];
+
+        render(<TransactionSummary transactions={transactions} />);
+
+        // 1000 - 100; the other three statuses are listed but never counted.
+        expect(screen.getAllByText("+$900,00").length).toBeGreaterThan(0);
+    });
+
+    it("counts REVIEWED alongside CONFIRMED and MANUAL", () => {
+        const transactions: FinancialTransaction[] = [
+            { ...base, id: "1", type: "INCOME", amount: 1000, status: "REVIEWED" },
+            { ...base, id: "2", amount: 250, status: "CONFIRMED" },
+        ];
+
+        render(<TransactionSummary transactions={transactions} />);
+
+        expect(screen.getAllByText("+$750,00").length).toBeGreaterThan(0);
+    });
+});

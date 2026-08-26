@@ -161,6 +161,68 @@ describe("FinancialInboxService", () => {
             expect(result.institutionId).toBe("new-inst-id");
         });
 
+        // The bank link is resolved *after* the text heuristic, so the flag has to
+        // be decided again once the card is known — otherwise the row lands with a
+        // CREDIT card and `paidWithCredit: false`, and its expense wrongly counts
+        // as cash out on both screens.
+        describe("credit flag vs. the resolved card", () => {
+            const cardRepo = { findByOwnerId: jest.fn() } as any;
+            const CREDIT_CARD_ID = "card-credit";
+            const DEBIT_CARD_ID = "card-debit";
+
+            function serviceLinkingCard(cardId: string | null) {
+                const bankService = {
+                    syncTransactionBankLinks: jest.fn().mockResolvedValue({
+                        bankSourceAccountId: null,
+                        bankDestinationAccountId: null,
+                        bankCardId: cardId,
+                        bankInstitutionId: null,
+                        bankCounterpartyObservationId: null,
+                    }),
+                } as any;
+                cardRepo.findByOwnerId.mockResolvedValue([
+                    { id: CREDIT_CARD_ID, cardType: "CREDIT" },
+                    { id: DEBIT_CARD_ID, cardType: "DEBIT" },
+                ]);
+                return new FinancialInboxService(
+                    scannerRepo, transactionRepo, auditLogRepo, institutionRepo, undefined, bankService, cardRepo,
+                );
+            }
+
+            it("marks the transaction as credit when the scan resolves to a CREDIT card", async () => {
+                scannerRepo.findById.mockResolvedValue({ ...baseScannerTx });
+                transactionRepo.create.mockImplementation(async (tx) => tx as any);
+
+                const result = await serviceLinkingCard(CREDIT_CARD_ID).mapAndConfirmTransaction(dto);
+
+                expect(result.bankCardId).toBe(CREDIT_CARD_ID);
+                expect(result.paidWithCredit).toBe(true);
+            });
+
+            it("leaves it as cash when the scan resolves to a DEBIT card, whatever the text said", async () => {
+                scannerRepo.findById.mockResolvedValue({
+                    ...baseScannerTx,
+                    summary: "Consumo con tarjeta de crédito en Amazon",
+                });
+                transactionRepo.create.mockImplementation(async (tx) => tx as any);
+
+                const result = await serviceLinkingCard(DEBIT_CARD_ID).mapAndConfirmTransaction(dto);
+
+                expect(result.bankCardId).toBe(DEBIT_CARD_ID);
+                expect(result.paidWithCredit).toBe(false);
+            });
+
+            it("keeps what the user chose by hand over the card's type", async () => {
+                scannerRepo.findById.mockResolvedValue({ ...baseScannerTx });
+                transactionRepo.create.mockImplementation(async (tx) => tx as any);
+
+                const result = await serviceLinkingCard(CREDIT_CARD_ID)
+                    .mapAndConfirmTransaction({ ...dto, paidWithCredit: false });
+
+                expect(result.paidWithCredit).toBe(false);
+            });
+        });
+
         it("should reuse an existing institution if institutionName is provided and matches", async () => {
             scannerRepo.findById.mockResolvedValue({ ...baseScannerTx });
             institutionRepo.findByOwnerId.mockResolvedValue([

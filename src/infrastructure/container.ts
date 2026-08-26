@@ -179,6 +179,7 @@ export const financialTransactionService = new FinancialTransactionService(
     financialInstitutionRepository,
     financialCategoryRepository,
     bankService,
+    bankCardRepository,
 );
 export const financialInboxService = new FinancialInboxService(
     financialScannerTransactionRepository,
@@ -187,8 +188,9 @@ export const financialInboxService = new FinancialInboxService(
     financialInstitutionRepository,
     financialCategoryRepository,
     bankService,
+    bankCardRepository,
 );
-export const financialDashboardService = new FinancialDashboardService(financialTransactionRepository, financialCategoryRepository, financialInstitutionRepository, financialScannerTransactionRepository);
+export const financialDashboardService = new FinancialDashboardService(financialTransactionRepository, financialCategoryRepository, financialInstitutionRepository, financialScannerTransactionRepository, bankCardRepository);
 export const financialSettingsService = new FinancialSettingsService(financialInstitutionTypeRepository, financialInstitutionRepository, financialCategoryRepository, financialTransactionRepository);
 export const notificationService = new NotificationService(notificationRepository);
 export const pushSubscriptionService = new PushSubscriptionService(pushSubscriptionRepository);

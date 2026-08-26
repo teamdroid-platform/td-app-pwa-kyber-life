@@ -170,6 +170,59 @@ describe("FinancialDashboardService", () => {
             expect(kpis.totalExpenses).toBe(400);
             expect(kpis.totalExpensesCredit).toBe(300);
         });
+
+        // The transactions list resolves `paidWithCredit` with
+        // `isTransactionPaidWithCredit`, which overrides a stored `false` when the
+        // scanner text says otherwise. The dashboard must resolve it the same way,
+        // or its balance disagrees with the list and "Incluir TC" moves nothing.
+        it("defers scanner-detected credit expenses stored with paidWithCredit=false", async () => {
+            const transactions: FinancialTransaction[] = [
+                { ...baseTransaction, id: "1", type: "INCOME", amount: 1000, status: "CONFIRMED" },
+                {
+                    ...baseTransaction,
+                    id: "2",
+                    type: "EXPENSE",
+                    amount: 186.5,
+                    status: "CONFIRMED",
+                    paidWithCredit: false,
+                    description: "Consumo en KYWI",
+                    notes: "Pago realizado en KYWI con tarjeta de crédito, correspondiente al gasto por productos adquiridos.",
+                },
+                { ...baseTransaction, id: "3", type: "EXPENSE", amount: 100, status: "CONFIRMED", paidWithCredit: false },
+            ];
+            transactionRepo.findByOwnerId.mockResolvedValue(transactions);
+
+            const kpis = await service.getKPIs(mockUserId);
+
+            expect(kpis.totalExpenses).toBe(286.5);
+            expect(kpis.totalExpensesCredit).toBe(186.5);
+            // 1000 - 100: the credit consumption is deferred, not cash out.
+            expect(kpis.netBalance).toBe(900);
+        });
+
+        // "Pago de tarjeta de crédito" is cash leaving to settle the card bill,
+        // not a purchase made with it — it must stay in the balance.
+        it("does not defer a bill payment made TO a credit card", async () => {
+            const transactions: FinancialTransaction[] = [
+                { ...baseTransaction, id: "1", type: "INCOME", amount: 1000, status: "CONFIRMED" },
+                {
+                    ...baseTransaction,
+                    id: "2",
+                    type: "EXPENSE",
+                    amount: 236.4,
+                    status: "CONFIRMED",
+                    paidWithCredit: false,
+                    description: "Pago de tarjeta de crédito",
+                    notes: "Pago de $236.40 a su tarjeta de crédito desde la cuenta de ahorros.",
+                },
+            ];
+            transactionRepo.findByOwnerId.mockResolvedValue(transactions);
+
+            const kpis = await service.getKPIs(mockUserId);
+
+            expect(kpis.totalExpensesCredit).toBe(0);
+            expect(kpis.netBalance).toBe(763.6);
+        });
     });
 
     describe("getMonthlyBreakdown", () => {
