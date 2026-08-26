@@ -1,6 +1,8 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* ============================================
    KYBER LIFE DUAL THEME DESIGN SYSTEM
    Dark Theme (Default) + Light Theme
