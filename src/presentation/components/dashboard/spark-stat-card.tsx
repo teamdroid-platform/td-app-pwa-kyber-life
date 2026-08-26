@@ -73,7 +73,7 @@ export function SparkStatCard({ label, value, icon: Icon, color, tintClassName, 
             onClick={onClick}
             onKeyDown={onClick ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(); } } : undefined}
             className={cn(
-                "flex min-w-0 flex-col gap-2 rounded-xl border border-border-base p-2 shadow-sm sm:gap-2.5 sm:rounded-2xl sm:p-4 dark:border-white/10 dark:bg-[#0b0e17]",
+                "flex min-w-0 flex-col gap-2 rounded-xl border border-border-base p-2 shadow-sm sm:gap-2.5 sm:rounded-2xl sm:p-4 bg-white/90 dark:border-white/10 dark:bg-[#0b0e17]",
                 "bg-gradient-to-b via-30% to-transparent to-70%",
                 tintClassName,
                 onClick && "cursor-pointer transition-transform hover:border-accent-primary/30 active:scale-[0.97]",
