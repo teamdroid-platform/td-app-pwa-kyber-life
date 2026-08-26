@@ -4,7 +4,7 @@ import { useMemo, useState, useEffect } from "react";
 import { AreaChart, Area, ResponsiveContainer, YAxis, XAxis, Tooltip, CartesianGrid, PieChart, Pie, Cell, BarChart, Bar, LabelList } from 'recharts';
 import { ChevronDown, BarChart2, TrendingUp, TrendingDown, Wallet, ArrowRightLeft, Scale, PieChart as PieChartIcon, BarChart3 as BarChartIcon, type LucideIcon } from "lucide-react";
 import type { FinancialTransaction, FinancialTransactionType } from "@/domain/entities/financial";
-import { computeNetBalance, sumCreditExpenses } from "@/domain/services/financial-balance";
+import { computeNetBalance, sumCreditExpenses, DASHBOARD_ACTIVE_STATUSES } from "@/domain/services/financial-balance";
 import { cn } from "@/lib/utils";
 import {
     Select,
@@ -70,9 +70,19 @@ export function TransactionSummary({ transactions }: TransactionSummaryProps) {
     // On touch there is no "mouse leave" to close the tooltip, so make it dismissable.
     const { containerRef, tooltipActive, handlePointerDown } = useChartTooltipDismiss();
 
+    // Only "active" transactions are real money. The list itself shows everything
+    // that isn't deleted or archived — pending scanner detections, rejected and
+    // duplicate rows included — but those must never move the totals, or this
+    // summary drifts from the financial overview, which counts exactly these
+    // three statuses.
+    const countableTransactions = useMemo(
+        () => transactions.filter((t) => (DASHBOARD_ACTIVE_STATUSES as readonly string[]).includes(t.status)),
+        [transactions],
+    );
+
     const effectiveTransactions = useMemo(
-        () => (showCredit ? transactions : transactions.filter((t) => !t.paidWithCredit)),
-        [transactions, showCredit],
+        () => (showCredit ? countableTransactions : countableTransactions.filter((t) => !t.paidWithCredit)),
+        [countableTransactions, showCredit],
     );
 
     useEffect(() => {
@@ -167,7 +177,7 @@ export function TransactionSummary({ transactions }: TransactionSummaryProps) {
         // TC" toggle ON, the user wants those expenses to count against the
         // balance too, so subtract them; OFF keeps them deferred (excluded).
         const finalBalance = Math.round(
-            (computeNetBalance(effectiveTransactions) - (showCredit ? sumCreditExpenses(transactions) : 0)) * 100,
+            (computeNetBalance(effectiveTransactions) - (showCredit ? sumCreditExpenses(countableTransactions) : 0)) * 100,
         ) / 100;
 
         return {
@@ -179,7 +189,7 @@ export function TransactionSummary({ transactions }: TransactionSummaryProps) {
             totalOther: otherSum,
             totalWithdrawal: withdrawalSum
         };
-    }, [effectiveTransactions, viewMode, transactions, showCredit]);
+    }, [effectiveTransactions, viewMode, countableTransactions, showCredit]);
 
     if (transactions.length === 0) return null;
 

@@ -3,7 +3,7 @@ import { FinancialTransaction, FinancialTransactionType, FinancialTransactionSta
 import { IFinancialTransactionRepository, IFinancialTransactionAuditLogRepository } from "../../domain/repositories/financial";
 import { findDuplicates } from "../../domain/services/financial-deduplication";
 import { PaginationParams, PaginatedResult, TransactionSearchFilters } from "../../domain/pagination";
-import { isTransactionPaidWithCredit } from "../../lib/financial-utils";
+import { isTransactionPaidWithCredit, creditCardIdSet } from "../../lib/financial-utils";
 
 export interface CreateFinancialTransactionDTO {
     ownerUserId: UUID;
@@ -70,7 +70,12 @@ export class FinancialTransactionService {
         private institutionRepo?: import("../../domain/repositories/financial").IFinancialInstitutionRepository,
         private categoryRepo?: import("../../domain/repositories/financial").IFinancialCategoryRepository,
         /** Opcional: sin él, capturar o editar no sincroniza el módulo Bancos. */
-        private bankService?: import("./bank-service").BankService
+        private bankService?: import("./bank-service").BankService,
+        /**
+         * Opcional: sin él, una transacción ligada a una tarjeta se resuelve solo
+         * por el texto del escáner. Con él, el tipo de la tarjeta manda.
+         */
+        private bankCardRepo?: import("../../domain/repositories/bank").IBankCardRepository,
     ) {}
 
     // ── Create ───────────────────────────────────────────────
@@ -455,17 +460,19 @@ export class FinancialTransactionService {
         if (transactions.length === 0) return transactions;
 
         try {
-            const [categories, institutions] = await Promise.all([
+            const [categories, institutions, cards] = await Promise.all([
                 this.categoryRepo ? this.categoryRepo.findAllBaseAndUser(userId) : Promise.resolve([]),
                 this.institutionRepo ? this.institutionRepo.findByOwnerId(userId) : Promise.resolve([]),
+                this.bankCardRepo ? this.bankCardRepo.findByOwnerId(userId) : Promise.resolve([]),
             ]);
             const categoryMap = new Map(categories.map(c => [c.id, c]));
             const institutionMap = new Map(institutions.map(i => [i.id, i]));
+            const creditCardIds = this.bankCardRepo ? creditCardIdSet(cards) : undefined;
 
             return transactions.map(tx => {
                 const category = tx.categoryId ? categoryMap.get(tx.categoryId) : undefined;
                 const institution = tx.institutionId ? institutionMap.get(tx.institutionId) : undefined;
-                const isPaidWithCredit = isTransactionPaidWithCredit(tx);
+                const isPaidWithCredit = isTransactionPaidWithCredit(tx, creditCardIds);
                 return {
                     ...tx,
                     categoryName: category?.name ?? tx.categoryName,

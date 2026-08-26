@@ -2,6 +2,8 @@ import { UUID } from "../../domain/core";
 import { FinancialTransaction } from "../../domain/entities/financial";
 import { IFinancialTransactionRepository, IFinancialCategoryRepository, IFinancialInstitutionRepository, IFinancialScannerTransactionRepository } from "../../domain/repositories/financial";
 import { computeNetBalance, isIncomeType, isWithdrawalType, isOtherType, isSavingsTransfer, isFundingTransfer } from "../../domain/services/financial-balance";
+import { isTransactionPaidWithCredit, creditCardIdSet } from "../../lib/financial-utils";
+import { IBankCardRepository } from "../../domain/repositories/bank";
 export interface FinancialKPIs {
     totalIncome: number;
     totalExpenses: number;
@@ -94,12 +96,40 @@ export interface DashboardOverview {
     dailyBreakdown: DailyBreakdown[];
 }
 
+/**
+ * Resolve `paidWithCredit` the same way the transactions list does.
+ *
+ * The stored column alone is not the whole truth: scanner-imported and legacy
+ * rows land with `false`/`null` even when the e-mail body clearly describes a
+ * credit-card purchase. `FinancialTransactionService.enrichTransactions` already
+ * runs every listed transaction through {@link isTransactionPaidWithCredit}, so
+ * the dashboard has to do the same or the two screens disagree: the list defers
+ * those expenses from the balance while the dashboard subtracts them, and the
+ * "Incluir TC" toggle moves nothing because `totalExpensesCredit` only counted
+ * the explicitly-flagged rows.
+ */
+function resolvePaidWithCredit(
+    transactions: FinancialTransaction[],
+    creditCardIds?: ReadonlySet<string>,
+): FinancialTransaction[] {
+    return transactions.map(t => {
+        const paidWithCredit = isTransactionPaidWithCredit(t, creditCardIds);
+        return paidWithCredit === (t.paidWithCredit ?? false) ? t : { ...t, paidWithCredit };
+    });
+}
+
 export class FinancialDashboardService {
     constructor(
         private transactionRepo: IFinancialTransactionRepository,
         private categoryRepo: IFinancialCategoryRepository,
         private institutionRepo: IFinancialInstitutionRepository,
-        private scannerRepo?: IFinancialScannerTransactionRepository
+        private scannerRepo?: IFinancialScannerTransactionRepository,
+        /**
+         * Optional: without it a transaction linked to a card is resolved from the
+         * scanner text alone. With it the card's own type decides — the same rule
+         * the transactions list applies.
+         */
+        private bankCardRepo?: IBankCardRepository,
     ) {}
 
     /**
@@ -125,12 +155,18 @@ export class FinancialDashboardService {
 
     /** One read of each source, shared by every block of a dashboard load. */
     private async buildContext(userId: UUID, startDate?: Date, endDate?: Date): Promise<DashboardContext> {
-        const [active, categories, institutions] = await Promise.all([
+        const [active, categories, institutions, creditCardIds] = await Promise.all([
             this.transactionRepo.findForDashboard(userId, { startDate, endDate }),
             this.categoryRepo.findAllBaseAndUser(userId),
             this.institutionRepo.findByOwnerId(userId),
+            this.loadCreditCardIds(userId),
         ]);
-        return { active, categories, institutions, pendingCount: await this.countPending(userId, startDate, endDate) };
+        return {
+            active: resolvePaidWithCredit(active, creditCardIds),
+            categories,
+            institutions,
+            pendingCount: await this.countPending(userId, startDate, endDate),
+        };
     }
 
     /** Transactions for a block: from the shared context, or read on demand. */
@@ -141,7 +177,17 @@ export class FinancialDashboardService {
         ctx?: DashboardContext,
     ): Promise<FinancialTransaction[]> {
         if (ctx) return ctx.active;
-        return this.transactionRepo.findForDashboard(userId, { startDate, endDate });
+        const [active, creditCardIds] = await Promise.all([
+            this.transactionRepo.findForDashboard(userId, { startDate, endDate }),
+            this.loadCreditCardIds(userId),
+        ]);
+        return resolvePaidWithCredit(active, creditCardIds);
+    }
+
+    /** Ids of the user's CREDIT cards, or `undefined` when no card repo is wired. */
+    private async loadCreditCardIds(userId: UUID): Promise<ReadonlySet<string> | undefined> {
+        if (!this.bankCardRepo) return undefined;
+        return creditCardIdSet(await this.bankCardRepo.findByOwnerId(userId));
     }
 
     private async countPending(userId: UUID, startDate?: Date, endDate?: Date): Promise<number> {

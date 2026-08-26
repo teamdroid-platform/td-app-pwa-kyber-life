@@ -1,4 +1,4 @@
-import { hasCreditCardKeywords, isTransactionPaidWithCredit } from "@/lib/financial-utils";
+import { hasCreditCardKeywords, isTransactionPaidWithCredit, creditCardIdSet } from "@/lib/financial-utils";
 
 describe("financial-credit-detection", () => {
     describe("hasCreditCardKeywords", () => {
@@ -148,9 +148,76 @@ describe("financial-credit-detection", () => {
             })).toBe(false);
         });
 
+        describe("with the user's CREDIT card ids", () => {
+            const creditCardIds = new Set(["card-credit"]);
+
+            it("marks a transaction linked to a CREDIT card, even with no wording in the text", () => {
+                expect(isTransactionPaidWithCredit({
+                    type: "EXPENSE",
+                    paidWithCredit: false,
+                    description: "Viaje en Uber",
+                    notes: "Gasto de $2.23 por un viaje de 4.1 kilómetros.",
+                    bankCardId: "card-credit",
+                }, creditCardIds)).toBe(true);
+            });
+
+            it("clears a transaction linked to a DEBIT card, even when the text says credit", () => {
+                // The card was matched by BIN / last four; the notification wording
+                // is the weaker evidence, so the card wins.
+                expect(isTransactionPaidWithCredit({
+                    type: "EXPENSE",
+                    paidWithCredit: false,
+                    description: "Cargo por suscripción mensual",
+                    notes: "Cargo recurrente de $11.99 en Netflix con tarjeta de crédito.",
+                    bankCardId: "card-debit",
+                }, creditCardIds)).toBe(false);
+            });
+
+            it("still refuses a bill payment TO a credit card, card link or not", () => {
+                expect(isTransactionPaidWithCredit({
+                    type: "EXPENSE",
+                    paidWithCredit: false,
+                    description: "Pago de tarjeta de crédito",
+                    notes: "Pago de $236.40 a su tarjeta de crédito desde la cuenta de ahorros.",
+                    bankCardId: "card-credit",
+                }, creditCardIds)).toBe(false);
+            });
+
+            it("falls back to the text heuristics when the transaction has no card", () => {
+                expect(isTransactionPaidWithCredit({
+                    type: "EXPENSE",
+                    paidWithCredit: false,
+                    description: "Consumo en KYWI",
+                    notes: "Pago realizado en KYWI con tarjeta de crédito.",
+                    bankCardId: null,
+                }, creditCardIds)).toBe(true);
+            });
+
+            it("keeps respecting an explicit true over a debit card link", () => {
+                expect(isTransactionPaidWithCredit({
+                    type: "EXPENSE",
+                    paidWithCredit: true,
+                    bankCardId: "card-debit",
+                }, creditCardIds)).toBe(true);
+            });
+        });
+
         it("handles null / undefined safely", () => {
             expect(isTransactionPaidWithCredit(null)).toBe(false);
             expect(isTransactionPaidWithCredit(undefined)).toBe(false);
+        });
+    });
+
+    describe("creditCardIdSet", () => {
+        it("keeps only the CREDIT cards that have an id", () => {
+            const ids = creditCardIdSet([
+                { id: "a", cardType: "CREDIT" },
+                { id: "b", cardType: "DEBIT" },
+                { id: null, cardType: "CREDIT" },
+                { id: "c", cardType: "CREDIT" },
+            ]);
+
+            expect([...ids].sort()).toEqual(["a", "c"]);
         });
     });
 });

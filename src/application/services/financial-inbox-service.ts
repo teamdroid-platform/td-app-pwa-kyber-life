@@ -1,7 +1,7 @@
 import { UUID } from "../../domain/core";
 import { FinancialScannerTransaction, FinancialTransaction } from "../../domain/entities/financial";
 import { IFinancialScannerTransactionRepository, IFinancialTransactionRepository, IFinancialTransactionAuditLogRepository, IFinancialInstitutionRepository } from "../../domain/repositories/financial";
-import { isTransactionPaidWithCredit } from "../../lib/financial-utils";
+import { isTransactionPaidWithCredit, creditCardIdSet } from "../../lib/financial-utils";
 
 export function normalizeForMatch(str?: string | null): string {
     if (!str) return "";
@@ -45,7 +45,12 @@ export class FinancialInboxService {
         private institutionRepo: IFinancialInstitutionRepository,
         private categoryRepo?: import("../../domain/repositories/financial").IFinancialCategoryRepository,
         /** Opcional: sin él, confirmar un escaneo no identifica cuentas. */
-        private bankService?: import("./bank-service").BankService
+        private bankService?: import("./bank-service").BankService,
+        /**
+         * Opcional: sin él, `paidWithCredit` se decide solo por el texto del
+         * correo, aunque el escaneo termine ligado a una tarjeta conocida.
+         */
+        private bankCardRepo?: import("../../domain/repositories/bank").IBankCardRepository,
     ) {}
 
     async getUnprocessedTransactions(userId: UUID): Promise<FinancialScannerTransaction[]> {
@@ -162,6 +167,25 @@ export class FinancialInboxService {
             })
             : null;
 
+        // El vínculo con la tarjeta se resuelve *después* de la heurística de
+        // texto, así que hay que volver a decidir con él: si el escaneo terminó
+        // ligado a una tarjeta conocida, su tipo manda sobre lo que dijera el
+        // correo. Lo que el usuario marcó a mano sigue por encima de todo.
+        const resolvedBankCardId = dto.bankCardId ?? resolvedBank?.bankCardId ?? null;
+        const creditCardIds = this.bankCardRepo
+            ? creditCardIdSet(await this.bankCardRepo.findByOwnerId(dto.userId))
+            : undefined;
+        const finalPaidWithCredit = dto.paidWithCredit !== undefined && dto.paidWithCredit !== null
+            ? dto.paidWithCredit
+            : transactionType === 'EXPENSE' && isTransactionPaidWithCredit({
+                type: transactionType,
+                summary: scannerTx.summary,
+                description: scannerTx.description ?? dto.description,
+                originStats: scannerTx.originStats as Record<string, unknown> | null,
+                notes: (scannerTx.originStats as Record<string, string>)?.emailBody,
+                bankCardId: resolvedBankCardId,
+            }, creditCardIds);
+
         const transaction: FinancialTransaction = {
             id: crypto.randomUUID(),
             ownerUserId: dto.userId,
@@ -175,14 +199,14 @@ export class FinancialInboxService {
             institutionId: finalInstitutionId,
             bankSourceAccountId: dto.bankSourceAccountId ?? resolvedBank?.bankSourceAccountId ?? null,
             bankDestinationAccountId: dto.bankDestinationAccountId ?? resolvedBank?.bankDestinationAccountId ?? null,
-            bankCardId: dto.bankCardId ?? resolvedBank?.bankCardId ?? null,
+            bankCardId: resolvedBankCardId,
             bankInstitutionId: dto.bankInstitutionId ?? resolvedBank?.bankInstitutionId ?? null,
             bankCounterpartyObservationId: resolvedBank?.bankCounterpartyObservationId ?? null,
             tags: dto.tags ?? [],
             description: resolvedDescription,
             notes: dto.notes ?? (scannerTx.originStats as Record<string, string>)?.emailBody ?? (scannerTx.originStats as Record<string, string>)?.snippet ?? null,
             possibleDuplicate: false,
-            paidWithCredit: effectivePaidWithCredit,
+            paidWithCredit: finalPaidWithCredit,
             executionId: validExecutionId,
             originStats: {
                 ...((scannerTx.originStats as Record<string, unknown>) || {}),
