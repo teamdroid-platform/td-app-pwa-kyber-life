@@ -82,7 +82,7 @@ export function SparkStatCard({ label, value, icon: Icon, color, tintClassName, 
             <div className="flex items-center justify-between gap-1">
                 <p className="truncate text-[10px] font-semibold text-text-primary sm:text-sm">{label}</p>
                 <div className="flex items-center gap-1">
-                    {onClick && <ChevronRight aria-hidden="true" className="h-3 w-3 shrink-0 text-text-tertiary/70 sm:h-3.5 sm:w-3.5" />}
+                    {onClick && <ChevronRight aria-hidden="true" className="hidden sm:block h-3 w-3 shrink-0 text-text-tertiary/70 sm:h-3.5 sm:w-3.5" />}
                     <span className={cn("flex h-5 w-5 shrink-0 items-center justify-center rounded-md sm:h-8 sm:w-8 sm:rounded-lg", badgeClassName)}>
                         <Icon className="h-3 w-3 sm:h-4 sm:w-4" />
                     </span>
