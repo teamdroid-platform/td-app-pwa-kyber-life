@@ -818,8 +818,8 @@ export function FinancialInbox() {
                 {Object.entries(groupedTransactions).map(([dateLabel, items]) => (
                     <div key={dateLabel} className="flex flex-col gap-2.5">
                         {/* Date Header with Purple Calendar Icon */}
-                        <div className="flex items-center gap-2 text-sm sm:text-base font-semibold text-slate-200 py-0.5">
-                            <Calendar className="h-4 w-4 text-purple-400 shrink-0" />
+                        <div className="flex items-center gap-2 text-sm sm:text-base font-semibold text-text-primary dark:text-slate-200 py-0.5">
+                            <Calendar className="h-4 w-4 text-purple-600 dark:text-purple-400 shrink-0" />
                             <span className="capitalize">{dateLabel}</span>
                         </div>
 
@@ -858,7 +858,7 @@ export function FinancialInbox() {
                                     <Card
                                         key={tx.id}
                                         className={cn(
-                                            "group relative overflow-hidden rounded-2xl border border-indigo-500/20 bg-slate-900/60 backdrop-blur-sm py-0 shadow-md shadow-black/20 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:border-indigo-500/40",
+                                            "group relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white/95 shadow-sm shadow-slate-200/50 backdrop-blur-sm py-0 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-indigo-300 dark:border-indigo-500/20 dark:bg-slate-900/60 dark:shadow-md dark:shadow-black/20 dark:hover:shadow-lg dark:hover:border-indigo-500/40",
                                             "flex flex-col cursor-pointer active:scale-[0.99]",
                                             isOpening && "scale-[0.99] border-indigo-400/60 ring-1 ring-indigo-400/40",
                                             isProcessing && "opacity-60 pointer-events-none"
@@ -877,13 +877,13 @@ export function FinancialInbox() {
                                         {/* Top Accent Gradient Line */}
                                         <div
                                             className={cn(
-                                                "absolute inset-x-0 top-0 h-[1.5px] bg-gradient-to-r from-transparent via-indigo-500/40 to-transparent",
+                                                "absolute inset-x-0 top-0 h-[1.5px] bg-gradient-to-r from-transparent via-indigo-500/20 dark:via-indigo-500/40 to-transparent",
                                                 isOpening && "h-0.5 animate-pulse via-indigo-400"
                                             )}
                                             aria-hidden="true"
                                         />
 
-                                        <CardHeader className="flex flex-col !space-y-0 !p-3 sm:!p-3.5 select-none bg-slate-900/40 transition-colors">
+                                        <CardHeader className="flex flex-col !space-y-0 !p-3 sm:!p-3.5 select-none bg-slate-50/40 dark:bg-slate-900/40 transition-colors">
                                             {/* TOP SECTION: Left Column (Avatar + Time) + Content Block */}
                                             <div className="flex items-start gap-3 w-full">
                                                 {/* Left Column: Circular Glowing Avatar + Time placed directly below (without clock icon) */}
@@ -909,7 +909,7 @@ export function FinancialInbox() {
                                                     </div>
 
                                                     {/* Time placed right under category icon without clock icon */}
-                                                    <span className="text-[11px] text-slate-400 font-medium tracking-tight">
+                                                    <span className="text-[11px] text-text-tertiary font-medium tracking-tight">
                                                         {tx.date
                                                             ? formatTime(tx.date)
                                                             : tx.createdAt
@@ -924,7 +924,7 @@ export function FinancialInbox() {
                                                     <div className="flex items-center justify-between gap-2 w-full min-w-0">
                                                         <div className="flex items-center gap-1.5 min-w-0">
                                                             <span
-                                                                className="inline-flex h-5 max-w-[150px] sm:max-w-[190px] items-center rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[11px] font-semibold leading-none tracking-wide text-amber-400"
+                                                                className="inline-flex h-5 max-w-[150px] sm:max-w-[190px] items-center rounded-md border border-amber-500/20 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold leading-none tracking-wide text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-400"
                                                                 title={tx.category || "Sin categoría"}
                                                             >
                                                                 <span className="truncate">{tx.category || "Sin categoría"}</span>
@@ -934,7 +934,7 @@ export function FinancialInbox() {
                                                                     <PopoverTrigger asChild>
                                                                         <button
                                                                             type="button"
-                                                                            className="inline-flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-md border border-amber-500/20 bg-amber-500/10 text-amber-400 transition-colors hover:bg-amber-500/20 focus-visible:outline-none"
+                                                                            className="inline-flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-md border border-amber-500/20 bg-amber-50 text-amber-700 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-400 transition-colors hover:bg-amber-100 dark:hover:bg-amber-500/20 focus-visible:outline-none"
                                                                             onClick={(e) => e.stopPropagation()}
                                                                         >
                                                                             <CircleAlert className="h-3 w-3" />
@@ -942,11 +942,11 @@ export function FinancialInbox() {
                                                                     </PopoverTrigger>
                                                                     <PopoverContent
                                                                         align="start"
-                                                                        className="w-72 rounded-xl border border-border/50 bg-slate-900 p-3 text-sm shadow-xl shadow-black/50"
+                                                                        className="w-72 rounded-xl border border-border/50 bg-bg-secondary p-3 text-sm shadow-xl"
                                                                         onClick={(e) => e.stopPropagation()}
                                                                     >
                                                                         <div className="flex items-start gap-2">
-                                                                            <CircleAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
+                                                                            <CircleAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
                                                                             <p className="text-muted-foreground">
                                                                                 Posible relación:{" "}
                                                                                 <span className="text-foreground font-medium">
@@ -957,7 +957,7 @@ export function FinancialInbox() {
                                                                     </PopoverContent>
                                                                 </Popover>
                                                             ) : (
-                                                                <span className="text-slate-500 text-xs select-none" title="Información">
+                                                                <span className="text-slate-400 dark:text-slate-500 text-xs select-none" title="Información">
                                                                     ⓘ
                                                                 </span>
                                                             )}
@@ -972,12 +972,12 @@ export function FinancialInbox() {
                                                                 className={cn(
                                                                     "text-[15px] sm:text-base font-bold tracking-tight whitespace-nowrap",
                                                                     isIncome
-                                                                        ? "text-emerald-400"
+                                                                        ? "text-emerald-600 dark:text-emerald-400"
                                                                         : isExpense
-                                                                        ? "text-[#FF4D6D]"
+                                                                        ? "text-rose-600 dark:text-[#FF4D6D]"
                                                                         : isWithdrawal
-                                                                        ? "text-sky-400"
-                                                                        : "text-amber-400"
+                                                                        ? "text-sky-600 dark:text-sky-400"
+                                                                        : "text-amber-600 dark:text-amber-400"
                                                                 )}
                                                                 title={formatAmount(tx.amount, tx.currency || "USD")}
                                                             >
@@ -989,14 +989,14 @@ export function FinancialInbox() {
 
                                                     {/* Title */}
                                                     <CardTitle
-                                                        className="text-sm sm:text-[15px] tracking-tight font-bold line-clamp-2 leading-snug w-full mt-1 group-hover:text-indigo-300 transition-colors text-white"
+                                                        className="text-sm sm:text-[15px] tracking-tight font-bold line-clamp-2 leading-snug w-full mt-1 group-hover:text-accent-primary transition-colors text-text-primary"
                                                         title={tx.description || "Transacción"}
                                                     >
                                                         {tx.description || "Transacción"}
                                                     </CardTitle>
 
                                                     {/* Institution / Merchant with Verification Badge */}
-                                                    <div className="flex items-center min-w-0 w-full text-xs text-slate-400 mt-0.5 font-medium">
+                                                    <div className="flex items-center min-w-0 w-full text-xs text-text-tertiary mt-0.5 font-medium">
                                                         <span
                                                             className="truncate min-w-0"
                                                             title={displayInstitution || "Institución por confirmar"}
@@ -1012,7 +1012,7 @@ export function FinancialInbox() {
                                                         )}
                                                     </div>
 
-                                                    {/* Origin and Destination Accounts (Individual badges for icon, number, type TCR/TDE/AHO/CTE/CTA, ownership MIA/TER) */}
+                                                    {/* Origin and Destination Accounts */}
                                                     {(accounts.source || accounts.destination) && (
                                                         <div className="flex flex-col gap-1.5 mt-2">
                                                             {accounts.source && (() => {
@@ -1021,29 +1021,29 @@ export function FinancialInbox() {
                                                                     <div className="flex items-center gap-1.5 flex-wrap min-w-0">
                                                                         {/* Origin Arrow Icon Badge */}
                                                                         <span
-                                                                            className="inline-flex items-center justify-center h-5 w-5 rounded-md border border-rose-500/30 bg-rose-500/10 text-rose-400 shrink-0 select-none"
+                                                                            className="inline-flex items-center justify-center h-5 w-5 rounded-md border border-rose-500/20 bg-rose-50 text-rose-600 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-400 shrink-0 select-none"
                                                                             title="Origen"
                                                                         >
                                                                             <ArrowUpRight className="h-3 w-3 stroke-[2.5]" />
                                                                         </span>
 
                                                                         {/* Account Number Badge */}
-                                                                        <span className="inline-flex items-center h-5 px-1.5 rounded-md border border-slate-700/60 bg-slate-800/50 font-mono text-[11px] text-slate-200 font-medium tracking-wide shrink-0 select-none">
+                                                                        <span className="inline-flex items-center h-5 px-1.5 rounded-md border border-slate-200 bg-slate-100/90 font-mono text-[11px] text-slate-700 font-medium tracking-wide shrink-0 select-none dark:border-slate-700/60 dark:bg-slate-800/50 dark:text-slate-200">
                                                                             {info.formattedNumber}
                                                                         </span>
 
                                                                         {/* Account Type Acronym Badge (TCR, TDE, AHO, CTE, CTA) */}
-                                                                        <span className="inline-flex items-center h-5 px-1.5 rounded-md border border-indigo-500/30 bg-indigo-500/10 text-[9.5px] font-bold text-indigo-300 shrink-0 select-none">
+                                                                        <span className="inline-flex items-center h-5 px-1.5 rounded-md border border-indigo-500/20 bg-indigo-50 text-[9.5px] font-bold text-indigo-700 shrink-0 select-none dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-300">
                                                                             {info.typeAcronym}
                                                                         </span>
 
                                                                         {/* Ownership Acronym Badge (MIA for own, TER for third party) */}
-                                                                        <span className="inline-flex items-center h-5 px-1.5 rounded-md border border-slate-600/40 bg-slate-800/40 text-[9px] font-bold text-slate-400 shrink-0 select-none">
+                                                                        <span className="inline-flex items-center h-5 px-1.5 rounded-md border border-slate-200/60 bg-slate-100/60 text-[9px] font-bold text-slate-600 shrink-0 select-none dark:border-slate-600/40 dark:bg-slate-800/40 dark:text-slate-400">
                                                                             {info.ownershipAcronym}
                                                                         </span>
                                                                     </div>
                                                                 );
-                                                            })()}
+                              })()}
 
                                                             {accounts.destination && (() => {
                                                                 const info = resolveAccountBadgeInfo("DESTINATION", accounts.destination, tx);
@@ -1051,24 +1051,24 @@ export function FinancialInbox() {
                                                                     <div className="flex items-center gap-1.5 flex-wrap min-w-0">
                                                                         {/* Destination Arrow Icon Badge */}
                                                                         <span
-                                                                            className="inline-flex items-center justify-center h-5 w-5 rounded-md border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 shrink-0 select-none"
+                                                                            className="inline-flex items-center justify-center h-5 w-5 rounded-md border border-emerald-500/20 bg-emerald-50 text-emerald-600 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-400 shrink-0 select-none"
                                                                             title="Destino"
                                                                         >
                                                                             <ArrowDownLeft className="h-3 w-3 stroke-[2.5]" />
                                                                         </span>
 
                                                                         {/* Account Number Badge */}
-                                                                        <span className="inline-flex items-center h-5 px-1.5 rounded-md border border-slate-700/60 bg-slate-800/50 font-mono text-[11px] text-slate-200 font-medium tracking-wide shrink-0 select-none">
+                                                                        <span className="inline-flex items-center h-5 px-1.5 rounded-md border border-slate-200 bg-slate-100/90 font-mono text-[11px] text-slate-700 font-medium tracking-wide shrink-0 select-none dark:border-slate-700/60 dark:bg-slate-800/50 dark:text-slate-200">
                                                                             {info.formattedNumber}
                                                                         </span>
 
                                                                         {/* Account Type Acronym Badge */}
-                                                                        <span className="inline-flex items-center h-5 px-1.5 rounded-md border border-indigo-500/30 bg-indigo-500/10 text-[9.5px] font-bold text-indigo-300 shrink-0 select-none">
+                                                                        <span className="inline-flex items-center h-5 px-1.5 rounded-md border border-indigo-500/20 bg-indigo-50 text-[9.5px] font-bold text-indigo-700 shrink-0 select-none dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-300">
                                                                             {info.typeAcronym}
                                                                         </span>
 
                                                                         {/* Ownership Acronym Badge */}
-                                                                        <span className="inline-flex items-center h-5 px-1.5 rounded-md border border-slate-600/40 bg-slate-800/40 text-[9px] font-bold text-slate-400 shrink-0 select-none">
+                                                                        <span className="inline-flex items-center h-5 px-1.5 rounded-md border border-slate-200/60 bg-slate-100/60 text-[9px] font-bold text-slate-600 shrink-0 select-none dark:border-slate-600/40 dark:bg-slate-800/40 dark:text-slate-400">
                                                                             {info.ownershipAcronym}
                                                                         </span>
                                                                     </div>
@@ -1079,9 +1079,9 @@ export function FinancialInbox() {
                                                 </div>
                                             </div>
 
-                                            {/* BOTTOM BAR: Subtle Full-Width Action Buttons */}
+                                            {/* BOTTOM BAR: Action Buttons */}
                                             <div
-                                                className="grid grid-cols-2 gap-2.5 w-full pt-2.5 mt-2.5 border-t border-slate-800/80"
+                                                className="grid grid-cols-2 gap-2.5 w-full pt-2.5 mt-2.5 border-t border-slate-100 dark:border-slate-800/80"
                                                 onClick={(e) => e.stopPropagation()}
                                             >
                                                 {/* Reject Button */}
@@ -1090,10 +1090,10 @@ export function FinancialInbox() {
                                                     onClick={() => handleDismiss(tx.id!)}
                                                     disabled={isProcessing}
                                                     title="Rechazar"
-                                                    className="flex items-center justify-center gap-1.5 h-8.5 rounded-xl bg-rose-950/20 border border-rose-500/20 text-rose-400 hover:bg-rose-900/40 hover:text-rose-300 hover:border-rose-500/35 text-xs font-semibold active:scale-[0.98] transition-all shadow-sm"
+                                                    className="flex items-center justify-center gap-1.5 h-8.5 rounded-xl border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 hover:text-rose-800 hover:border-rose-300 text-xs font-semibold active:scale-[0.98] transition-all shadow-sm dark:bg-rose-950/20 dark:border-rose-500/20 dark:text-rose-400 dark:hover:bg-rose-900/40 dark:hover:text-rose-300 dark:hover:border-rose-500/35"
                                                 >
                                                     {isDismissing ? (
-                                                        <Loader2 className="h-3.5 w-3.5 animate-spin text-rose-400" />
+                                                        <Loader2 className="h-3.5 w-3.5 animate-spin text-rose-500 dark:text-rose-400" />
                                                     ) : (
                                                         <X className="h-3.5 w-3.5 stroke-[2.5]" />
                                                     )}
@@ -1106,10 +1106,10 @@ export function FinancialInbox() {
                                                     onClick={() => handleConfirm(tx)}
                                                     disabled={isProcessing}
                                                     title="Aprobar"
-                                                    className="flex items-center justify-center gap-1.5 h-8.5 rounded-xl bg-emerald-950/20 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-900/40 hover:text-emerald-300 hover:border-emerald-500/35 text-xs font-semibold active:scale-[0.98] transition-all shadow-sm"
+                                                    className="flex items-center justify-center gap-1.5 h-8.5 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 hover:border-emerald-300 text-xs font-semibold active:scale-[0.98] transition-all shadow-sm dark:bg-emerald-950/20 dark:border-emerald-500/20 dark:text-emerald-400 dark:hover:bg-emerald-900/40 dark:hover:text-emerald-300 dark:hover:border-emerald-500/35"
                                                 >
                                                     {isConfirming ? (
-                                                        <Loader2 className="h-3.5 w-3.5 animate-spin text-emerald-400" />
+                                                        <Loader2 className="h-3.5 w-3.5 animate-spin text-emerald-500 dark:text-emerald-400" />
                                                     ) : (
                                                         <Check className="h-3.5 w-3.5 stroke-[2.5]" />
                                                     )}

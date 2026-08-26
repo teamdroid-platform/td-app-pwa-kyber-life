@@ -21,21 +21,21 @@ import type { CaptureMethod } from "@/presentation/financial/components/ai-captu
 const WAYS: { id: CaptureMethod; label: string; Icon: typeof Mic; className: string }[] = [
     {
         id: "voice", label: "Audio", Icon: Mic,
-        className: "border-emerald-500/40 bg-emerald-500/12 text-emerald-300 hover:border-emerald-500/70",
+        className: "border-emerald-500/30 bg-emerald-50 text-emerald-800 hover:bg-emerald-100/80 dark:bg-emerald-950/20 dark:text-emerald-300 dark:hover:bg-emerald-900/30",
     },
     {
         id: "text", label: "Texto", Icon: MessageSquareText,
-        className: "border-violet-500/40 bg-violet-500/12 text-violet-300 hover:border-violet-500/70",
+        className: "border-violet-500/30 bg-violet-50 text-violet-800 hover:bg-violet-100/80 dark:bg-violet-950/20 dark:text-violet-300 dark:hover:bg-violet-900/30",
     },
     {
         id: "form", label: "Formulario", Icon: ClipboardList,
-        className: "border-amber-500/40 bg-amber-500/12 text-amber-300 hover:border-amber-500/70",
+        className: "border-amber-500/30 bg-amber-50 text-amber-800 hover:bg-amber-100/80 dark:bg-amber-950/20 dark:text-amber-300 dark:hover:bg-amber-900/30",
     },
 ];
 
 function SectionTitle({ children }: { children: ReactNode }) {
     return (
-        <h2 className="mb-2 ml-0.5 text-[10px] font-bold uppercase tracking-[0.12em] text-text-tertiary">
+        <h2 className="mb-2 ml-0.5 text-[10.5px] font-bold uppercase tracking-[0.12em] text-text-tertiary">
             {children}
         </h2>
     );
@@ -46,12 +46,12 @@ function CountBadge({ count, tone }: { count: number; tone: "amber" | "sky" }) {
     const pending = count > 0;
     return (
         <span className={cn(
-            "shrink-0 rounded-full border px-2.5 py-0.5 text-[11px] font-bold tabular-nums",
+            "shrink-0 rounded-md border px-2 py-0.5 text-[11px] font-bold tabular-nums select-none",
             !pending
-                ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-400"
+                ? "border-emerald-500/30 bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400"
                 : tone === "amber"
-                    ? "border-amber-500/40 bg-amber-500/10 text-amber-400"
-                    : "border-sky-500/40 bg-sky-500/10 text-sky-400",
+                    ? "border-amber-500/30 bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400"
+                    : "border-sky-500/30 bg-sky-50 text-sky-700 dark:bg-sky-500/10 dark:text-sky-400",
         )}>
             {pending ? count : "Al día"}
         </span>
@@ -70,21 +70,21 @@ interface AttentionChipProps {
 
 /**
  * Lo que espera, en media fila.
- *
- * Iban una debajo de otra y entre las dos empujaban los accesos fuera de la
- * pantalla en móvil. Puestas en paralelo caben en el alto de una sola, y como
- * lo que se lee de ellas es el número, perder el subtítulo no cuesta nada.
  */
 function AttentionChip({ href, icon, iconClassName, label, count, tone }: AttentionChipProps) {
     return (
         <Link
             href={href}
-            className="flex min-w-0 flex-1 items-center gap-2.5 rounded-2xl border border-border-base bg-bg-secondary p-2.5 transition-colors hover:border-border-strong"
+            className="group relative overflow-hidden flex min-w-0 flex-1 items-center gap-2.5 rounded-2xl border border-slate-200/80 bg-white/90 shadow-sm shadow-slate-200/50 backdrop-blur-sm p-3 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-indigo-300 active:scale-[0.99] dark:border-indigo-500/20 dark:bg-slate-900/60 dark:shadow-md dark:shadow-black/20 dark:hover:shadow-lg dark:hover:border-indigo-500/40"
         >
-            <span className={cn("grid h-8 w-8 shrink-0 place-items-center rounded-xl", iconClassName)}>
+            <div
+                className="absolute inset-x-0 top-0 h-[1.5px] bg-gradient-to-r from-transparent via-indigo-500/20 dark:via-indigo-500/30 to-transparent"
+                aria-hidden="true"
+            />
+            <span className={cn("grid h-8 w-8 shrink-0 place-items-center rounded-xl border border-slate-200/60 dark:border-border/20", iconClassName)}>
                 {icon}
             </span>
-            <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-text-primary">
+            <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-text-primary group-hover:text-accent-primary transition-colors">
                 {label}
             </span>
             <CountBadge count={count} tone={tone} />
@@ -105,27 +105,22 @@ function RowLink({ href, icon, iconClassName, title, hint }: RowLinkProps) {
     return (
         <Link
             href={href}
-            className="flex items-center gap-3 border-b border-border-base px-3 py-2.5 transition-colors last:border-b-0 hover:bg-bg-tertiary/40"
+            className="group flex items-center gap-3 px-3.5 py-3 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/40"
         >
-            <span className={cn("grid h-8 w-8 shrink-0 place-items-center rounded-xl", iconClassName)}>
+            <span className={cn("grid h-8 w-8 shrink-0 place-items-center rounded-xl border border-slate-200/60 dark:border-border/20", iconClassName)}>
                 {icon}
             </span>
             <span className="min-w-0 flex-1">
-                <span className="block truncate text-[13px] font-semibold text-text-primary">{title}</span>
+                <span className="block truncate text-[13px] font-semibold text-text-primary group-hover:text-accent-primary transition-colors">{title}</span>
                 <span className="block truncate text-[11px] text-text-tertiary">{hint}</span>
             </span>
-            <ChevronRight className="h-4 w-4 shrink-0 text-text-tertiary" />
+            <ChevronRight className="h-4 w-4 shrink-0 text-text-tertiary group-hover:text-text-secondary group-hover:translate-x-0.5 transition-all" />
         </Link>
     );
 }
 
 /**
  * El motivo que va detrás de cada panel.
- *
- * Es ornamento, no los datos del usuario: dibujar su serie real aquí costaría
- * las dos consultas pesadas que este inicio existe para no hacer, y una cifra
- * a medias engaña más que una forma. Por eso no lleva ejes, ni números, ni
- * nada que se pueda leer como una medición.
  */
 function FinanceMotif() {
     return (
@@ -158,6 +153,10 @@ function MarketMotif() {
             aria-hidden viewBox="0 0 160 44" preserveAspectRatio="none"
             className="pointer-events-none absolute inset-x-0 bottom-0 h-11 w-full"
         >
+            <rect
+                x="0" y="0" width="160" height="44"
+                fill="none"
+            />
             {bars.map((height, index) => (
                 <rect
                     key={index}
@@ -183,13 +182,17 @@ function PanelCard({ href, icon, iconClassName, title, hint, motif }: PanelCardP
     return (
         <Link
             href={href}
-            className="relative overflow-hidden rounded-2xl border border-border-base bg-bg-secondary p-3 pb-10 transition-colors hover:border-border-strong"
+            className="group relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white/90 shadow-sm shadow-slate-200/50 backdrop-blur-sm p-3.5 pb-10 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-indigo-300 active:scale-[0.99] dark:border-indigo-500/20 dark:bg-slate-900/60 dark:shadow-md dark:shadow-black/20 dark:hover:shadow-lg dark:hover:border-indigo-500/40"
         >
+            <div
+                className="absolute inset-x-0 top-0 h-[1.5px] bg-gradient-to-r from-transparent via-indigo-500/20 dark:via-indigo-500/30 to-transparent"
+                aria-hidden="true"
+            />
             {motif}
-            <span className={cn("relative grid h-8 w-8 place-items-center rounded-xl", iconClassName)}>
+            <span className={cn("relative grid h-8 w-8 place-items-center rounded-xl border border-slate-200/60 dark:border-border/20", iconClassName)}>
                 {icon}
             </span>
-            <span className="relative mt-2 block text-[13px] font-semibold text-text-primary">{title}</span>
+            <span className="relative mt-2 block text-[13px] font-bold text-text-primary group-hover:text-accent-primary transition-colors">{title}</span>
             <span className="relative block text-[11px] leading-snug text-text-tertiary">{hint}</span>
         </Link>
     );
@@ -201,32 +204,22 @@ export interface HomeMobileProps {
     pendingScans: number;
 }
 
-/**
- * El inicio en un teléfono: qué hacer, qué está esperando y a dónde ir.
- *
- * No trae cifras ni gráficas. Los números viven en `/financial` y en
- * `/market/analytics`; tenerlos también aquí obligaba a esperar dos consultas
- * pesadas antes de poder tocar el único botón por el que la mayoría entra
- * —anotar lo que acaba de gastar— y a media pantalla se leen mal.
- *
- * Cada acción lleva el color de su módulo. En una pantalla que es toda
- * acciones, el color es lo que las distingue de un vistazo: en gris, diez
- * accesos son diez filas iguales que hay que leer una por una.
- */
 export function HomeMobile({ balances, pendingScans }: HomeMobileProps) {
     return (
         <div className="flex flex-col gap-5">
             {/* ── Acción principal ── */}
-            <section className="relative overflow-hidden rounded-3xl border border-border-base bg-bg-secondary p-4 sm:p-5">
-                <span aria-hidden className="absolute inset-y-0 left-0 w-[3px] bg-emerald-500" />
+            <section className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white/90 shadow-sm shadow-slate-200/50 backdrop-blur-sm p-4 sm:p-5 dark:border-indigo-500/20 dark:bg-slate-900/60 dark:shadow-md dark:shadow-black/20">
+                <div
+                    className="absolute inset-x-0 top-0 h-[1.5px] bg-gradient-to-r from-transparent via-indigo-500/20 dark:via-indigo-500/40 to-transparent"
+                    aria-hidden="true"
+                />
+                <span aria-hidden className="absolute inset-y-0 left-0 w-[3px] bg-emerald-500/80 rounded-r" />
                 <span
                     aria-hidden
-                    className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-emerald-500/[0.07] to-transparent"
+                    className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-emerald-500/[0.04] dark:from-indigo-500/[0.06] to-transparent"
                 />
 
                 <div className="relative">
-                    {/* Un solo título: el rótulo pequeño encima decía «Registrar» y el
-                        titular «Anotar un movimiento» — lo mismo dos veces. */}
                     <h2 className="text-xl font-bold tracking-tight text-text-primary sm:text-2xl">
                         Registrar un movimiento
                     </h2>
@@ -240,7 +233,7 @@ export function HomeMobile({ balances, pendingScans }: HomeMobileProps) {
                                 <button
                                     type="button"
                                     className={cn(
-                                        "flex flex-col items-center gap-1.5 rounded-2xl border px-2 py-3 transition-colors",
+                                        "flex flex-col items-center gap-1.5 rounded-2xl border px-2 py-3 shadow-sm transition-all active:scale-[0.98]",
                                         className,
                                     )}
                                 >
@@ -253,23 +246,15 @@ export function HomeMobile({ balances, pendingScans }: HomeMobileProps) {
                 </div>
             </section>
 
-            {/* ── Lo que espera ──
-                Las dos fichas están siempre: son dos sitios a los que se entra
-                a diario, y esconderlas al quedar en cero las volvía difíciles
-                de encontrar justo cuando el usuario ya se acostumbró a que
-                estuvieran ahí. Con nada pendiente dicen «Al día», que es una
-                respuesta, no un hueco. La de saldos es la excepción: sin
-                ninguna cuenta registrada no hay saldo que declarar. */}
+            {/* ── Lo que espera ── */}
             <section>
                 <SectionTitle>Requiere tu atención</SectionTitle>
-                {/* Flex y no rejilla: cuando solo hay una, ocupa la fila entera
-                    en vez de dejar media pantalla vacía al lado. */}
                 <div className="flex gap-2">
                     {balances.total > 0 && (
                         <AttentionChip
                             href="/financial/balances"
                             icon={<Scale className="h-4 w-4" />}
-                            iconClassName="bg-amber-500/15 text-amber-400"
+                            iconClassName="border border-amber-500/20 bg-amber-50 text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-400"
                             label="Saldos"
                             count={balances.pending}
                             tone="amber"
@@ -278,7 +263,7 @@ export function HomeMobile({ balances, pendingScans }: HomeMobileProps) {
                     <AttentionChip
                         href="/financial/scans"
                         icon={<Inbox className="h-4 w-4" />}
-                        iconClassName="bg-sky-500/15 text-sky-400"
+                        iconClassName="border border-sky-500/20 bg-sky-50 text-sky-700 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-400"
                         label="Escaneos"
                         count={pendingScans}
                         tone="sky"
@@ -293,7 +278,7 @@ export function HomeMobile({ balances, pendingScans }: HomeMobileProps) {
                     <PanelCard
                         href="/financial"
                         icon={<BarChart3 className="h-4 w-4" />}
-                        iconClassName="bg-emerald-500/15 text-emerald-400"
+                        iconClassName="border border-emerald-500/20 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-400"
                         title="Panel financiero"
                         hint="Saldos, flujo y categorías"
                         motif={<FinanceMotif />}
@@ -301,7 +286,7 @@ export function HomeMobile({ balances, pendingScans }: HomeMobileProps) {
                     <PanelCard
                         href="/market/analytics"
                         icon={<ShoppingCart className="h-4 w-4" />}
-                        iconClassName="bg-cyan-500/15 text-cyan-300"
+                        iconClassName="border border-cyan-500/20 bg-cyan-50 text-cyan-700 dark:border-cyan-500/30 dark:bg-cyan-500/10 dark:text-cyan-300"
                         title="Panel de compras"
                         hint="Precios, productos y ahorro"
                         motif={<MarketMotif />}
@@ -312,34 +297,36 @@ export function HomeMobile({ balances, pendingScans }: HomeMobileProps) {
             {/* ── Accesos ── */}
             <section>
                 <SectionTitle>Ir a</SectionTitle>
-                <div className="overflow-hidden rounded-2xl border border-border-base bg-bg-secondary">
-                    {/* El historial primero: es a donde más se vuelve, y en móvil
-                        es la fila que más veces queda a la vista. */}
+                <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white/90 shadow-sm shadow-slate-200/50 backdrop-blur-sm divide-y divide-slate-100 dark:border-indigo-500/20 dark:bg-slate-900/60 dark:shadow-md dark:shadow-black/20 dark:divide-slate-800/80">
+                    <div
+                        className="absolute inset-x-0 top-0 h-[1.5px] bg-gradient-to-r from-transparent via-indigo-500/20 dark:via-indigo-500/30 to-transparent"
+                        aria-hidden="true"
+                    />
                     <RowLink
                         href="/financial/transactions"
                         icon={<Receipt className="h-4 w-4" />}
-                        iconClassName="bg-violet-500/15 text-violet-300"
+                        iconClassName="border border-violet-500/20 bg-violet-50 text-violet-700 dark:border-violet-500/30 dark:bg-violet-500/10 dark:text-violet-300"
                         title="Transacciones"
                         hint="Historial y filtros"
                     />
                     <RowLink
                         href="/financial/banks"
                         icon={<Landmark className="h-4 w-4" />}
-                        iconClassName="bg-blue-500/15 text-blue-300"
+                        iconClassName="border border-blue-500/20 bg-blue-50 text-blue-700 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-300"
                         title="Bancos"
                         hint="Cuentas, tarjetas e instituciones"
                     />
                     <RowLink
                         href="/market/purchases"
                         icon={<ShoppingBag className="h-4 w-4" />}
-                        iconClassName="bg-rose-500/15 text-rose-300"
+                        iconClassName="border border-rose-500/20 bg-rose-50 text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300"
                         title="Compras"
                         hint="Listas, plantillas y productos"
                     />
                     <RowLink
                         href="/market/purchases/new"
                         icon={<ShoppingCart className="h-4 w-4" />}
-                        iconClassName="bg-cyan-500/15 text-cyan-300"
+                        iconClassName="border border-cyan-500/20 bg-cyan-50 text-cyan-700 dark:border-cyan-500/30 dark:bg-cyan-500/10 dark:text-cyan-300"
                         title="Nueva compra"
                         hint="Empezar la lista del súper"
                     />

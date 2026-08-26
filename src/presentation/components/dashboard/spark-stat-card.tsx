@@ -73,7 +73,7 @@ export function SparkStatCard({ label, value, icon: Icon, color, tintClassName, 
             onClick={onClick}
             onKeyDown={onClick ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(); } } : undefined}
             className={cn(
-                "flex min-w-0 flex-col gap-2 rounded-xl border border-border-base p-2 shadow-sm sm:gap-2.5 sm:rounded-2xl sm:p-4 dark:border-white/10 dark:bg-[#0b0e17]",
+                "flex min-w-0 flex-col gap-2 rounded-xl border border-border-base p-2 shadow-sm sm:gap-2.5 sm:rounded-2xl sm:p-4 bg-white/90 dark:border-white/10 dark:bg-[#0b0e17]",
                 "bg-gradient-to-b via-30% to-transparent to-70%",
                 tintClassName,
                 onClick && "cursor-pointer transition-transform hover:border-accent-primary/30 active:scale-[0.97]",
@@ -82,7 +82,7 @@ export function SparkStatCard({ label, value, icon: Icon, color, tintClassName, 
             <div className="flex items-center justify-between gap-1">
                 <p className="truncate text-[10px] font-semibold text-text-primary sm:text-sm">{label}</p>
                 <div className="flex items-center gap-1">
-                    {onClick && <ChevronRight aria-hidden="true" className="h-3 w-3 shrink-0 text-text-tertiary/70 sm:h-3.5 sm:w-3.5" />}
+                    {onClick && <ChevronRight aria-hidden="true" className="hidden sm:block h-3 w-3 shrink-0 text-text-tertiary/70 sm:h-3.5 sm:w-3.5" />}
                     <span className={cn("flex h-5 w-5 shrink-0 items-center justify-center rounded-md sm:h-8 sm:w-8 sm:rounded-lg", badgeClassName)}>
                         <Icon className="h-3 w-3 sm:h-4 sm:w-4" />
                     </span>

@@ -1,6 +1,6 @@
 "use client";
 
-import { Menu, Search, PanelLeft, ChevronDown, User as UserIcon, LogOut } from "lucide-react";
+import { Menu, Search, PanelLeft, ChevronDown, User as UserIcon, LogOut, Home } from "lucide-react";
 import { NotificationBell } from "@/presentation/components/notifications/NotificationBell";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { Input } from "@/components/ui/input";
@@ -15,7 +15,7 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useState, useMemo, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { MENU_ITEMS, MenuItem } from "@/config/menu-items";
 import { cn } from "@/lib/utils";
 import { logoutAction } from "@/app/actions/auth";
@@ -32,7 +32,9 @@ export function Topbar({ onMenuClick, isSidebarOpen, onSidebarToggle, user }: To
     const [query, setQuery] = useState("");
     const [isFocused, setIsFocused] = useState(false);
     const router = useRouter();
+    const pathname = usePathname();
     const wrapperRef = useRef<HTMLDivElement>(null);
+    const isHomePage = pathname === "/";
 
     // Flatten menu items for search
     const searchableItems = useMemo(() => {
@@ -86,20 +88,34 @@ export function Topbar({ onMenuClick, isSidebarOpen, onSidebarToggle, user }: To
     };
 
     return (
-        <header className="sticky top-0 z-30 flex h-16 items-center gap-4 bg-bg-primary/60 backdrop-blur-md px-4 md:px-6 transition-all duration-300">
+        <header className="sticky top-0 z-30 flex h-16 items-center gap-2 sm:gap-4 bg-bg-primary/60 backdrop-blur-md px-3 sm:px-4 md:px-6 transition-all duration-300">
             {/* Mobile Menu Button */}
             <Button
                 variant="ghost"
                 size="icon"
-                className="lg:hidden hover:bg-bg-hover"
+                className="lg:hidden hover:bg-bg-hover text-text-secondary hover:text-text-primary"
                 onClick={onMenuClick}
                 aria-label="Toggle menu"
             >
                 <Menu className="h-5 w-5" />
             </Button>
 
+            {/* Mobile Home Button (Visible when not on Home) */}
+            {!isHomePage && (
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    className="md:hidden hover:bg-bg-hover text-text-secondary hover:text-text-primary"
+                    onClick={() => router.push("/")}
+                    aria-label="Ir a inicio"
+                    title="Inicio"
+                >
+                    <Home className="h-5 w-5" />
+                </Button>
+            )}
+
             {/* Desktop Search Area */}
-            <div className="flex-1 max-w-xl hidden md:flex items-center gap-4" ref={wrapperRef}>
+            <div className="flex-1 max-w-xl hidden md:flex items-center gap-3" ref={wrapperRef}>
                 {/* Sidebar Toggle */}
                 <Button
                     variant="outline"
@@ -109,6 +125,20 @@ export function Topbar({ onMenuClick, isSidebarOpen, onSidebarToggle, user }: To
                 >
                     <PanelLeft className={cn("h-5 w-5 transition-transform", !isSidebarOpen && "rotate-180")} />
                 </Button>
+
+                {/* Desktop Home Button (Visible when not on Home) */}
+                {!isHomePage && (
+                    <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => router.push("/")}
+                        className="shrink-0 hidden md:flex h-10 w-10 border-border-base bg-bg-primary hover:bg-bg-secondary text-text-secondary hover:text-text-primary"
+                        aria-label="Ir a inicio"
+                        title="Inicio"
+                    >
+                        <Home className="h-4.5 w-4.5" />
+                    </Button>
+                )}
 
                 <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-tertiary" />
