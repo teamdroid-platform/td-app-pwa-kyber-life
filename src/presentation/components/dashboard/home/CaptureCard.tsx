@@ -21,18 +21,18 @@ const WAYS: {
 }[] = [
     {
         id: "voice", label: "Audio", hint: "Dilo y la app lo interpreta.", Icon: Mic,
-        className: "border-emerald-500/35 bg-emerald-500/10 text-emerald-300 hover:border-emerald-500/70",
-        iconClassName: "bg-emerald-500/20 text-emerald-300",
+        className: "border-emerald-500/30 bg-emerald-50/80 text-emerald-800 hover:border-emerald-500/60 hover:bg-emerald-100/80 dark:bg-emerald-950/20 dark:text-emerald-300 dark:hover:bg-emerald-900/30",
+        iconClassName: "border border-emerald-500/20 bg-emerald-500/15 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/20 dark:text-emerald-300",
     },
     {
         id: "text", label: "Texto", hint: "Descríbelo en tus propias palabras.", Icon: MessageSquareText,
-        className: "border-violet-500/35 bg-violet-500/10 text-violet-300 hover:border-violet-500/70",
-        iconClassName: "bg-violet-500/20 text-violet-300",
+        className: "border-violet-500/30 bg-violet-50/80 text-violet-800 hover:border-violet-500/60 hover:bg-violet-100/80 dark:bg-violet-950/20 dark:text-violet-300 dark:hover:bg-violet-900/30",
+        iconClassName: "border border-violet-500/20 bg-violet-500/15 text-violet-700 dark:border-violet-500/30 dark:bg-violet-500/20 dark:text-violet-300",
     },
     {
         id: "form", label: "Formulario", hint: "Completa todos los detalles.", Icon: ClipboardList,
-        className: "border-amber-500/35 bg-amber-500/10 text-amber-300 hover:border-amber-500/70",
-        iconClassName: "bg-amber-500/20 text-amber-300",
+        className: "border-amber-500/30 bg-amber-50/80 text-amber-800 hover:border-amber-500/60 hover:bg-amber-100/80 dark:bg-amber-950/20 dark:text-amber-300 dark:hover:bg-amber-900/30",
+        iconClassName: "border border-amber-500/20 bg-amber-500/15 text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/20 dark:text-amber-300",
     },
 ];
 

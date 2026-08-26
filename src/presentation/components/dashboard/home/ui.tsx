@@ -9,22 +9,22 @@ import { cn } from "@/lib/utils";
  * cuanto una tiene otro radio u otro borde, salta a la vista antes que su
  * contenido.
  */
-export const CARD = "relative overflow-hidden rounded-2xl border border-indigo-500/20 bg-slate-900/60 backdrop-blur-sm shadow-md shadow-black/20";
+export const CARD = "relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white/90 shadow-sm shadow-slate-200/50 backdrop-blur-sm dark:border-indigo-500/20 dark:bg-slate-900/60 dark:shadow-md dark:shadow-black/20";
 
 /** Tarjeta que además reacciona al cursor: se usa cuando lleva a algún sitio. */
-export const CARD_LINK = cn(CARD, "transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:border-indigo-500/40 active:scale-[0.99]");
+export const CARD_LINK = cn(CARD, "transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-indigo-300 dark:hover:shadow-lg dark:hover:border-indigo-500/40 active:scale-[0.99]");
 
 /** Los tintes de cada módulo, para que el color diga de qué habla la ficha. */
 export const TINT = {
-    emerald: "bg-emerald-500/15 text-emerald-400",
-    violet: "bg-violet-500/15 text-violet-300",
-    red: "bg-red-500/15 text-red-400",
-    sky: "bg-sky-500/15 text-sky-300",
-    amber: "bg-amber-500/15 text-amber-400",
-    cyan: "bg-cyan-500/15 text-cyan-300",
-    blue: "bg-blue-500/15 text-blue-300",
-    rose: "bg-rose-500/15 text-rose-300",
-    slate: "bg-slate-500/15 text-slate-300",
+    emerald: "border border-emerald-500/20 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/15 dark:text-emerald-400",
+    violet: "border border-violet-500/20 bg-violet-50 text-violet-700 dark:border-violet-500/30 dark:bg-violet-500/15 dark:text-violet-300",
+    red: "border border-red-500/20 bg-red-50 text-red-700 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-400",
+    sky: "border border-sky-500/20 bg-sky-50 text-sky-700 dark:border-sky-500/30 dark:bg-sky-500/15 dark:text-sky-300",
+    amber: "border border-amber-500/20 bg-amber-50 text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/15 dark:text-amber-400",
+    cyan: "border border-cyan-500/20 bg-cyan-50 text-cyan-700 dark:border-cyan-500/30 dark:bg-cyan-500/15 dark:text-cyan-300",
+    blue: "border border-blue-500/20 bg-blue-50 text-blue-700 dark:border-blue-500/30 dark:bg-blue-500/15 dark:text-blue-300",
+    rose: "border border-rose-500/20 bg-rose-50 text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/15 dark:text-rose-300",
+    slate: "border border-slate-500/20 bg-slate-50 text-slate-700 dark:border-slate-500/30 dark:bg-slate-500/15 dark:text-slate-300",
 } as const;
 
 export type Tint = keyof typeof TINT;

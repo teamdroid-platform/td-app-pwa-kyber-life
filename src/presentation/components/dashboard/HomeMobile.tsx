@@ -21,21 +21,21 @@ import type { CaptureMethod } from "@/presentation/financial/components/ai-captu
 const WAYS: { id: CaptureMethod; label: string; Icon: typeof Mic; className: string }[] = [
     {
         id: "voice", label: "Audio", Icon: Mic,
-        className: "border-emerald-500/30 bg-emerald-950/20 text-emerald-300 hover:border-emerald-500/50 hover:bg-emerald-900/30",
+        className: "border-emerald-500/30 bg-emerald-50 text-emerald-800 hover:bg-emerald-100/80 dark:bg-emerald-950/20 dark:text-emerald-300 dark:hover:bg-emerald-900/30",
     },
     {
         id: "text", label: "Texto", Icon: MessageSquareText,
-        className: "border-violet-500/30 bg-violet-950/20 text-violet-300 hover:border-violet-500/50 hover:bg-violet-900/30",
+        className: "border-violet-500/30 bg-violet-50 text-violet-800 hover:bg-violet-100/80 dark:bg-violet-950/20 dark:text-violet-300 dark:hover:bg-violet-900/30",
     },
     {
         id: "form", label: "Formulario", Icon: ClipboardList,
-        className: "border-amber-500/30 bg-amber-950/20 text-amber-300 hover:border-amber-500/50 hover:bg-amber-900/30",
+        className: "border-amber-500/30 bg-amber-50 text-amber-800 hover:bg-amber-100/80 dark:bg-amber-950/20 dark:text-amber-300 dark:hover:bg-amber-900/30",
     },
 ];
 
 function SectionTitle({ children }: { children: ReactNode }) {
     return (
-        <h2 className="mb-2 ml-0.5 text-[10.5px] font-bold uppercase tracking-[0.12em] text-slate-400">
+        <h2 className="mb-2 ml-0.5 text-[10.5px] font-bold uppercase tracking-[0.12em] text-text-tertiary">
             {children}
         </h2>
     );
@@ -48,10 +48,10 @@ function CountBadge({ count, tone }: { count: number; tone: "amber" | "sky" }) {
         <span className={cn(
             "shrink-0 rounded-md border px-2 py-0.5 text-[11px] font-bold tabular-nums select-none",
             !pending
-                ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400"
+                ? "border-emerald-500/30 bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400"
                 : tone === "amber"
-                    ? "border-amber-500/30 bg-amber-500/10 text-amber-400"
-                    : "border-sky-500/30 bg-sky-500/10 text-sky-400",
+                    ? "border-amber-500/30 bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400"
+                    : "border-sky-500/30 bg-sky-50 text-sky-700 dark:bg-sky-500/10 dark:text-sky-400",
         )}>
             {pending ? count : "Al día"}
         </span>
@@ -75,16 +75,16 @@ function AttentionChip({ href, icon, iconClassName, label, count, tone }: Attent
     return (
         <Link
             href={href}
-            className="group relative overflow-hidden flex min-w-0 flex-1 items-center gap-2.5 rounded-2xl border border-indigo-500/20 bg-slate-900/60 backdrop-blur-sm p-3 shadow-md shadow-black/20 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:border-indigo-500/40 active:scale-[0.99]"
+            className="group relative overflow-hidden flex min-w-0 flex-1 items-center gap-2.5 rounded-2xl border border-slate-200/80 bg-white/90 shadow-sm shadow-slate-200/50 backdrop-blur-sm p-3 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-indigo-300 active:scale-[0.99] dark:border-indigo-500/20 dark:bg-slate-900/60 dark:shadow-md dark:shadow-black/20 dark:hover:shadow-lg dark:hover:border-indigo-500/40"
         >
             <div
-                className="absolute inset-x-0 top-0 h-[1.5px] bg-gradient-to-r from-transparent via-indigo-500/30 to-transparent"
+                className="absolute inset-x-0 top-0 h-[1.5px] bg-gradient-to-r from-transparent via-indigo-500/20 dark:via-indigo-500/30 to-transparent"
                 aria-hidden="true"
             />
-            <span className={cn("grid h-8 w-8 shrink-0 place-items-center rounded-xl border border-border/20", iconClassName)}>
+            <span className={cn("grid h-8 w-8 shrink-0 place-items-center rounded-xl border border-slate-200/60 dark:border-border/20", iconClassName)}>
                 {icon}
             </span>
-            <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-white group-hover:text-indigo-200 transition-colors">
+            <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-text-primary group-hover:text-accent-primary transition-colors">
                 {label}
             </span>
             <CountBadge count={count} tone={tone} />
@@ -105,16 +105,16 @@ function RowLink({ href, icon, iconClassName, title, hint }: RowLinkProps) {
     return (
         <Link
             href={href}
-            className="group flex items-center gap-3 px-3.5 py-3 transition-colors hover:bg-slate-800/40"
+            className="group flex items-center gap-3 px-3.5 py-3 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/40"
         >
-            <span className={cn("grid h-8 w-8 shrink-0 place-items-center rounded-xl border border-border/20", iconClassName)}>
+            <span className={cn("grid h-8 w-8 shrink-0 place-items-center rounded-xl border border-slate-200/60 dark:border-border/20", iconClassName)}>
                 {icon}
             </span>
             <span className="min-w-0 flex-1">
-                <span className="block truncate text-[13px] font-semibold text-white group-hover:text-indigo-200 transition-colors">{title}</span>
-                <span className="block truncate text-[11px] text-slate-400">{hint}</span>
+                <span className="block truncate text-[13px] font-semibold text-text-primary group-hover:text-accent-primary transition-colors">{title}</span>
+                <span className="block truncate text-[11px] text-text-tertiary">{hint}</span>
             </span>
-            <ChevronRight className="h-4 w-4 shrink-0 text-slate-500 group-hover:text-slate-300 group-hover:translate-x-0.5 transition-all" />
+            <ChevronRight className="h-4 w-4 shrink-0 text-text-tertiary group-hover:text-text-secondary group-hover:translate-x-0.5 transition-all" />
         </Link>
     );
 }
@@ -182,18 +182,18 @@ function PanelCard({ href, icon, iconClassName, title, hint, motif }: PanelCardP
     return (
         <Link
             href={href}
-            className="group relative overflow-hidden rounded-2xl border border-indigo-500/20 bg-slate-900/60 backdrop-blur-sm p-3.5 pb-10 shadow-md shadow-black/20 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:border-indigo-500/40 active:scale-[0.99]"
+            className="group relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white/90 shadow-sm shadow-slate-200/50 backdrop-blur-sm p-3.5 pb-10 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-indigo-300 active:scale-[0.99] dark:border-indigo-500/20 dark:bg-slate-900/60 dark:shadow-md dark:shadow-black/20 dark:hover:shadow-lg dark:hover:border-indigo-500/40"
         >
             <div
-                className="absolute inset-x-0 top-0 h-[1.5px] bg-gradient-to-r from-transparent via-indigo-500/30 to-transparent"
+                className="absolute inset-x-0 top-0 h-[1.5px] bg-gradient-to-r from-transparent via-indigo-500/20 dark:via-indigo-500/30 to-transparent"
                 aria-hidden="true"
             />
             {motif}
-            <span className={cn("relative grid h-8 w-8 place-items-center rounded-xl border border-border/20", iconClassName)}>
+            <span className={cn("relative grid h-8 w-8 place-items-center rounded-xl border border-slate-200/60 dark:border-border/20", iconClassName)}>
                 {icon}
             </span>
-            <span className="relative mt-2 block text-[13px] font-bold text-white group-hover:text-indigo-200 transition-colors">{title}</span>
-            <span className="relative block text-[11px] leading-snug text-slate-400">{hint}</span>
+            <span className="relative mt-2 block text-[13px] font-bold text-text-primary group-hover:text-accent-primary transition-colors">{title}</span>
+            <span className="relative block text-[11px] leading-snug text-text-tertiary">{hint}</span>
         </Link>
     );
 }
@@ -208,22 +208,22 @@ export function HomeMobile({ balances, pendingScans }: HomeMobileProps) {
     return (
         <div className="flex flex-col gap-5">
             {/* ── Acción principal ── */}
-            <section className="relative overflow-hidden rounded-2xl border border-indigo-500/20 bg-slate-900/60 backdrop-blur-sm p-4 sm:p-5 shadow-md shadow-black/20">
+            <section className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white/90 shadow-sm shadow-slate-200/50 backdrop-blur-sm p-4 sm:p-5 dark:border-indigo-500/20 dark:bg-slate-900/60 dark:shadow-md dark:shadow-black/20">
                 <div
-                    className="absolute inset-x-0 top-0 h-[1.5px] bg-gradient-to-r from-transparent via-indigo-500/40 to-transparent"
+                    className="absolute inset-x-0 top-0 h-[1.5px] bg-gradient-to-r from-transparent via-indigo-500/20 dark:via-indigo-500/40 to-transparent"
                     aria-hidden="true"
                 />
                 <span aria-hidden className="absolute inset-y-0 left-0 w-[3px] bg-emerald-500/80 rounded-r" />
                 <span
                     aria-hidden
-                    className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-indigo-500/[0.06] to-transparent"
+                    className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-emerald-500/[0.04] dark:from-indigo-500/[0.06] to-transparent"
                 />
 
                 <div className="relative">
-                    <h2 className="text-xl font-bold tracking-tight text-white sm:text-2xl">
+                    <h2 className="text-xl font-bold tracking-tight text-text-primary sm:text-2xl">
                         Registrar un movimiento
                     </h2>
-                    <p className="mt-1 text-[13px] text-slate-400">
+                    <p className="mt-1 text-[13px] text-text-tertiary">
                         Dilo, escríbelo en una frase o llena el formulario.
                     </p>
 
@@ -254,7 +254,7 @@ export function HomeMobile({ balances, pendingScans }: HomeMobileProps) {
                         <AttentionChip
                             href="/financial/balances"
                             icon={<Scale className="h-4 w-4" />}
-                            iconClassName="border border-amber-500/30 bg-amber-500/10 text-amber-400"
+                            iconClassName="border border-amber-500/20 bg-amber-50 text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-400"
                             label="Saldos"
                             count={balances.pending}
                             tone="amber"
@@ -263,7 +263,7 @@ export function HomeMobile({ balances, pendingScans }: HomeMobileProps) {
                     <AttentionChip
                         href="/financial/scans"
                         icon={<Inbox className="h-4 w-4" />}
-                        iconClassName="border border-sky-500/30 bg-sky-500/10 text-sky-400"
+                        iconClassName="border border-sky-500/20 bg-sky-50 text-sky-700 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-400"
                         label="Escaneos"
                         count={pendingScans}
                         tone="sky"
@@ -278,7 +278,7 @@ export function HomeMobile({ balances, pendingScans }: HomeMobileProps) {
                     <PanelCard
                         href="/financial"
                         icon={<BarChart3 className="h-4 w-4" />}
-                        iconClassName="border border-emerald-500/30 bg-emerald-500/10 text-emerald-400"
+                        iconClassName="border border-emerald-500/20 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-400"
                         title="Panel financiero"
                         hint="Saldos, flujo y categorías"
                         motif={<FinanceMotif />}
@@ -286,7 +286,7 @@ export function HomeMobile({ balances, pendingScans }: HomeMobileProps) {
                     <PanelCard
                         href="/market/analytics"
                         icon={<ShoppingCart className="h-4 w-4" />}
-                        iconClassName="border border-cyan-500/30 bg-cyan-500/10 text-cyan-300"
+                        iconClassName="border border-cyan-500/20 bg-cyan-50 text-cyan-700 dark:border-cyan-500/30 dark:bg-cyan-500/10 dark:text-cyan-300"
                         title="Panel de compras"
                         hint="Precios, productos y ahorro"
                         motif={<MarketMotif />}
@@ -297,36 +297,36 @@ export function HomeMobile({ balances, pendingScans }: HomeMobileProps) {
             {/* ── Accesos ── */}
             <section>
                 <SectionTitle>Ir a</SectionTitle>
-                <div className="relative overflow-hidden rounded-2xl border border-indigo-500/20 bg-slate-900/60 backdrop-blur-sm shadow-md shadow-black/20 divide-y divide-slate-800/80">
+                <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white/90 shadow-sm shadow-slate-200/50 backdrop-blur-sm divide-y divide-slate-100 dark:border-indigo-500/20 dark:bg-slate-900/60 dark:shadow-md dark:shadow-black/20 dark:divide-slate-800/80">
                     <div
-                        className="absolute inset-x-0 top-0 h-[1.5px] bg-gradient-to-r from-transparent via-indigo-500/30 to-transparent"
+                        className="absolute inset-x-0 top-0 h-[1.5px] bg-gradient-to-r from-transparent via-indigo-500/20 dark:via-indigo-500/30 to-transparent"
                         aria-hidden="true"
                     />
                     <RowLink
                         href="/financial/transactions"
                         icon={<Receipt className="h-4 w-4" />}
-                        iconClassName="border border-violet-500/30 bg-violet-500/10 text-violet-300"
+                        iconClassName="border border-violet-500/20 bg-violet-50 text-violet-700 dark:border-violet-500/30 dark:bg-violet-500/10 dark:text-violet-300"
                         title="Transacciones"
                         hint="Historial y filtros"
                     />
                     <RowLink
                         href="/financial/banks"
                         icon={<Landmark className="h-4 w-4" />}
-                        iconClassName="border border-blue-500/30 bg-blue-500/10 text-blue-300"
+                        iconClassName="border border-blue-500/20 bg-blue-50 text-blue-700 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-300"
                         title="Bancos"
                         hint="Cuentas, tarjetas e instituciones"
                     />
                     <RowLink
                         href="/market/purchases"
                         icon={<ShoppingBag className="h-4 w-4" />}
-                        iconClassName="border border-rose-500/30 bg-rose-500/10 text-rose-300"
+                        iconClassName="border border-rose-500/20 bg-rose-50 text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300"
                         title="Compras"
                         hint="Listas, plantillas y productos"
                     />
                     <RowLink
                         href="/market/purchases/new"
                         icon={<ShoppingCart className="h-4 w-4" />}
-                        iconClassName="border border-cyan-500/30 bg-cyan-500/10 text-cyan-300"
+                        iconClassName="border border-cyan-500/20 bg-cyan-50 text-cyan-700 dark:border-cyan-500/30 dark:bg-cyan-500/10 dark:text-cyan-300"
                         title="Nueva compra"
                         hint="Empezar la lista del súper"
                     />

@@ -57,8 +57,8 @@ export function QuickAccess() {
                         key={href}
                         href={href}
                         className={cn(
-                            "items-center gap-3 border-b border-border-base px-3.5 py-3 transition-colors last:border-b-0 hover:bg-bg-tertiary/40",
-                            "lg:rounded-2xl lg:border lg:bg-bg-secondary/70 lg:hover:border-border-strong lg:hover:bg-bg-secondary",
+                            "items-center gap-3 border-b border-border-base px-3.5 py-3 transition-colors last:border-b-0 hover:bg-slate-50 dark:hover:bg-slate-800/40",
+                            "lg:rounded-2xl lg:border lg:border-slate-200/80 lg:bg-white/90 lg:shadow-sm lg:shadow-slate-200/50 lg:hover:border-indigo-300 lg:hover:shadow-md lg:dark:border-indigo-500/20 lg:dark:bg-slate-900/60 lg:dark:shadow-md lg:dark:shadow-black/20 lg:dark:hover:border-indigo-500/40",
                             desktopOnly ? "hidden lg:flex" : "flex",
                         )}
                     >
