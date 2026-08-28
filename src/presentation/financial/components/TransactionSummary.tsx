@@ -4,7 +4,7 @@ import { useMemo, useState, useEffect, type ReactNode } from "react";
 import { AreaChart, Area, ResponsiveContainer, YAxis, XAxis, Tooltip, CartesianGrid, PieChart, Pie, Cell, BarChart, Bar, LabelList } from 'recharts';
 import { ChevronDown, BarChart2, TrendingUp, TrendingDown, Wallet, ArrowRightLeft, Scale, PieChart as PieChartIcon, BarChart3 as BarChartIcon, type LucideIcon } from "lucide-react";
 import type { FinancialTransaction, FinancialTransactionType } from "@/domain/entities/financial";
-import { computeNetBalance, sumCreditExpenses, DASHBOARD_ACTIVE_STATUSES } from "@/domain/services/financial-balance";
+import { computeNetBalance, DASHBOARD_ACTIVE_STATUSES } from "@/domain/services/financial-balance";
 import { cn } from "@/lib/utils";
 import {
     Select,
@@ -15,7 +15,6 @@ import {
 } from "@/components/ui/select";
 import { MobileCarousel } from "@/presentation/components/dashboard/MobileCarousel";
 import { formatAxisCurrency } from "@/lib/date-bucketing";
-import { CreditToggle } from "./CreditToggle";
 import { BalanceModeSwitch, balanceValue } from "./BalanceModeSwitch";
 import type { BalanceSet } from "@/application/services/balance-service";
 import { type BalanceMode, DEFAULT_BALANCE_MODE } from "@/domain/entities/balance";
@@ -69,9 +68,6 @@ export function TransactionSummary({ transactions, balances, rangeLabel }: Trans
     // Default null avoids hydration mismatch; we determine it on mount
     const [userChartPreference, setUserChartPreference] = useState<"donut" | "bar" | null>(null);
     const [isMobile, setIsMobile] = useState(false);
-    // Off by default: amounts and charts show only real (cash) spending until
-    // the user opts into seeing credit-card-paid transactions too.
-    const [showCredit, setShowCredit] = useState(false);
     // El modo del selector de balance: arranca en el de ajustes y no se
     // recuerda entre cargas. Solo importa cuando `balances` viene — sin él,
     // el chip sigue el cálculo local de siempre.
@@ -89,9 +85,11 @@ export function TransactionSummary({ transactions, balances, rangeLabel }: Trans
         [transactions],
     );
 
+    // Los consumos con tarjeta quedan diferidos hasta que se paga la tarjeta,
+    // así que no cuentan aquí — mismo criterio que el balance del periodo.
     const effectiveTransactions = useMemo(
-        () => (showCredit ? countableTransactions : countableTransactions.filter((t) => !t.paidWithCredit)),
-        [countableTransactions, showCredit],
+        () => countableTransactions.filter((t) => !t.paidWithCredit),
+        [countableTransactions],
     );
 
     useEffect(() => {
@@ -182,12 +180,9 @@ export function TransactionSummary({ transactions, balances, rangeLabel }: Trans
         // Ordenar cronológicamente para el gráfico
         const chartData = Object.values(chartDataMap).sort((a, b) => a.timestamp - b.timestamp);
 
-        // Balance defers credit-card-paid expenses by default. With the "Incluir
-        // TC" toggle ON, the user wants those expenses to count against the
-        // balance too, so subtract them; OFF keeps them deferred (excluded).
-        const finalBalance = Math.round(
-            (computeNetBalance(effectiveTransactions) - (showCredit ? sumCreditExpenses(countableTransactions) : 0)) * 100,
-        ) / 100;
+        // Balance defers credit-card-paid expenses: `effectiveTransactions`
+        // already excludes them, so nothing further to subtract here.
+        const finalBalance = Math.round(computeNetBalance(effectiveTransactions) * 100) / 100;
 
         return {
             balance: finalBalance,
@@ -198,7 +193,7 @@ export function TransactionSummary({ transactions, balances, rangeLabel }: Trans
             totalOther: otherSum,
             totalWithdrawal: withdrawalSum
         };
-    }, [effectiveTransactions, viewMode, countableTransactions, showCredit]);
+    }, [effectiveTransactions, viewMode]);
 
     if (transactions.length === 0) return null;
 
@@ -250,7 +245,7 @@ export function TransactionSummary({ transactions, balances, rangeLabel }: Trans
     // El número que muestra el chip "Balance": el del modo elegido cuando hay
     // `balances`, o el cálculo local de siempre cuando no lo hay. El resto del
     // componente (donut, desglose por tipo) sigue leyendo `balance`/`balanceStr`
-    // sin tocar — conviven con el chip hasta que la Task 10 retire el toggle.
+    // sin tocar — conviven con el chip.
     const chipBalance = balances ? balanceValue(balances, balanceMode) : balance;
     const chipCurrency = balances ? balances.currency : primaryCurrency;
     const chipBalanceStr = (chipBalance > 0 ? "+" : chipBalance < 0 ? "-" : "") + formatCurrency(Math.abs(chipBalance), chipCurrency);
@@ -389,9 +384,8 @@ export function TransactionSummary({ transactions, balances, rangeLabel }: Trans
                     {/* ── LEFT SIDE: BALANCE NETO (DONUT CHART OR BAR CHART) ── */}
                     <div className="relative z-10 flex flex-col items-center justify-center lg:w-auto lg:shrink-0 lg:border-r lg:border-white/5 lg:pr-8 w-full sm:w-auto">
 
-                        {/* Credit toggle + chart type */}
-                        <div className="flex items-center justify-between gap-2 w-full mb-4">
-                            <CreditToggle checked={showCredit} onChange={setShowCredit} />
+                        {/* Chart type */}
+                        <div className="flex items-center justify-end gap-2 w-full mb-4">
                             <div className="flex items-center gap-1 bg-black/5 dark:bg-white/5 p-1 rounded-full shrink-0">
                                 <button
                                     onClick={() => setUserChartPreference('donut')}
@@ -511,9 +505,8 @@ export function TransactionSummary({ transactions, balances, rangeLabel }: Trans
 
                     {/* ── RIGHT SIDE: BREAKDOWN CHART ── */}
                     <div className="relative z-10 flex flex-col w-full flex-1 sm:h-44 lg:h-44 justify-between">
-                        {/* Header (Credit toggle + view Select) */}
-                        <div className="flex justify-between items-start sm:items-center mb-4 sm:mb-2 gap-2">
-                            <CreditToggle checked={showCredit} onChange={setShowCredit} />
+                        {/* Header (view Select) */}
+                        <div className="flex justify-end items-start sm:items-center mb-4 sm:mb-2 gap-2">
                             <Select value={viewMode} onValueChange={(value) => setViewMode(value as ViewMode)}>
                                 <SelectTrigger className="h-7 w-[110px] text-xs bg-white/5 border-white/10 hover:bg-white/10 transition-colors">
                                     <SelectValue placeholder="Vista" />
@@ -654,9 +647,8 @@ export function TransactionSummary({ transactions, balances, rangeLabel }: Trans
 
                         {/* ── LEFT: BALANCE NETO (DONUT OR BAR CHART) ── */}
                         <div className="relative z-10 flex flex-col items-center justify-center w-1/2 border-r border-white/5 pr-6">
-                            {/* Credit toggle + chart type */}
-                            <div className="flex items-center justify-between gap-2 w-full mb-4">
-                                <CreditToggle checked={showCredit} onChange={setShowCredit} />
+                            {/* Chart type */}
+                            <div className="flex items-center justify-end gap-2 w-full mb-4">
                                 <div className="flex items-center gap-1 bg-black/5 dark:bg-white/5 p-1 rounded-full shrink-0">
                                     <button
                                         onClick={(e) => { e.stopPropagation(); setUserChartPreference('donut'); }}
@@ -776,8 +768,7 @@ export function TransactionSummary({ transactions, balances, rangeLabel }: Trans
 
                         {/* ── RIGHT: BREAKDOWN CHART ── */}
                         <div className="relative z-10 flex flex-col w-1/2 justify-between">
-                            <div className="flex justify-between items-center mb-2 gap-2">
-                                <CreditToggle checked={showCredit} onChange={setShowCredit} />
+                            <div className="flex justify-end items-center mb-2 gap-2">
                                 <Select value={viewMode} onValueChange={(value) => setViewMode(value as ViewMode)}>
                                     <SelectTrigger className="h-7 w-[110px] text-xs bg-white/5 border-white/10 hover:bg-white/10 transition-colors">
                                         <SelectValue placeholder="Vista" />

@@ -26,7 +26,6 @@ import type { BalanceSet } from "@/application/services/balance-service";
 import type { BalanceMode } from "@/domain/entities/balance";
 import {
     excludeCreditFromKpis,
-    includeCreditInKpis,
     excludeCreditFromCategoryBreakdown,
     excludeCreditFromInstitutionBreakdown,
     excludeCreditFromDailyBreakdown,
@@ -55,9 +54,6 @@ export function FinancialDashboard() {
     const [customEndDate, setCustomEndDate] = useState<string>(() => defaultHubCustomRange().end);
     const [categoryLimit, setCategoryLimit] = useState<number>(5);
     const [institutionLimit, setInstitutionLimit] = useState<number>(5);
-    // Off by default: amounts and charts show only real (cash) spending until
-    // the user opts into seeing credit-card-paid transactions too.
-    const [showCredit, setShowCredit] = useState(false);
     // Mobile-only: filters collapsed by default (accordion), matching the
     // transactions list screen's "Filtros de Búsqueda" pattern.
     const [filtersExpanded, setFiltersExpanded] = useState(false);
@@ -129,9 +125,12 @@ export function FinancialDashboard() {
         return () => { cancelled = true; };
     }, [startDate, endDate]);
 
+    // Los KPIs y los tres desgloses muestran siempre el gasto real (sin
+    // tarjeta): el balance con tarjeta ahora lo resuelve el selector de modo,
+    // así que no hace falta un segundo control que exprese lo mismo.
     const kpis = useMemo(
-        () => (rawKpis ? (showCredit ? includeCreditInKpis(rawKpis) : excludeCreditFromKpis(rawKpis)) : rawKpis),
-        [rawKpis, showCredit],
+        () => (rawKpis ? excludeCreditFromKpis(rawKpis) : rawKpis),
+        [rawKpis],
     );
 
     // El balance activo del hero: el del modo elegido en cuanto los tres
@@ -142,22 +141,22 @@ export function FinancialDashboard() {
         : (kpis?.netBalance ?? 0);
 
     const categoryBreakdown = useMemo(
-        () => (showCredit ? rawCategoryBreakdown : excludeCreditFromCategoryBreakdown(rawCategoryBreakdown)),
-        [rawCategoryBreakdown, showCredit],
+        () => excludeCreditFromCategoryBreakdown(rawCategoryBreakdown),
+        [rawCategoryBreakdown],
     );
     const institutionBreakdown = useMemo(
-        () => (showCredit ? rawInstitutionBreakdown : excludeCreditFromInstitutionBreakdown(rawInstitutionBreakdown)),
-        [rawInstitutionBreakdown, showCredit],
+        () => excludeCreditFromInstitutionBreakdown(rawInstitutionBreakdown),
+        [rawInstitutionBreakdown],
     );
     const dailyBreakdown = useMemo(
-        () => (showCredit ? rawDailyBreakdown : excludeCreditFromDailyBreakdown(rawDailyBreakdown)),
-        [rawDailyBreakdown, showCredit],
+        () => excludeCreditFromDailyBreakdown(rawDailyBreakdown),
+        [rawDailyBreakdown],
     );
 
-    // Always shows the full detail (real + credit), regardless of the toggle.
+    // Always shows the full detail (real + credit).
     const kpiModalConfig = useMemo(
-        () => (openKpiModal && rawKpis ? buildKpiModalConfig(openKpiModal, rawKpis, showCredit) : null),
-        [openKpiModal, rawKpis, showCredit],
+        () => (openKpiModal && rawKpis ? buildKpiModalConfig(openKpiModal, rawKpis) : null),
+        [openKpiModal, rawKpis],
     );
 
     const totalCategoryExpenses = useMemo(() => {
@@ -332,8 +331,6 @@ export function FinancialDashboard() {
                 <QuickSummary
                     kpis={kpis}
                     dailyBreakdown={dailyBreakdown}
-                    showCredit={showCredit}
-                    onToggleCredit={setShowCredit}
                     onOpenModal={rawKpis ? (kind) => setOpenKpiModal(kind) : undefined}
                 />
             </div>
