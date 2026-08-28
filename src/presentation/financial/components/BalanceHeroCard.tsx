@@ -62,7 +62,7 @@ export function BalanceHeroCard({ value, negative, creditSpent, onDetails, modeS
                         // The switch is its own interactive control (a dropdown
                         // trigger); it must not also trigger `onDetails` via the
                         // card-wide click handler it sits inside.
-                        <div onClick={(e) => e.stopPropagation()}>{modeSwitch}</div>
+                        <div onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>{modeSwitch}</div>
                     ) : (
                         <p className="text-sm font-medium text-white/85">
                             Balance actual
