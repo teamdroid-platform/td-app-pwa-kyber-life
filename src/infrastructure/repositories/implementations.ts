@@ -4,6 +4,8 @@ import { IUserRepository, ISupermarketRepository, ICategoryRepository, IUnitRepo
 import { UUID } from "@/domain/core";
 import { PaginationParams, PaginatedResult, TransactionSearchFilters } from "@/domain/pagination";
 import { DASHBOARD_ACTIVE_STATUSES } from "@/domain/services/financial-balance";
+import { IBalanceSettingsRepository } from "@/domain/repositories/balance";
+import { BalanceMode, BalanceScopeRule, BalanceScopeTargetType, BalanceSettings } from "@/domain/entities/balance";
 
 export class InMemoryFinancialTransactionAuditLogRepository extends InMemoryRepository<FinancialTransactionAuditLog> implements IFinancialTransactionAuditLogRepository {
     async findByTransactionId(transactionId: UUID): Promise<FinancialTransactionAuditLog[]> {
@@ -471,5 +473,62 @@ export class InMemoryPushSubscriptionRepository extends InMemoryRepository<PushS
     async deleteByEndpoint(endpoint: string, userId: UUID): Promise<void> {
         const match = (await this.findAll()).find(s => s.endpoint === endpoint && s.ownerUserId === userId);
         if (match) await this.delete(match.id);
+    }
+}
+
+export class InMemoryBalanceSettingsRepository implements IBalanceSettingsRepository {
+    private settings = new Map<UUID, BalanceSettings>();
+    private rules = new Map<UUID, BalanceScopeRule[]>();
+
+    async getSettings(userId: UUID): Promise<BalanceSettings | null> {
+        return this.settings.get(userId) ?? null;
+    }
+
+    async setDefaultMode(userId: UUID, mode: BalanceMode): Promise<BalanceSettings> {
+        const saved: BalanceSettings = { ownerUserId: userId, defaultMode: mode };
+        this.settings.set(userId, saved);
+        return saved;
+    }
+
+    async getRules(userId: UUID): Promise<BalanceScopeRule[]> {
+        return [...(this.rules.get(userId) ?? [])];
+    }
+
+    async setRule(
+        userId: UUID,
+        targetType: BalanceScopeTargetType,
+        targetId: UUID,
+        included: boolean,
+    ): Promise<BalanceScopeRule> {
+        const now = new Date().toISOString();
+        const existing = this.rules.get(userId) ?? [];
+        const previous = existing.find(r => r.targetType === targetType && r.targetId === targetId);
+
+        const rule: BalanceScopeRule = {
+            id: previous?.id ?? `${targetType}:${targetId}`,
+            ownerUserId: userId,
+            targetType,
+            targetId,
+            included,
+            createdAt: previous?.createdAt ?? now,
+            updatedAt: now,
+            isDeleted: false,
+        };
+
+        this.rules.set(userId, [
+            ...existing.filter(r => !(r.targetType === targetType && r.targetId === targetId)),
+            rule,
+        ]);
+        return rule;
+    }
+
+    async clearRulesForTargets(userId: UUID, targetIds: readonly UUID[]): Promise<void> {
+        const drop = new Set(targetIds);
+        const existing = this.rules.get(userId) ?? [];
+        this.rules.set(userId, existing.filter(r => !drop.has(r.targetId)));
+    }
+
+    async clearRules(userId: UUID): Promise<void> {
+        this.rules.delete(userId);
     }
 }
