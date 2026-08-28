@@ -43,9 +43,9 @@ describe("BalanceService", () => {
         { id: "card-in", institutionId: "inst-in", cardType: "CREDIT", status: "ACTIVE", isUnconfirmed: false, isDeleted: false, ownerUserId: userId, currency: "USD", createdAt: "", updatedAt: "" },
     ];
 
-    function buildService(rules: unknown[] = []) {
+    function buildService(rules: unknown[] = [], txs: FinancialTransaction[] = transactions) {
         const transactionRepo = {
-            findForDashboard: jest.fn().mockResolvedValue(transactions),
+            findForDashboard: jest.fn().mockResolvedValue(txs),
         } as any;
         const accountRepo = { findByOwnerId: jest.fn().mockResolvedValue(accounts) } as any;
         const cardRepo = { findByOwnerId: jest.fn().mockResolvedValue(cards) } as any;
@@ -105,10 +105,7 @@ describe("BalanceService", () => {
             included: false, createdAt: "", updatedAt: "", isDeleted: false,
         }];
 
-        const service = buildService(rules);
-        (service as any).transactionRepo.findForDashboard.mockResolvedValue(scopedTransactions);
-
-        const set = await service.getBalanceSet(userId, {});
+        const set = await buildService(rules, scopedTransactions).getBalanceSet(userId, {});
 
         const { income, expenses, savings, funding, value } = set.period;
         expect(income - expenses + set.withCredit.creditDeferred - savings + funding).toBe(value);
