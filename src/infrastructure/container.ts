@@ -156,6 +156,7 @@ import { BankService } from "@/application/services/bank-service";
 import { BankIdentificationService } from "@/application/services/bank-identification-service";
 import { NotificationService } from "@/application/services/notification-service";
 import { PushSubscriptionService } from "@/application/services/push-subscription-service";
+import { BalanceService } from "@/application/services/balance-service";
 
 export const authService = new AuthService(userRepository, passwordResetTokenRepository);
 export const userService = new UserService(userRepository);
@@ -195,6 +196,15 @@ export const financialInboxService = new FinancialInboxService(
     bankCardRepository,
 );
 export const financialDashboardService = new FinancialDashboardService(financialTransactionRepository, financialCategoryRepository, financialInstitutionRepository, financialScannerTransactionRepository, bankCardRepository);
+export const balanceService = new BalanceService(
+    financialTransactionRepository,
+    bankAccountRepository,
+    bankCardRepository,
+    bankMovementRepository,
+    bankSnapshotRepository,
+    financialCategoryRepository,
+    balanceSettingsRepository,
+);
 export const financialSettingsService = new FinancialSettingsService(financialInstitutionTypeRepository, financialInstitutionRepository, financialCategoryRepository, financialTransactionRepository);
 export const notificationService = new NotificationService(notificationRepository);
 export const pushSubscriptionService = new PushSubscriptionService(pushSubscriptionRepository);
