@@ -1,4 +1,5 @@
 import { FinancialTransaction, FinancialTransactionType } from "../entities/financial";
+import { BalanceScope } from "./balance-scope";
 
 /**
  * Category name that marks a TRANSFER as money leaving the user's available
@@ -50,7 +51,13 @@ export function transactionTypeBucket(type: FinancialTransactionType): Transacti
     return "expense";
 }
 
-type BalanceTransaction = Pick<FinancialTransaction, "type" | "amount" | "categoryId" | "categoryName" | "paidWithCredit">;
+type BalanceTransaction = Pick<
+    FinancialTransaction,
+    "type" | "amount" | "categoryId" | "categoryName" | "paidWithCredit"
+> & Partial<Pick<
+    FinancialTransaction,
+    "bankSourceAccountId" | "bankDestinationAccountId" | "bankCardId"
+>>;
 
 function resolveCategoryName(t: BalanceTransaction, categoryNameById?: ReadonlyMap<string, string>): string | undefined {
     if (t.categoryName) return t.categoryName;
@@ -77,25 +84,49 @@ export function isFundingTransfer(t: BalanceTransaction, categoryNameById?: Read
  * `categoryNameById` is only needed when `categoryName` isn't already
  * populated on the transactions (e.g. raw repository reads); already-enriched
  * transaction lists (with `categoryName` set) can omit it.
+ *
+ * `scope` restricts the balance to a subset of accounts/cards (Task 1). When
+ * omitted, behavior is unchanged. Non-transfer transactions linked to
+ * anything excluded are skipped entirely. Transfers are special: the
+ * category still wins first (a savings/funding transfer keeps its sign no
+ * matter what its endpoints are), and only then does the scope decide —
+ * moving money into an excluded account is treated as spending it (it
+ * leaves the budgeted balance), moving it back out of one is treated as
+ * income (it re-enters), and a transfer between two included — or two
+ * excluded — accounts is neutral, same as today.
  */
 export function computeNetBalance(
     transactions: readonly BalanceTransaction[],
     categoryNameById?: ReadonlyMap<string, string>,
+    scope?: BalanceScope,
 ): number {
     let balance = 0;
 
     for (const t of transactions) {
         const amount = Number(t.amount);
+
+        if (t.type === "TRANSFER") {
+            // La categoría manda sobre el scope: una transferencia marcada como
+            // ahorro resta una sola vez, aunque su destino esté además excluido.
+            if (isSavingsTransfer(t, categoryNameById)) { balance -= amount; continue; }
+            if (isFundingTransfer(t, categoryNameById)) { balance += amount; continue; }
+            if (scope) {
+                const fromIn = scope.isAccountIncluded(t.bankSourceAccountId);
+                const toIn = scope.isAccountIncluded(t.bankDestinationAccountId);
+                // Mover dinero a una cuenta que no presupuestas es sacarlo del
+                // bolsillo; traerlo de vuelta es meterlo.
+                if (fromIn && !toIn) { balance -= amount; continue; }
+                if (!fromIn && toIn) { balance += amount; continue; }
+            }
+            continue;
+        }
+
+        if (scope && !scope.isTransactionIncluded(t)) continue;
+
         if (isIncomeType(t.type)) {
             balance += amount;
         } else if (isWithdrawalType(t.type)) {
             // no-op: cash changes form, still available
-        } else if (t.type === "TRANSFER") {
-            if (isSavingsTransfer(t, categoryNameById)) {
-                balance -= amount;
-            } else if (isFundingTransfer(t, categoryNameById)) {
-                balance += amount;
-            }
         } else if (!t.paidWithCredit) {
             balance -= amount;
         }
@@ -110,15 +141,22 @@ export function computeNetBalance(
  * balance "as if the card were already paid" (the "Incluir gastos con tarjeta"
  * toggle ON). Only expense-like transactions can be `paidWithCredit`; income,
  * withdrawals and transfers are ignored.
+ *
+ * `scope` restricts the sum to cards included in it (Task 1); omitted, behavior
+ * is unchanged.
  */
-export function sumCreditExpenses(transactions: readonly BalanceTransaction[]): number {
+export function sumCreditExpenses(
+    transactions: readonly BalanceTransaction[],
+    scope?: BalanceScope,
+): number {
     let sum = 0;
     for (const t of transactions) {
         if (
             t.paidWithCredit &&
             !isIncomeType(t.type) &&
             !isWithdrawalType(t.type) &&
-            t.type !== "TRANSFER"
+            t.type !== "TRANSFER" &&
+            (!scope || scope.isCardIncluded(t.bankCardId))
         ) {
             sum += Number(t.amount);
         }
