@@ -71,4 +71,44 @@ describe("BalanceModeSwitch", () => {
 
         expect(screen.getByText(/1 cuenta sin saldo declarado/i)).toBeInTheDocument();
     });
+
+    it("usa el singular cuando solo hay una cuenta con saldo declarado", () => {
+        const singleAccount: BalanceSet = {
+            ...balances,
+            total: { ...balances.total, accountsCounted: 1 },
+        };
+        render(
+            <BalanceModeSwitch
+                balances={singleAccount}
+                mode="TOTAL"
+                onModeChange={() => {}}
+                rangeLabel="22 ago – 21 sep"
+            />
+        );
+        fireEvent.pointerDown(screen.getByRole("button", { name: /balance total/i }), { button: 0 });
+
+        expect(screen.getByText(/Suma de los saldos de tus 1 cuenta con saldo declarado/i)).toBeInTheDocument();
+    });
+
+    it("avisa de transacciones excluidas por la configuración en modo periodo", () => {
+        const withExclusions: BalanceSet = {
+            ...balances,
+            period: { ...balances.period, excludedCount: 3 },
+        };
+        render(
+            <BalanceModeSwitch
+                balances={withExclusions}
+                mode="PERIOD"
+                onModeChange={() => {}}
+                rangeLabel="22 ago – 21 sep"
+            />
+        );
+
+        expect(screen.getByText(/3 transacciones fuera de tu configuración de balances/i)).toBeInTheDocument();
+    });
+
+    it("no avisa de transacciones excluidas cuando excludedCount es 0", () => {
+        render(<Harness />);
+        expect(screen.queryByText(/fuera de tu configuración de balances/i)).not.toBeInTheDocument();
+    });
 });

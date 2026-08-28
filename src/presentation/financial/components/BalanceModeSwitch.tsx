@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { ChevronDown, AlertCircle } from "lucide-react";
 import type { BalanceSet } from "@/application/services/balance-service";
 import { type BalanceMode, BALANCE_MODES } from "@/domain/entities/balance";
@@ -46,7 +47,9 @@ export function balanceModeCopy(
     const money = (v: number) => formatCurrency(v, balances.currency);
 
     if (mode === "TOTAL") {
-        return `Suma de los saldos de tus ${balances.total.accountsCounted} cuentas con saldo declarado. No depende del rango ni de tu configuración.`;
+        const count = balances.total.accountsCounted;
+        const cuentas = count === 1 ? "1 cuenta" : `${count} cuentas`;
+        return `Suma de los saldos de tus ${cuentas} con saldo declarado. No depende del rango ni de tu configuración.`;
     }
     if (mode === "PERIOD") {
         return `Ingresos menos gastos reales del ${rangeLabel}, restando ahorros y sumando fondeos. Los consumos con tarjeta no cuentan hasta que pagas.`;
@@ -73,6 +76,7 @@ export function BalanceModeSwitch({
     balances, mode, onModeChange, rangeLabel, size = "hero", className,
 }: BalanceModeSwitchProps) {
     const missing = balances.total.accountsWithoutSnapshot.length;
+    const excluded = balances.period.excludedCount;
 
     return (
         <div className={cn("flex flex-col gap-1", className)}>
@@ -114,7 +118,7 @@ export function BalanceModeSwitch({
             </DropdownMenu>
 
             {mode === "TOTAL" && missing > 0 && (
-                <a
+                <Link
                     href="/financial/balances"
                     className="flex w-fit items-center gap-1.5 text-[11px] font-medium text-amber-500 hover:underline"
                 >
@@ -122,7 +126,22 @@ export function BalanceModeSwitch({
                     {missing === 1
                         ? "1 cuenta sin saldo declarado"
                         : `${missing} cuentas sin saldo declarado`}
-                </a>
+                </Link>
+            )}
+
+            {/* Único indicio visible de por qué este número no cuadra con las
+                tiles de Ingresos/Gastos de al lado: esas muestran todo, este
+                balance ya filtró lo que la configuración de balances excluyó. */}
+            {(mode === "PERIOD" || mode === "PERIOD_WITH_CREDIT") && excluded > 0 && (
+                <Link
+                    href="/financial/settings"
+                    className="flex w-fit items-center gap-1.5 text-[11px] font-medium text-amber-500 hover:underline"
+                >
+                    <AlertCircle className="h-3 w-3 shrink-0" aria-hidden="true" />
+                    {excluded === 1
+                        ? "1 transacción fuera de tu configuración de balances"
+                        : `${excluded} transacciones fuera de tu configuración de balances`}
+                </Link>
             )}
         </div>
     );
