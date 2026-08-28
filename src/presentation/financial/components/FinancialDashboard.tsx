@@ -20,7 +20,7 @@ import { BalanceHeroCard } from "./BalanceHeroCard";
 import { BalanceModeSwitch, balanceValue } from "./BalanceModeSwitch";
 import { QuickSummary } from "./QuickSummary";
 import { KpiBreakdownModal } from "./KpiBreakdownModal";
-import { buildKpiModalConfig, type KpiModalKind } from "../lib/kpi-modal-config";
+import { buildKpiModalConfig, type KpiModalKind, type KpiBreakdownInputs } from "../lib/kpi-modal-config";
 import { getBalanceSetAction } from "@/app/actions/balance";
 import type { BalanceSet } from "@/application/services/balance-service";
 import type { BalanceMode } from "@/domain/entities/balance";
@@ -153,11 +153,35 @@ export function FinancialDashboard() {
         [rawDailyBreakdown],
     );
 
-    // Always shows the full detail (real + credit).
-    const kpiModalConfig = useMemo(
-        () => (openKpiModal && rawKpis ? buildKpiModalConfig(openKpiModal, rawKpis) : null),
-        [openKpiModal, rawKpis],
+    // El desglose de "balance" debe explicar el número que lo abrió, no el
+    // netBalance crudo (que es PERIOD sin scope): PERIOD y PERIOD_WITH_CREDIT
+    // comparten el mismo period.value de entrada y solo difieren en si el
+    // consumo con tarjeta se resta aquí (includeCredit). TOTAL no tiene un
+    // desglose de ingresos/gastos que mostrar — ver el onDetails del hero.
+    const balanceBreakdownInputs: KpiBreakdownInputs | null = useMemo(
+        () => (balances
+            ? {
+                totalIncome: balances.period.income,
+                totalExpenses: balances.period.expenses,
+                totalExpensesCredit: balances.withCredit.creditDeferred,
+                totalTransfersFunding: balances.period.funding,
+                totalTransfersSavings: balances.period.savings,
+                netBalance: balances.period.value,
+            }
+            : null),
+        [balances],
     );
+
+    const kpiModalConfig = useMemo(() => {
+        if (!openKpiModal) return null;
+        if (openKpiModal === "balance") {
+            // TOTAL no ofrece esta afinidad (ver onDetails más abajo); si el modo
+            // cambia a TOTAL mientras el modal ya está abierto, se cierra solo.
+            if (!balanceBreakdownInputs || balanceMode === "TOTAL" || !balanceMode) return null;
+            return buildKpiModalConfig("balance", balanceBreakdownInputs, balanceMode === "PERIOD_WITH_CREDIT");
+        }
+        return rawKpis ? buildKpiModalConfig(openKpiModal, rawKpis) : null;
+    }, [openKpiModal, rawKpis, balanceBreakdownInputs, balanceMode]);
 
     const totalCategoryExpenses = useMemo(() => {
         if (!categoryBreakdown) return 0;
@@ -316,8 +340,14 @@ export function FinancialDashboard() {
                 <BalanceHeroCard
                     value={`${activeBalance >= 0 ? "+" : "-"}${formatCurrency(activeBalance)}`}
                     negative={activeBalance < 0}
-                    creditSpent={rawKpis?.totalExpensesCredit ?? 0}
-                    onDetails={rawKpis ? () => setOpenKpiModal("balance") : undefined}
+                    // TOTAL ignora el rango, así que el gasto con tarjeta del
+                    // periodo no es un dato relevante para él — ahí la pill
+                    // muestra la deuda de tarjeta en pie (no se resta del
+                    // total, solo se exhibe al lado). Los dos modos de periodo
+                    // mantienen el gasto con tarjeta del rango de siempre.
+                    creditAmount={balanceMode === "TOTAL" ? (balances?.total.creditDebt ?? 0) : (rawKpis?.totalExpensesCredit ?? 0)}
+                    creditKind={balanceMode === "TOTAL" ? "debt" : "spent"}
+                    onDetails={balanceMode && balanceMode !== "TOTAL" ? () => setOpenKpiModal("balance") : undefined}
                     modeSwitch={balances && balanceMode ? (
                         <BalanceModeSwitch
                             balances={balances}

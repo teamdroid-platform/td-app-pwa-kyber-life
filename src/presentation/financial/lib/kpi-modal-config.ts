@@ -20,15 +20,33 @@ function currency(n: number): string {
 }
 
 /**
- * Builds the content for a KpiBreakdownModal from the raw (untoggled) KPIs —
- * shared by every dashboard that lets a user tap a Balance/Ingresos/Gastos
- * tile to see "how was this number calculated".
- *
- * `includeCredit` mirrors the "Incluir gastos con tarjeta" toggle: when ON, the
- * balance detail counts the credit-card-paid expenses (so the total and the
- * note match the toggled hero card); when OFF, they are shown as deferred.
+ * The only fields any of the three breakdowns read. Kept narrow on purpose:
+ * for `kind === "balance"` the caller must NOT pass the raw, unscoped,
+ * PERIOD-only `FinancialKPIs` — it must build this from the figures of the
+ * BalanceMode currently on screen (`BalanceSet.period` for income/expenses/
+ * savings/funding/netBalance, `BalanceSet.withCredit.creditDeferred` for the
+ * credit portion), or the modal ends up explaining a different number than
+ * the one that opened it. `FinancialKPIs` itself satisfies this type
+ * structurally, so "ingresos"/"gastos" (unaffected by the balance mode) keep
+ * passing it unchanged.
  */
-export function buildKpiModalConfig(kind: KpiModalKind, kpis: FinancialKPIs, includeCredit = false): KpiModalConfig {
+export type KpiBreakdownInputs = Pick<
+    FinancialKPIs,
+    "totalIncome" | "totalExpenses" | "totalExpensesCredit" | "totalTransfersFunding" | "totalTransfersSavings" | "netBalance"
+>;
+
+/**
+ * Builds the content for a KpiBreakdownModal — shared by every dashboard that
+ * lets a user tap a Balance/Ingresos/Gastos tile to see "how was this number
+ * calculated".
+ *
+ * `includeCredit` mirrors the active BalanceMode: pass `mode ===
+ * "PERIOD_WITH_CREDIT"` for `kind === "balance"` so the total and the note
+ * match whichever balance the user has on screen (PERIOD and
+ * PERIOD_WITH_CREDIT share the same `netBalance` input — PERIOD's own value —
+ * and only differ in whether the credit portion gets subtracted here).
+ */
+export function buildKpiModalConfig(kind: KpiModalKind, kpis: KpiBreakdownInputs, includeCredit = false): KpiModalConfig {
     const realExpenses = Math.max(0, kpis.totalExpenses - kpis.totalExpensesCredit);
 
     if (kind === "balance") {

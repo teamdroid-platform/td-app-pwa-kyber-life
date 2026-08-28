@@ -49,4 +49,24 @@ describe("buildKpiModalConfig — balance", () => {
         expect(on.total.amount).toBe(1494.23);
         expect(on.rows.some((r) => r.label === "Gastos con tarjeta")).toBe(false);
     });
+
+    it("PERIOD and PERIOD_WITH_CREDIT share the same netBalance input — the mode only decides whether it's subtracted here", () => {
+        // Shape a caller builds from BalanceSet.period / .withCredit.creditDeferred
+        // (see FinancialDashboard's balanceBreakdownInputs): netBalance is
+        // period.value in BOTH modes; includeCredit is what differs.
+        const periodShaped = {
+            totalIncome: 5000,
+            totalExpenses: 300,
+            totalExpensesCredit: 50,
+            totalTransfersFunding: 0,
+            totalTransfersSavings: 0,
+            netBalance: 4700,
+        };
+
+        const period = buildKpiModalConfig("balance", periodShaped, false);
+        expect(period.total.amount).toBe(4700);
+
+        const withCredit = buildKpiModalConfig("balance", periodShaped, true);
+        expect(withCredit.total.amount).toBe(4650);
+    });
 });

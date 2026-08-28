@@ -14,7 +14,7 @@ describe("BalanceHeroCard", () => {
             <BalanceHeroCard
                 value="+$100,00"
                 negative={false}
-                creditSpent={0}
+                creditAmount={0}
                 onDetails={onDetails}
                 modeSwitch={<button type="button">Cambiar modo</button>}
             />
@@ -27,5 +27,20 @@ describe("BalanceHeroCard", () => {
 
         fireEvent.keyDown(card, { key: "Enter" });
         expect(onDetails).toHaveBeenCalledTimes(1);
+    });
+
+    it("defaults to 'spent' copy for the credit pill", () => {
+        render(<BalanceHeroCard value="+$100,00" negative={false} creditAmount={50} />);
+        expect(screen.getByText("$50,00 en tarjeta de crédito")).toBeInTheDocument();
+    });
+
+    it("switches to 'debt' copy when creditKind is debt (TOTAL mode)", () => {
+        render(<BalanceHeroCard value="+$100,00" negative={false} creditAmount={50} creditKind="debt" />);
+        expect(screen.getByText("$50,00 en deuda de tarjeta de crédito")).toBeInTheDocument();
+    });
+
+    it("shows the 'no debt' variant when creditKind is debt and the amount is zero", () => {
+        render(<BalanceHeroCard value="+$100,00" negative={false} creditAmount={0} creditKind="debt" />);
+        expect(screen.getByText("Sin deuda de tarjeta de crédito")).toBeInTheDocument();
     });
 });

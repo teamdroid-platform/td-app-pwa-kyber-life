@@ -13,8 +13,15 @@ interface BalanceHeroCardProps {
     value: string;
     /** True when the balance is negative — flips the card to the danger palette. */
     negative: boolean;
-    /** Amount spent with a credit card in the period — surfaced in the pill. */
-    creditSpent: number;
+    /**
+     * Credit-card figure surfaced in the pill — its meaning depends on
+     * `creditKind`: the range's card spending in the two period modes, or
+     * TOTAL's standing card debt (which doesn't subtract from the balance
+     * above it, it's just shown alongside it).
+     */
+    creditAmount: number;
+    /** "spent" (default): copy talks about spending in the period. "debt": copy talks about outstanding debt (TOTAL mode). */
+    creditKind?: "spent" | "debt";
     /** Opens the balance breakdown modal when set (renders the affordance chip). */
     onDetails?: () => void;
     /** El selector de balance; sustituye al rótulo fijo "Balance actual". */
@@ -26,8 +33,11 @@ interface BalanceHeroCardProps {
  * prominent gradient panel (red when negative, emerald when positive) with a
  * status pill and a stylized wallet illustration glowing from the right.
  */
-export function BalanceHeroCard({ value, negative, creditSpent, onDetails, modeSwitch }: BalanceHeroCardProps) {
-    const hasCredit = creditSpent > 0;
+export function BalanceHeroCard({ value, negative, creditAmount, creditKind = "spent", onDetails, modeSwitch }: BalanceHeroCardProps) {
+    const hasCredit = creditAmount > 0;
+    const pillLabel = creditKind === "debt"
+        ? (hasCredit ? `${formatCurrency(creditAmount)} en deuda de tarjeta de crédito` : "Sin deuda de tarjeta de crédito")
+        : (hasCredit ? `${formatCurrency(creditAmount)} en tarjeta de crédito` : "Sin gastos con tarjeta de crédito");
     return (
         <div
             role={onDetails ? "button" : undefined}
@@ -96,11 +106,7 @@ export function BalanceHeroCard({ value, negative, creditSpent, onDetails, modeS
                         )}
                     >
                         <CreditCard className="h-3 w-3 shrink-0" />
-                        <span className="truncate">
-                            {hasCredit
-                                ? `${formatCurrency(creditSpent)} en tarjeta de crédito`
-                                : "Sin gastos con tarjeta de crédito"}
-                        </span>
+                        <span className="truncate">{pillLabel}</span>
                     </span>
                 </div>
 
