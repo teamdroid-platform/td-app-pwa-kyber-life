@@ -7,6 +7,9 @@ describe("computeNetBalance con scope", () => {
         accounts: [
             { id: "acc-in", institutionId: "inst-in" },
             { id: "acc-out", institutionId: "inst-out" },
+            // Segunda cuenta excluida (mismo banco), para probar una
+            // transferencia entre DOS cuentas excluidas sin reusar la misma.
+            { id: "acc-out2", institutionId: "inst-out" },
         ],
         cards: [
             { id: "card-in", institutionId: "inst-in" },
@@ -93,6 +96,29 @@ describe("computeNetBalance con scope", () => {
         ];
 
         expect(computeNetBalance(txs, undefined, scope)).toBe(-400);
+    });
+
+    it("la categoría manda sobre el scope: fondeo entra una sola vez (simétrico al de ahorros)", () => {
+        const txs = [
+            {
+                type: "TRANSFER" as const,
+                amount: 400,
+                categoryId: null,
+                categoryName: "Fondeo ingresos",
+                bankSourceAccountId: "acc-in",
+                bankDestinationAccountId: "acc-out",
+            },
+        ];
+
+        expect(computeNetBalance(txs, undefined, scope)).toBe(400);
+    });
+
+    it("una transferencia entre dos cuentas excluidas es neutra", () => {
+        const txs = [
+            { type: "TRANSFER" as const, amount: 400, categoryId: null, bankSourceAccountId: "acc-out", bankDestinationAccountId: "acc-out2" },
+        ];
+
+        expect(computeNetBalance(txs, undefined, scope)).toBe(0);
     });
 
     it("un consumo con tarjeta excluida no aparece por ningún lado", () => {

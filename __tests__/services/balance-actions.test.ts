@@ -16,7 +16,7 @@ jest.mock("@/infrastructure/container", () => ({
 
 import { balanceService, balanceSettingsRepository } from "@/infrastructure/container";
 import {
-    getBalanceSetAction, setBalanceDefaultModeAction, setBalanceScopeRuleAction,
+    getBalanceSetAction, setBalanceDefaultModeAction, setBalanceScopeRuleAction, clearBalanceScopeAction,
 } from "@/app/actions/balance";
 
 describe("balance actions", () => {
@@ -100,5 +100,25 @@ describe("balance actions", () => {
         // assertion that actually catches that case: it fails unless
         // clearRulesForTargets had *resolved* by the time setRule ran.
         expect(clearedWhenSetRuleRan).toBe(true);
+    });
+
+    // Botón "Restablecer": destructivo (borra TODAS las excepciones del
+    // usuario) y hasta ahora sin ninguna prueba.
+    it("restablece el scope borrando todas las excepciones del usuario", async () => {
+        (balanceSettingsRepository.clearRules as jest.Mock).mockResolvedValue(undefined);
+
+        const result = await clearBalanceScopeAction();
+
+        expect(result).toEqual({ success: true, data: null });
+        expect(balanceSettingsRepository.clearRules).toHaveBeenCalledWith("user-1");
+    });
+
+    it("no lanza al cliente cuando clearRules falla", async () => {
+        (balanceSettingsRepository.clearRules as jest.Mock).mockRejectedValue(new Error("boom"));
+
+        const result = await clearBalanceScopeAction();
+
+        expect(result.success).toBe(false);
+        expect(result).toHaveProperty("error", "boom");
     });
 });
