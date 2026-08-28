@@ -45,3 +45,35 @@ if (typeof globalThis.fetch === 'undefined') {
     headers: { 'Content-Type': 'application/json' },
   }));
 }
+
+// jsdom (26.x) no implementa PointerEvent ni las APIs de captura de puntero
+// (https://github.com/jsdom/jsdom/issues/2527), y Radix UI (dropdown-menu,
+// select, popover, etc.) abre y cierra sus triggers escuchando pointerdown,
+// no click. Sin este polyfill, fireEvent.pointerDown recibe un Event plano
+// sin `button`/`ctrlKey` y Radix nunca abre el panel en los tests.
+if (typeof globalThis.PointerEvent === 'undefined') {
+  class PointerEvent extends MouseEvent {
+    constructor(type, params = {}) {
+      super(type, params);
+      this.pointerId = params.pointerId ?? 0;
+      this.pointerType = params.pointerType ?? 'mouse';
+      this.isPrimary = params.isPrimary ?? true;
+    }
+  }
+  global.PointerEvent = PointerEvent;
+}
+
+if (typeof Element !== 'undefined') {
+  if (!Element.prototype.hasPointerCapture) {
+    Element.prototype.hasPointerCapture = () => false;
+  }
+  if (!Element.prototype.setPointerCapture) {
+    Element.prototype.setPointerCapture = () => {};
+  }
+  if (!Element.prototype.releasePointerCapture) {
+    Element.prototype.releasePointerCapture = () => {};
+  }
+  if (!Element.prototype.scrollIntoView) {
+    Element.prototype.scrollIntoView = () => {};
+  }
+}
