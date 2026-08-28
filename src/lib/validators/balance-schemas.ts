@@ -1,6 +1,10 @@
 import { z } from "zod";
+import { BALANCE_MODES } from "@/domain/entities/balance";
 
-export const balanceModeSchema = z.enum(['TOTAL', 'PERIOD', 'PERIOD_WITH_CREDIT']);
+// Derivado de BALANCE_MODES, no re-declarado: un cuarto modo que se agregue
+// ahí entra aquí solo, en vez de quedar rechazado en silencio en el borde de
+// la action por un enum que nadie recordó actualizar.
+export const balanceModeSchema = z.enum(BALANCE_MODES);
 
 export const balanceRangeSchema = z.object({
     startDate: z.string().datetime().optional(),
