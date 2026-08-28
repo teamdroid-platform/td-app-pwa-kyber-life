@@ -58,7 +58,23 @@ describe("balance actions", () => {
     });
 
     it("al guardar la regla de un banco limpia las excepciones de dentro", async () => {
-        (balanceSettingsRepository.setRule as jest.Mock).mockResolvedValue({});
+        // `setBalanceScopeRuleAction` wraps everything in try/catch (never throw
+        // to the client), so an `expect` thrown *inside* a mock implementation
+        // would be swallowed there and never fail this test. Instead, record
+        // what each mock observed into plain variables and assert on those
+        // after the action has returned, outside any try/catch.
+        let cleared = false;
+        let clearedWhenSetRuleRan: boolean | undefined;
+        (balanceSettingsRepository.clearRulesForTargets as jest.Mock).mockImplementation(async () => {
+            // Yield once so a concurrent caller (e.g. a `Promise.all` regression)
+            // would run its own body before this flips the flag.
+            await Promise.resolve();
+            cleared = true;
+        });
+        (balanceSettingsRepository.setRule as jest.Mock).mockImplementation(async () => {
+            clearedWhenSetRuleRan = cleared;
+            return {};
+        });
 
         await setBalanceScopeRuleAction({
             targetType: "INSTITUTION",
@@ -79,5 +95,10 @@ describe("balance actions", () => {
         const clearOrder = (balanceSettingsRepository.clearRulesForTargets as jest.Mock).mock.invocationCallOrder[0];
         const setRuleOrder = (balanceSettingsRepository.setRule as jest.Mock).mock.invocationCallOrder[0];
         expect(clearOrder).toBeLessThan(setRuleOrder);
+        // The call-order check above passes even under a same-order `Promise.all`
+        // regression (invocation order is synchronous either way). This is the
+        // assertion that actually catches that case: it fails unless
+        // clearRulesForTargets had *resolved* by the time setRule ran.
+        expect(clearedWhenSetRuleRan).toBe(true);
     });
 });
