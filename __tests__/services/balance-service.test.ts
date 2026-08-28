@@ -83,6 +83,35 @@ describe("BalanceService", () => {
         expect(income - expenses + set.withCredit.creditDeferred - savings + funding).toBe(value);
     });
 
+    it("mantiene la identidad con scope activo, incluyendo un gasto con tarjeta sin bankCardId excluido por su cuenta origen", async () => {
+        // Reproduce el caso que rompía sumCreditExpenses: paidWithCredit=true,
+        // sin bankCardId, pero con bankSourceAccountId apuntando a un banco
+        // excluido. Debe quedar fuera tanto de period (buildPeriod ya lo hacía)
+        // como de creditDeferred (sumCreditExpenses ahora usa el mismo predicado).
+        const scopedTransactions: FinancialTransaction[] = [
+            ...transactions,
+            {
+                ...baseTx, id: "5", amount: 75, paidWithCredit: true,
+                bankSourceAccountId: "acc-out", bankCardId: null,
+            },
+        ];
+
+        const rules = [{
+            id: "r1", ownerUserId: userId, targetType: "INSTITUTION", targetId: "inst-out",
+            included: false, createdAt: "", updatedAt: "", isDeleted: false,
+        }];
+
+        const service = buildService(rules);
+        (service as any).transactionRepo.findForDashboard.mockResolvedValue(scopedTransactions);
+
+        const set = await service.getBalanceSet(userId, {});
+
+        const { income, expenses, savings, funding, value } = set.period;
+        expect(income - expenses + set.withCredit.creditDeferred - savings + funding).toBe(value);
+        // El gasto con tarjeta de la cuenta excluida no debe restar de withCredit.value.
+        expect(set.withCredit.creditDeferred).toBe(50);
+    });
+
     it("el total solo suma cuentas con saldo declarado y reporta las demás", async () => {
         const set = await buildService().getBalanceSet(userId, {});
 

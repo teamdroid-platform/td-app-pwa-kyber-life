@@ -138,12 +138,16 @@ export function computeNetBalance(
 /**
  * Total of expenses paid with a credit card — the amount {@link computeNetBalance}
  * defers from the available balance. Subtract it from the net balance to get the
- * balance "as if the card were already paid" (the "Incluir gastos con tarjeta"
- * toggle ON). Only expense-like transactions can be `paidWithCredit`; income,
- * withdrawals and transfers are ignored.
+ * balance for PERIOD_WITH_CREDIT. Only expense-like transactions can be
+ * `paidWithCredit`; income, withdrawals and transfers are ignored.
  *
- * `scope` restricts the sum to cards included in it (Task 1); omitted, behavior
- * is unchanged.
+ * `scope` restricts the sum to the same rows `computeNetBalance`/`buildPeriod`
+ * would count (Task 1); omitted, behavior is unchanged. Gated on
+ * `isTransactionIncluded`, not `isCardIncluded` alone: a credit expense can be
+ * excluded via its source/destination account even with no card linked (e.g.
+ * `paidWithCredit` inferred from description/notes), and using a narrower
+ * predicate here than `buildPeriod` uses would let `withCredit.value` subtract
+ * money the scope asked the app to ignore.
  */
 export function sumCreditExpenses(
     transactions: readonly BalanceTransaction[],
@@ -156,7 +160,7 @@ export function sumCreditExpenses(
             !isIncomeType(t.type) &&
             !isWithdrawalType(t.type) &&
             t.type !== "TRANSFER" &&
-            (!scope || scope.isCardIncluded(t.bankCardId))
+            (!scope || scope.isTransactionIncluded(t))
         ) {
             sum += Number(t.amount);
         }
