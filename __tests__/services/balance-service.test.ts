@@ -113,6 +113,45 @@ describe("BalanceService", () => {
         expect(set.withCredit.creditDeferred).toBe(50);
     });
 
+    describe("con transacciones ya filtradas por quien llama", () => {
+        it("las usa en vez de leer del repositorio", async () => {
+            const service = buildService();
+            const repo = (service as any).transactionRepo;
+
+            // Solo el ingreso y un gasto: lo que devolvería una lista filtrada
+            // por categoría, por ejemplo.
+            const set = await service.getBalanceSet(userId, {
+                transactions: [transactions[0], transactions[1]],
+            });
+
+            expect(repo.findForDashboard).not.toHaveBeenCalled();
+            expect(set.period.value).toBe(4800);
+        });
+
+        it("descarta las que no son dinero real, aunque vengan en la lista", async () => {
+            // `search` no filtra por estado: devuelve todo salvo DELETED y
+            // ARCHIVED, así que una detección pendiente o un rechazo llegan
+            // aquí y no deben mover el balance.
+            const service = buildService();
+
+            const set = await service.getBalanceSet(userId, {
+                transactions: [
+                    transactions[0],
+                    { ...baseTx, id: "pending", amount: 900, status: "DETECTED" },
+                    { ...baseTx, id: "rejected", amount: 700, status: "REJECTED" },
+                ],
+            });
+
+            expect(set.period.value).toBe(5000);
+        });
+
+        it("el total no depende de esa lista: sigue siendo el saldo de las cuentas", async () => {
+            const set = await buildService().getBalanceSet(userId, { transactions: [] });
+
+            expect(set.total.value).toBe(1200);
+        });
+    });
+
     it("el total solo suma cuentas con saldo declarado y reporta las demás", async () => {
         const set = await buildService().getBalanceSet(userId, {});
 

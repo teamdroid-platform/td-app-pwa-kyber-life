@@ -344,8 +344,14 @@ export function FinancialDashboard() {
                     // periodo no es un dato relevante para él — ahí la pill
                     // muestra la deuda de tarjeta en pie (no se resta del
                     // total, solo se exhibe al lado). Los dos modos de periodo
-                    // mantienen el gasto con tarjeta del rango de siempre.
-                    creditAmount={balanceMode === "TOTAL" ? (balances?.total.creditDebt ?? 0) : (rawKpis?.totalExpensesCredit ?? 0)}
+                    // muestran el gasto con tarjeta del rango, tomado de
+                    // `withCredit.creditDeferred` y no de los KPIs: es la misma
+                    // cifra que el modal desglosa y la única que respeta las
+                    // cuentas y tarjetas excluidas en la configuración. Los KPIs
+                    // solo cubren el hueco mientras los balances cargan.
+                    creditAmount={balanceMode === "TOTAL"
+                        ? (balances?.total.creditDebt ?? 0)
+                        : (balances?.withCredit.creditDeferred ?? rawKpis?.totalExpensesCredit ?? 0)}
                     creditKind={balanceMode === "TOTAL" ? "debt" : "spent"}
                     onDetails={balanceMode && balanceMode !== "TOTAL" ? () => setOpenKpiModal("balance") : undefined}
                     modeSwitch={balances && balanceMode ? (

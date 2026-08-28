@@ -2,8 +2,10 @@ import { Suspense } from "react";
 import { TransactionTimeline } from "@/presentation/financial/components/TransactionTimeline";
 import { TransactionFilters } from "@/presentation/financial/components/TransactionFilters";
 import { searchPaginatedTransactionsAction, searchAllFilteredTransactionsAction } from "@/app/actions/financial-transactions";
+import type { FinancialTransaction } from "@/domain/entities/financial";
+import { balanceService } from "@/infrastructure/container";
+import { requireUserId } from "@/infrastructure/supabase/auth-user";
 import { getCategoriesAction, getInstitutionsAction } from "@/app/actions/financial-settings";
-import { getBalanceSetAction } from "@/app/actions/balance";
 import { Button } from "@/components/ui/button";
 import { Plus, Inbox as InboxIcon, PieChart } from "lucide-react";
 import Link from "next/link";
@@ -54,7 +56,7 @@ export default async function TransactionsPage({
         dateTo = new Date(`${cycle.end}T23:59:59`).toISOString();
     }
 
-    const [initialResult, allFilteredResult, categories, institutions, balanceSetResult] = await Promise.all([
+    const [initialResult, allFilteredResult, categories, institutions] = await Promise.all([
         searchPaginatedTransactionsAction({
             query,
             status,
@@ -79,20 +81,31 @@ export default async function TransactionsPage({
         }),
         getCategoriesAction(),
         getInstitutionsAction(),
-        // Los tres balances del mismo rango que el listado: el selector del
-        // resumen los necesita los tres a la vez, no vuelve al servidor.
-        getBalanceSetAction(dateFrom, dateTo),
     ]);
 
     const initialTransactions = initialResult.success && initialResult.data
         ? initialResult.data.data
         : [];
 
-    const allFilteredTransactions = allFilteredResult.success && allFilteredResult.data
-        ? allFilteredResult.data as any[] // we know it's FinancialTransaction[]
+    const allFilteredTransactions: FinancialTransaction[] = allFilteredResult.success && allFilteredResult.data
+        ? allFilteredResult.data
         : [];
 
-    const balances = balanceSetResult.success ? balanceSetResult.data : null;
+    // Los tres balances sobre EXACTAMENTE las filas que el listado muestra, no
+    // sobre el rango entero: la lista filtra además por categoría, tipo,
+    // estado, moneda y texto. Se le pasan las transacciones ya consultadas
+    // arriba en vez de que el servicio las vuelva a leer, así el chip del
+    // resumen y el gráfico de abajo no pueden contradecirse.
+    const balances = await balanceService
+        .getBalanceSet(await requireUserId(), {
+            startDate: dateFrom ? new Date(dateFrom) : undefined,
+            endDate: dateTo ? new Date(dateTo) : undefined,
+            transactions: allFilteredTransactions,
+        })
+        .catch((error) => {
+            console.error("Error fetching balance set:", error);
+            return null;
+        });
 
     // Pass URL filters so the infinite-scroll can re-apply them
     const searchFilters = { query, status, types, currency, dateFrom, dateTo, range, categoryId, institutionId };

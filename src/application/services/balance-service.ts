@@ -9,7 +9,7 @@ import {
     IBankAccountBalanceSnapshotRepository,
 } from "../../domain/repositories/bank";
 import { IBalanceSettingsRepository } from "../../domain/repositories/balance";
-import { computeNetBalance, sumCreditExpenses, isIncomeType, isWithdrawalType, isSavingsTransfer, isFundingTransfer } from "../../domain/services/financial-balance";
+import { computeNetBalance, sumCreditExpenses, isIncomeType, isWithdrawalType, isSavingsTransfer, isFundingTransfer, DASHBOARD_ACTIVE_STATUSES } from "../../domain/services/financial-balance";
 import { computeTotalBalance, TotalBalanceAccount } from "../../domain/services/balance-modes";
 import { computeAccountBalance, computeCardDebt } from "../../domain/services/bank-balance";
 import { resolveScope, BalanceScope } from "../../domain/services/balance-scope";
@@ -47,6 +47,33 @@ export interface BalanceSet {
     };
 }
 
+export interface BalanceSetOptions {
+    startDate?: Date;
+    endDate?: Date;
+    /**
+     * Transacciones que quien llama ya consultó, para que el balance resuma
+     * exactamente las mismas filas que esa pantalla muestra.
+     *
+     * El listado filtra por categoría, tipo, estado, moneda y texto, no solo
+     * por fechas. Sin esto el chip resumía el rango entero mientras la lista
+     * de abajo mostraba lo filtrado, y los dos números se contradecían.
+     *
+     * Solo afecta a los balances de periodo: el total sale de los saldos de
+     * las cuentas y no depende de ninguna lista de transacciones.
+     */
+    transactions?: readonly FinancialTransaction[];
+}
+
+/**
+ * Las transacciones que cuentan como dinero real. `findForDashboard` ya
+ * estrecha por estos estados en SQL, pero una lista traída con `search` no:
+ * esa devuelve todo salvo lo borrado y lo archivado, así que una detección
+ * pendiente o un movimiento rechazado llegarían aquí y moverían el balance.
+ */
+function isCountable(t: FinancialTransaction): boolean {
+    return (DASHBOARD_ACTIVE_STATUSES as readonly string[]).includes(t.status);
+}
+
 /**
  * Los tres balances de una sola lectura, para que el selector de la interfaz
  * pueda cambiar de modo sin volver al servidor.
@@ -68,11 +95,15 @@ export class BalanceService {
 
     async getBalanceSet(
         userId: UUID,
-        range: { startDate?: Date; endDate?: Date },
+        options: BalanceSetOptions,
     ): Promise<BalanceSet> {
+        const { transactions: given, ...range } = options;
+
         const [rawTransactions, accounts, cards, movements, categories, settings, rules] =
             await Promise.all([
-                this.transactionRepo.findForDashboard(userId, range),
+                given
+                    ? Promise.resolve(given.filter(t => isCountable(t)))
+                    : this.transactionRepo.findForDashboard(userId, range),
                 this.accountRepo.findByOwnerId(userId),
                 this.cardRepo.findByOwnerId(userId),
                 this.movementRepo.findAllForOwner(userId),
