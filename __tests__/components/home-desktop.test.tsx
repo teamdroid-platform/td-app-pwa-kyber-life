@@ -47,7 +47,6 @@ const METRICS: HomeMetrics = {
         expenses: [80, 120, 300],
         net: [20, 130, 100],
     },
-    balanceSeries: [20, 150, 250],
     expensesSeries: [80, 200, 500],
     purchases: {
         slices: [

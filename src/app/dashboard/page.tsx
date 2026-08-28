@@ -166,7 +166,6 @@ function buildMetrics({ overview, previous, recent, purchaseCategories, balances
             expenses: daily.map(day => day.expenses),
             net: daily.map(day => day.net),
         },
-        balanceSeries: cumulative(daily.map(day => day.net)),
         expensesSeries: cumulative(daily.map(day => day.expenses)),
         purchases: {
             slices,

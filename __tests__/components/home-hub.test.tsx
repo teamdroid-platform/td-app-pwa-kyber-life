@@ -26,7 +26,6 @@ const METRICS: HomeMetrics = {
     expensesDeltaPct: -4.3,
     pendingTransactions: 3,
     series: { dates: ["2026-08-01", "2026-08-08"], income: [100, 250], expenses: [80, 120], net: [20, 130] },
-    balanceSeries: [20, 150],
     expensesSeries: [80, 200],
     purchases: { slices: [], total: 0 },
     recent: [],

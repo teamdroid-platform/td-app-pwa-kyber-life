@@ -34,8 +34,7 @@ export interface HomeMetrics {
     pendingTransactions: number;
     /** Un punto por día del periodo. */
     series: { dates: string[]; income: number[]; expenses: number[]; net: number[] };
-    /** Saldo y gasto acumulados del periodo, para las miniaturas de las cifras. */
-    balanceSeries: number[];
+    /** Gasto acumulado del periodo, para la miniatura de la cifra de gastos. */
     expensesSeries: number[];
     /** Gasto del súper por categoría, sobre todo el historial de compras. */
     purchases: { slices: DonutSlice[]; total: number };
