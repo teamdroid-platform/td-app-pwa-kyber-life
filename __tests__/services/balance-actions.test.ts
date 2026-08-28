@@ -70,5 +70,14 @@ describe("balance actions", () => {
         expect(balanceSettingsRepository.clearRulesForTargets).toHaveBeenCalledWith(
             "user-1", ["22222222-2222-4222-8222-222222222222"],
         );
+        expect(balanceSettingsRepository.setRule).toHaveBeenCalledWith(
+            "user-1", "INSTITUTION", "11111111-1111-4111-8111-111111111111", false,
+        );
+        // Order matters: clearing exceptions before writing the bank's own rule
+        // is what keeps a bank from dragging exceptions the settings UI no
+        // longer shows. This pins clearRulesForTargets running before setRule.
+        const clearOrder = (balanceSettingsRepository.clearRulesForTargets as jest.Mock).mock.invocationCallOrder[0];
+        const setRuleOrder = (balanceSettingsRepository.setRule as jest.Mock).mock.invocationCallOrder[0];
+        expect(clearOrder).toBeLessThan(setRuleOrder);
     });
 });
