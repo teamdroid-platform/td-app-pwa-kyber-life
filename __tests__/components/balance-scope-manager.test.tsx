@@ -124,6 +124,69 @@ describe("BalanceScopeManager", () => {
         });
     });
 
+    // Sin cuentas ni tarjetas, "incluidas === total" y "incluidas === 0" son
+    // AMBAS ciertas (0 === 0): antes del fix, el checkbox de un banco vacío
+    // quedaba SIEMPRE marcado, sin importar la regla guardada, así que un
+    // clic escribía una excepción que la interfaz nunca reflejaba.
+    describe("banco sin cuentas ni tarjetas", () => {
+        const emptyInstitutions = [{ id: "inst-empty", name: "Banco Nuevo" }];
+
+        it("sin regla se muestra incluido (checked)", () => {
+            render(
+                <BalanceScopeManager
+                    defaultMode="PERIOD"
+                    initialRules={[]}
+                    institutions={emptyInstitutions}
+                    accounts={[]}
+                    cards={[]}
+                />,
+            );
+
+            const checkbox = screen.getByRole("checkbox", { name: /Banco Nuevo/i });
+            expect(checkbox).toHaveAttribute("data-state", "checked");
+        });
+
+        it("clic lo excluye, y el checkbox refleja la regla guardada (no queda pegado en 'incluido')", async () => {
+            const { rerender } = render(
+                <BalanceScopeManager
+                    defaultMode="PERIOD"
+                    initialRules={[]}
+                    institutions={emptyInstitutions}
+                    accounts={[]}
+                    cards={[]}
+                />,
+            );
+
+            fireEvent.click(screen.getByRole("checkbox", { name: /Banco Nuevo/i }));
+
+            await waitFor(() => {
+                expect(setBalanceScopeRuleAction).toHaveBeenCalledWith(expect.objectContaining({
+                    targetType: "INSTITUTION",
+                    targetId: "inst-empty",
+                    included: false,
+                }));
+            });
+            // El estado optimista local ya debe mostrarlo excluido, sin depender
+            // del round-trip al servidor.
+            expect(screen.getByRole("checkbox", { name: /Banco Nuevo/i })).toHaveAttribute("data-state", "unchecked");
+
+            // Con la regla persistida (nueva carga de la página), sigue honesto.
+            rerender(
+                <BalanceScopeManager
+                    defaultMode="PERIOD"
+                    initialRules={[{
+                        id: "r1", ownerUserId: "u", targetType: "INSTITUTION", targetId: "inst-empty",
+                        included: false, createdAt: "", updatedAt: "", isDeleted: false,
+                    }]}
+                    institutions={emptyInstitutions}
+                    accounts={[]}
+                    cards={[]}
+                />,
+            );
+            expect(screen.getByRole("checkbox", { name: /Banco Nuevo/i })).toHaveAttribute("data-state", "unchecked");
+        });
+    });
+
     it("banco parcial: click incluye todo", async () => {
         render(
             <BalanceScopeManager

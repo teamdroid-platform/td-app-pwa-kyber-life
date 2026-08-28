@@ -154,8 +154,18 @@ export function BalanceScopeManager({
                     {institutions.map((institution) => {
                         const items = itemsOf(institution.id);
                         const includedCount = items.filter(i => scope.isAccountIncluded(i.id)).length;
-                        const allIn = includedCount === items.length;
-                        const noneIn = includedCount === 0;
+                        // Con items.length === 0, "includedCount === items.length" y
+                        // "includedCount === 0" son AMBAS ciertas (0 === 0): un banco
+                        // sin cuentas ni tarjetas quedaría siempre marcado como
+                        // "todo incluido" sin importar la regla guardada, así que un
+                        // clic escribiría una excepción invisible — el checkbox nunca
+                        // reflejaría el cambio. Sin items que contar, la única fuente
+                        // honesta es la regla de banco misma.
+                        const bankRule = rules.find(
+                            r => !r.isDeleted && r.targetType === "INSTITUTION" && r.targetId === institution.id,
+                        );
+                        const allIn = items.length > 0 ? includedCount === items.length : (bankRule?.included ?? true);
+                        const noneIn = items.length > 0 ? includedCount === 0 : bankRule?.included === false;
                         const isOpen = expanded === institution.id;
 
                         return (
