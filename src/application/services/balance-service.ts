@@ -9,7 +9,7 @@ import {
     IBankAccountBalanceSnapshotRepository,
 } from "../../domain/repositories/bank";
 import { IBalanceSettingsRepository } from "../../domain/repositories/balance";
-import { computeNetBalance, sumCreditExpenses, isIncomeType, isWithdrawalType } from "../../domain/services/financial-balance";
+import { computeNetBalance, sumCreditExpenses, isIncomeType, isWithdrawalType, isSavingsTransfer, isFundingTransfer } from "../../domain/services/financial-balance";
 import { computeTotalBalance, TotalBalanceAccount } from "../../domain/services/balance-modes";
 import { computeAccountBalance, computeCardDebt } from "../../domain/services/bank-balance";
 import { resolveScope, BalanceScope } from "../../domain/services/balance-scope";
@@ -24,6 +24,14 @@ export interface BalanceSet {
         accountsWithoutSnapshot: { id: UUID; name: string }[];
         creditDebt: number;
     };
+    /**
+     * `expenses` es el gasto bruto: incluye lo pagado con tarjeta, igual que
+     * `FinancialKPIs.totalExpenses`. `value` en cambio difiere exactamente
+     * `withCredit.creditDeferred` de ese gasto, así que la identidad que se
+     * cumple es:
+     *
+     *   income − expenses + withCredit.creditDeferred − savings + funding === value
+     */
     period: {
         value: number;
         income: number;
@@ -136,13 +144,11 @@ export class BalanceService {
             .reduce((sum, t) => sum + Number(t.amount), 0);
 
         const savings = inScope
-            .filter(t => t.type === "TRANSFER"
-                && categoryName(t, categoryNameById) === "Ahorros e Inversiones")
+            .filter(t => isSavingsTransfer(t, categoryNameById))
             .reduce((sum, t) => sum + Number(t.amount), 0);
 
         const funding = inScope
-            .filter(t => t.type === "TRANSFER"
-                && categoryName(t, categoryNameById) === "Fondeo ingresos")
+            .filter(t => isFundingTransfer(t, categoryNameById))
             .reduce((sum, t) => sum + Number(t.amount), 0);
 
         return {
@@ -167,13 +173,6 @@ export class BalanceService {
             creditDeferred,
         };
     }
-}
-
-function categoryName(
-    t: FinancialTransaction,
-    categoryNameById: ReadonlyMap<string, string>,
-): string | undefined {
-    return t.categoryName ?? (t.categoryId ? categoryNameById.get(t.categoryId) : undefined);
 }
 
 function round2(value: number): number {

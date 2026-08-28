@@ -73,6 +73,16 @@ describe("BalanceService", () => {
         expect(set.defaultMode).toBe("PERIOD");
     });
 
+    it("mantiene la identidad entre expenses (bruto) y value (neto de crédito)", async () => {
+        const set = await buildService().getBalanceSet(userId, {});
+
+        // expenses es gasto bruto (incluye lo pagado con tarjeta); value lo difiere
+        // exactamente en withCredit.creditDeferred. La relación documentada en
+        // BalanceSet.period debe sostenerse siempre, no solo en este fixture.
+        const { income, expenses, savings, funding, value } = set.period;
+        expect(income - expenses + set.withCredit.creditDeferred - savings + funding).toBe(value);
+    });
+
     it("el total solo suma cuentas con saldo declarado y reporta las demás", async () => {
         const set = await buildService().getBalanceSet(userId, {});
 
