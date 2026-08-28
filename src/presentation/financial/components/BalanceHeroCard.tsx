@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { Wallet, ChevronDown, Sparkles, CreditCard } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -16,6 +17,8 @@ interface BalanceHeroCardProps {
     creditSpent: number;
     /** Opens the balance breakdown modal when set (renders the affordance chip). */
     onDetails?: () => void;
+    /** El selector de balance; sustituye al rótulo fijo "Balance actual". */
+    modeSwitch?: ReactNode;
 }
 
 /**
@@ -23,7 +26,7 @@ interface BalanceHeroCardProps {
  * prominent gradient panel (red when negative, emerald when positive) with a
  * status pill and a stylized wallet illustration glowing from the right.
  */
-export function BalanceHeroCard({ value, negative, creditSpent, onDetails }: BalanceHeroCardProps) {
+export function BalanceHeroCard({ value, negative, creditSpent, onDetails, modeSwitch }: BalanceHeroCardProps) {
     const hasCredit = creditSpent > 0;
     return (
         <div
@@ -55,9 +58,16 @@ export function BalanceHeroCard({ value, negative, creditSpent, onDetails }: Bal
 
             <div className="relative flex items-center justify-between gap-4">
                 <div className="flex min-w-0 flex-col gap-2">
-                    <p className="text-sm font-medium text-white/85">
-                        Balance actual
-                    </p>
+                    {modeSwitch ? (
+                        // The switch is its own interactive control (a dropdown
+                        // trigger); it must not also trigger `onDetails` via the
+                        // card-wide click handler it sits inside.
+                        <div onClick={(e) => e.stopPropagation()}>{modeSwitch}</div>
+                    ) : (
+                        <p className="text-sm font-medium text-white/85">
+                            Balance actual
+                        </p>
+                    )}
                     <div className="flex items-center gap-2.5">
                         <h2
                             className={cn(

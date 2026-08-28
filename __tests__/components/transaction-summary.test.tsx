@@ -53,4 +53,13 @@ describe("TransactionSummary", () => {
 
         expect(screen.getAllByText("+$750,00").length).toBeGreaterThan(0);
     });
+
+    it("sin balances sigue calculando el balance localmente", () => {
+        render(<TransactionSummary transactions={[
+            { ...base, id: "1", type: "INCOME", amount: 1000, status: "CONFIRMED" },
+            { ...base, id: "2", amount: 100, status: "MANUAL" },
+        ]} />);
+
+        expect(screen.getAllByText("+$900,00").length).toBeGreaterThan(0);
+    });
 });

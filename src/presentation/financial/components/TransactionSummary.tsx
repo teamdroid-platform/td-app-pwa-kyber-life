@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, type ReactNode } from "react";
 import { AreaChart, Area, ResponsiveContainer, YAxis, XAxis, Tooltip, CartesianGrid, PieChart, Pie, Cell, BarChart, Bar, LabelList } from 'recharts';
 import { ChevronDown, BarChart2, TrendingUp, TrendingDown, Wallet, ArrowRightLeft, Scale, PieChart as PieChartIcon, BarChart3 as BarChartIcon, type LucideIcon } from "lucide-react";
 import type { FinancialTransaction, FinancialTransactionType } from "@/domain/entities/financial";
@@ -16,6 +16,9 @@ import {
 import { MobileCarousel } from "@/presentation/components/dashboard/MobileCarousel";
 import { formatAxisCurrency } from "@/lib/date-bucketing";
 import { CreditToggle } from "./CreditToggle";
+import { BalanceModeSwitch, balanceValue } from "./BalanceModeSwitch";
+import type { BalanceSet } from "@/application/services/balance-service";
+import { type BalanceMode, DEFAULT_BALANCE_MODE } from "@/domain/entities/balance";
 import { useChartTooltipDismiss } from "@/hooks/use-chart-tooltip-dismiss";
 
 // ─── Type visual metadata ────────────────────────────────────
@@ -52,21 +55,27 @@ function formatCurrency(amount: number, currency: string): string {
 
 interface TransactionSummaryProps {
     transactions: FinancialTransaction[];
+    balances?: BalanceSet | null;
+    rangeLabel?: string;
 }
 
 type ViewMode = 'day' | 'week' | 'month';
 
-export function TransactionSummary({ transactions }: TransactionSummaryProps) {
+export function TransactionSummary({ transactions, balances, rangeLabel }: TransactionSummaryProps) {
     const [viewMode, setViewMode] = useState<ViewMode>('day');
     const [isExpanded, setIsExpanded] = useState(false);
     const [isDesktopExpanded, setIsDesktopExpanded] = useState(false);
-    
+
     // Default null avoids hydration mismatch; we determine it on mount
     const [userChartPreference, setUserChartPreference] = useState<"donut" | "bar" | null>(null);
     const [isMobile, setIsMobile] = useState(false);
     // Off by default: amounts and charts show only real (cash) spending until
     // the user opts into seeing credit-card-paid transactions too.
     const [showCredit, setShowCredit] = useState(false);
+    // El modo del selector de balance: arranca en el de ajustes y no se
+    // recuerda entre cargas. Solo importa cuando `balances` viene — sin él,
+    // el chip sigue el cálculo local de siempre.
+    const [balanceMode, setBalanceMode] = useState<BalanceMode>(() => balances?.defaultMode ?? DEFAULT_BALANCE_MODE);
     // On touch there is no "mouse leave" to close the tooltip, so make it dismissable.
     const { containerRef, tooltipActive, handlePointerDown } = useChartTooltipDismiss();
 
@@ -238,11 +247,32 @@ export function TransactionSummary({ transactions }: TransactionSummaryProps) {
         );
     };
 
-    // Balance accent color by sign; used for its own chip.
-    const balanceColor = balance > 0 ? "#10b981" : balance < 0 ? "#f43f5e" : "#64748b";
+    // El número que muestra el chip "Balance": el del modo elegido cuando hay
+    // `balances`, o el cálculo local de siempre cuando no lo hay. El resto del
+    // componente (donut, desglose por tipo) sigue leyendo `balance`/`balanceStr`
+    // sin tocar — conviven con el chip hasta que la Task 10 retire el toggle.
+    const chipBalance = balances ? balanceValue(balances, balanceMode) : balance;
+    const chipCurrency = balances ? balances.currency : primaryCurrency;
+    const chipBalanceStr = (chipBalance > 0 ? "+" : chipBalance < 0 ? "-" : "") + formatCurrency(Math.abs(chipBalance), chipCurrency);
+    const chipBalanceColor = chipBalance > 0 ? "#10b981" : chipBalance < 0 ? "#f43f5e" : "#64748b";
+
+    // La etiqueta del chip "Balance", como selector cuando hay `balances`. El
+    // `stopPropagation` evita que abrir el panel también pliegue/despliegue el
+    // acordeón que lo envuelve.
+    const balanceChipLabel: ReactNode = balances ? (
+        <span onClick={(e) => e.stopPropagation()}>
+            <BalanceModeSwitch
+                balances={balances}
+                mode={balanceMode}
+                onModeChange={setBalanceMode}
+                rangeLabel={rangeLabel ?? ""}
+                size="compact"
+            />
+        </span>
+    ) : "Balance";
 
     // A single tinted "box" (chip): icon + uppercase label + bold amount.
-    const renderChip = (key: string, Icon: LucideIcon, label: string, value: string, color: string) => (
+    const renderChip = (key: string, Icon: LucideIcon, label: ReactNode, value: string, color: string) => (
         <div
             key={key}
             className="flex items-center gap-2 rounded-xl border px-2.5 py-1.5 shrink-0"
@@ -282,12 +312,24 @@ export function TransactionSummary({ transactions }: TransactionSummaryProps) {
                     </div>
                     <div className="flex flex-col justify-center gap-1.5">
                         <div className="flex items-baseline gap-1.5">
-                            <span className="text-lg font-bold tracking-tight leading-none text-foreground/90">Balance</span>
+                            {balances ? (
+                                <span onClick={(e) => e.stopPropagation()}>
+                                    <BalanceModeSwitch
+                                        balances={balances}
+                                        mode={balanceMode}
+                                        onModeChange={setBalanceMode}
+                                        rangeLabel={rangeLabel ?? ""}
+                                        size="compact"
+                                    />
+                                </span>
+                            ) : (
+                                <span className="text-lg font-bold tracking-tight leading-none text-foreground/90">Balance</span>
+                            )}
                             <span className={cn(
                                 "text-lg font-bold tracking-tight leading-none",
-                                balance > 0 ? "text-emerald-600 dark:text-emerald-400" : balance < 0 ? "text-rose-600 dark:text-rose-400" : "text-foreground/90"
+                                chipBalance > 0 ? "text-emerald-600 dark:text-emerald-400" : chipBalance < 0 ? "text-rose-600 dark:text-rose-400" : "text-foreground/90"
                             )}>
-                                {balanceStr}
+                                {chipBalanceStr}
                             </span>
                         </div>
                         <p className="text-[10px] text-muted-foreground font-medium leading-none uppercase tracking-wider">
@@ -326,7 +368,7 @@ export function TransactionSummary({ transactions }: TransactionSummaryProps) {
                     </div>
                     {/* Boxes: balance + per-type, right-aligned on the same row */}
                     <div className="flex flex-1 items-center justify-end gap-2 flex-wrap min-w-0">
-                        {renderChip("balance", Scale, "Balance", balanceStr, balanceColor)}
+                        {renderChip("balance", Scale, balanceChipLabel, chipBalanceStr, chipBalanceColor)}
                         {pieData.map((item) => renderChip(item.name, item.icon, item.name, formatCurrency(item.value, primaryCurrency), item.fill))}
                     </div>
                     {/* Chevron */}

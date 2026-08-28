@@ -3,6 +3,7 @@ import { TransactionTimeline } from "@/presentation/financial/components/Transac
 import { TransactionFilters } from "@/presentation/financial/components/TransactionFilters";
 import { searchPaginatedTransactionsAction, searchAllFilteredTransactionsAction } from "@/app/actions/financial-transactions";
 import { getCategoriesAction, getInstitutionsAction } from "@/app/actions/financial-settings";
+import { getBalanceSetAction } from "@/app/actions/balance";
 import { Button } from "@/components/ui/button";
 import { Plus, Inbox as InboxIcon, PieChart } from "lucide-react";
 import Link from "next/link";
@@ -14,6 +15,15 @@ import { defaultHubCustomRange } from "@/lib/date-range";
 // correctly filtered first page instead of serving a cached route payload.
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
+
+/** Etiqueta legible del rango activo, para las explicaciones del selector de balance. */
+function formatRangeLabel(startISO?: string, endISO?: string): string {
+    if (!startISO || !endISO) return "Todo el tiempo";
+    const fmt = (iso: string) => new Date(iso).toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" });
+    const start = fmt(startISO);
+    const end = fmt(endISO);
+    return start === end ? start : `${start} – ${end}`;
+}
 
 export default async function TransactionsPage({
     searchParams,
@@ -44,7 +54,7 @@ export default async function TransactionsPage({
         dateTo = new Date(`${cycle.end}T23:59:59`).toISOString();
     }
 
-    const [initialResult, allFilteredResult, categories, institutions] = await Promise.all([
+    const [initialResult, allFilteredResult, categories, institutions, balanceSetResult] = await Promise.all([
         searchPaginatedTransactionsAction({
             query,
             status,
@@ -68,7 +78,10 @@ export default async function TransactionsPage({
             institutionId,
         }),
         getCategoriesAction(),
-        getInstitutionsAction()
+        getInstitutionsAction(),
+        // Los tres balances del mismo rango que el listado: el selector del
+        // resumen los necesita los tres a la vez, no vuelve al servidor.
+        getBalanceSetAction(dateFrom, dateTo),
     ]);
 
     const initialTransactions = initialResult.success && initialResult.data
@@ -78,6 +91,8 @@ export default async function TransactionsPage({
     const allFilteredTransactions = allFilteredResult.success && allFilteredResult.data
         ? allFilteredResult.data as any[] // we know it's FinancialTransaction[]
         : [];
+
+    const balances = balanceSetResult.success ? balanceSetResult.data : null;
 
     // Pass URL filters so the infinite-scroll can re-apply them
     const searchFilters = { query, status, types, currency, dateFrom, dateTo, range, categoryId, institutionId };
@@ -129,6 +144,8 @@ export default async function TransactionsPage({
                             initialTransactions={initialTransactions}
                             allFilteredTransactions={allFilteredTransactions}
                             searchFilters={searchFilters}
+                            balances={balances}
+                            rangeLabel={formatRangeLabel(dateFrom, dateTo)}
                         />
                     </Suspense>
                 </TransactionTabs>

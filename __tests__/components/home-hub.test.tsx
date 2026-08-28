@@ -1,14 +1,23 @@
 import { render, screen } from "@testing-library/react";
 import { HomeHub, type HomeMetrics } from "@/presentation/components/dashboard/HomeHub";
+import type { BalanceSet } from "@/application/services/balance-service";
 
 // El diálogo de captura navega al resumen tras interpretar.
 jest.mock("next/navigation", () => ({
     useRouter: () => ({ push: jest.fn(), prefetch: jest.fn(), refresh: jest.fn() }),
 }));
 
+const BALANCES: BalanceSet = {
+    defaultMode: "PERIOD",
+    currency: "USD",
+    total: { value: 24560, accountsCounted: 6, accountsWithoutSnapshot: [], creditDebt: 0 },
+    period: { value: 5100.75, income: 8450, expenses: 3240.8, savings: 0, funding: 0, excludedCount: 0 },
+    withCredit: { value: 4902.06, creditDeferred: 198.69 },
+};
+
 const METRICS: HomeMetrics = {
     currency: "USD",
-    totalBalance: 24560,
+    balances: BALANCES,
     accounts: 6,
     accountsWithBalance: 6,
     monthIncome: 8450,
@@ -53,14 +62,14 @@ describe("HomeHub", () => {
 
         expect(screen.getByRole("heading", { name: "Registrar un movimiento" })).toBeInTheDocument();
         expect(screen.getByRole("link", { name: /^Saldos/ })).toBeInTheDocument();
-        expect(screen.queryByRole("link", { name: /Saldo total/ })).not.toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: /balance del periodo/i })).not.toBeInTheDocument();
         expect(screen.queryByText(/Actividad reciente/)).not.toBeInTheDocument();
     });
 
     it("con cifras, monta también el tablero", () => {
         render(<HomeHub {...BASE} />);
 
-        expect(screen.getByRole("link", { name: /Saldo total/ })).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: /balance del periodo/i })).toBeInTheDocument();
         // Y la pantalla de móvil sigue en el árbol: es CSS quien elige cuál se ve.
         expect(screen.getByRole("link", { name: /^Saldos/ })).toBeInTheDocument();
     });

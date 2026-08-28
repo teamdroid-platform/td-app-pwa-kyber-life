@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { UnifiedTrendChart } from "./UnifiedTrendChart";
 import { CategoryPieChart } from "./CategoryPieChart";
@@ -17,9 +17,13 @@ import { RobotLoader } from "@/components/ui/RobotLoader";
 import { defaultHubCustomRange, STANDARD_PERIOD_PRESETS } from "@/lib/date-range";
 import { cn } from "@/lib/utils";
 import { BalanceHeroCard } from "./BalanceHeroCard";
+import { BalanceModeSwitch, balanceValue } from "./BalanceModeSwitch";
 import { QuickSummary } from "./QuickSummary";
 import { KpiBreakdownModal } from "./KpiBreakdownModal";
 import { buildKpiModalConfig, type KpiModalKind } from "../lib/kpi-modal-config";
+import { getBalanceSetAction } from "@/app/actions/balance";
+import type { BalanceSet } from "@/application/services/balance-service";
+import type { BalanceMode } from "@/domain/entities/balance";
 import {
     excludeCreditFromKpis,
     includeCreditInKpis,
@@ -108,10 +112,35 @@ export function FinancialDashboard() {
     const { kpis: rawKpis, monthly, typeBreakdown, categoryBreakdown: rawCategoryBreakdown, institutionBreakdown: rawInstitutionBreakdown, dailyBreakdown: rawDailyBreakdown, loading, refetching, refresh } =
         useFinancialDashboard(startDate, endDate);
 
+    // Los tres balances, cargados aparte de los KPIs: el selector los necesita
+    // los tres a la vez, y no vuelve al servidor al cambiar de modo. El modo
+    // arranca en `null` y se resuelve al de ajustes (`defaultMode`) en cuanto
+    // llega la respuesta — a propósito no se recuerda entre cargas.
+    const [balances, setBalances] = useState<BalanceSet | null>(null);
+    const [balanceMode, setBalanceMode] = useState<BalanceMode | null>(null);
+
+    useEffect(() => {
+        let cancelled = false;
+        getBalanceSetAction(startDate, endDate).then((result) => {
+            if (cancelled || !result.success) return;
+            setBalances(result.data);
+            setBalanceMode((current) => current ?? result.data.defaultMode);
+        });
+        return () => { cancelled = true; };
+    }, [startDate, endDate]);
+
     const kpis = useMemo(
         () => (rawKpis ? (showCredit ? includeCreditInKpis(rawKpis) : excludeCreditFromKpis(rawKpis)) : rawKpis),
         [rawKpis, showCredit],
     );
+
+    // El balance activo del hero: el del modo elegido en cuanto los tres
+    // balances llegaron; mientras tanto, el `netBalance` de siempre, para que
+    // el número no parpadee a "0,00" en la primera carga.
+    const activeBalance = balances && balanceMode
+        ? balanceValue(balances, balanceMode)
+        : (kpis?.netBalance ?? 0);
+
     const categoryBreakdown = useMemo(
         () => (showCredit ? rawCategoryBreakdown : excludeCreditFromCategoryBreakdown(rawCategoryBreakdown)),
         [rawCategoryBreakdown, showCredit],
@@ -162,9 +191,14 @@ export function FinancialDashboard() {
         () => ({
             onChange: () => {
                 refresh();
+                // Los tres balances también quedan obsoletos con la edición: sin
+                // esto, el hero seguiría mostrando el número de antes del cambio.
+                getBalanceSetAction(startDate, endDate).then((result) => {
+                    if (result.success) setBalances(result.data);
+                });
             },
         }),
-        [refresh],
+        [refresh, startDate, endDate],
     );
 
     const { isPollingFallback } = useFinancialRealtime({
@@ -281,10 +315,19 @@ export function FinancialDashboard() {
             {/* KPI section: hero balance panel + quick summary (all breakpoints) */}
             <div className="space-y-4">
                 <BalanceHeroCard
-                    value={`${(kpis?.netBalance ?? 0) >= 0 ? "+" : "-"}${formatCurrency(kpis?.netBalance ?? 0)}`}
-                    negative={(kpis?.netBalance ?? 0) < 0}
+                    value={`${activeBalance >= 0 ? "+" : "-"}${formatCurrency(activeBalance)}`}
+                    negative={activeBalance < 0}
                     creditSpent={rawKpis?.totalExpensesCredit ?? 0}
                     onDetails={rawKpis ? () => setOpenKpiModal("balance") : undefined}
+                    modeSwitch={balances && balanceMode ? (
+                        <BalanceModeSwitch
+                            balances={balances}
+                            mode={balanceMode}
+                            onModeChange={setBalanceMode}
+                            rangeLabel={formatRangeLabel(filterType, startDate, endDate)}
+                            size="hero"
+                        />
+                    ) : undefined}
                 />
                 <QuickSummary
                     kpis={kpis}
