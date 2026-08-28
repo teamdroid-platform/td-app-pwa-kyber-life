@@ -167,9 +167,8 @@ export function BalanceScopeManager({
                                         onCheckedChange={() => applyRule(
                                             "INSTITUTION",
                                             institution.id,
-                                            // Solo lo totalmente excluido pasa a incluido entero;
-                                            // completo o parcial pasa a excluido entero.
-                                            noneIn,
+                                            // Parcial o excluido pasa a incluido entero.
+                                            !allIn,
                                             items.map(i => i.id),
                                         )}
                                     />

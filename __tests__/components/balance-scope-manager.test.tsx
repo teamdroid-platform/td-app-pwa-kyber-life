@@ -71,8 +71,80 @@ describe("BalanceScopeManager", () => {
             expect(setBalanceScopeRuleAction).toHaveBeenCalledWith(expect.objectContaining({
                 targetType: "INSTITUTION",
                 targetId: "inst-1",
-                included: false,
+                included: true,
                 clearTargetIds: expect.arrayContaining(["acc-1", "acc-2", "card-1"]),
+            }));
+        });
+    });
+
+    it("banco incluido entero: click excluye todo", async () => {
+        render(
+            <BalanceScopeManager
+                defaultMode="PERIOD"
+                initialRules={[]}
+                institutions={institutions}
+                accounts={accounts}
+                cards={cards}
+            />,
+        );
+
+        fireEvent.click(screen.getByRole("checkbox", { name: /Pichincha/i }));
+
+        await waitFor(() => {
+            expect(setBalanceScopeRuleAction).toHaveBeenCalledWith(expect.objectContaining({
+                targetType: "INSTITUTION",
+                targetId: "inst-1",
+                included: false,
+            }));
+        });
+    });
+
+    it("banco excluido entero: click incluye todo", async () => {
+        render(
+            <BalanceScopeManager
+                defaultMode="PERIOD"
+                initialRules={[{
+                    id: "r1", ownerUserId: "u", targetType: "INSTITUTION", targetId: "inst-1",
+                    included: false, createdAt: "", updatedAt: "", isDeleted: false,
+                }]}
+                institutions={institutions}
+                accounts={accounts}
+                cards={cards}
+            />,
+        );
+
+        fireEvent.click(screen.getByRole("checkbox", { name: /Pichincha/i }));
+
+        await waitFor(() => {
+            expect(setBalanceScopeRuleAction).toHaveBeenCalledWith(expect.objectContaining({
+                targetType: "INSTITUTION",
+                targetId: "inst-1",
+                included: true,
+            }));
+        });
+    });
+
+    it("banco parcial: click incluye todo", async () => {
+        render(
+            <BalanceScopeManager
+                defaultMode="PERIOD"
+                initialRules={[{
+                    id: "r1", ownerUserId: "u", targetType: "ACCOUNT", targetId: "acc-2",
+                    included: false, createdAt: "", updatedAt: "", isDeleted: false,
+                }]}
+                institutions={institutions}
+                accounts={accounts}
+                cards={cards}
+            />,
+        );
+
+        fireEvent.click(screen.getByRole("checkbox", { name: /Pichincha/i }));
+
+        await waitFor(() => {
+            expect(setBalanceScopeRuleAction).toHaveBeenCalledWith(expect.objectContaining({
+                targetType: "INSTITUTION",
+                targetId: "inst-1",
+                included: true,
             }));
         });
     });
