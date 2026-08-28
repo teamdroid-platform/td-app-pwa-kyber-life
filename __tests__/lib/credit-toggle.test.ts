@@ -1,6 +1,5 @@
 import {
     excludeCreditFromKpis,
-    includeCreditInKpis,
     excludeCreditFromCategoryBreakdown,
     excludeCreditFromInstitutionBreakdown,
     excludeCreditFromDailyBreakdown,
@@ -37,53 +36,6 @@ describe("credit-toggle", () => {
             expect(result.totalIncome).toBe(1000);
             expect(result.netBalance).toBe(900);
             expect(result.totalTransfersSavings).toBe(20);
-        });
-    });
-
-    describe("includeCreditInKpis", () => {
-        it("subtracts the credit portion from netBalance and leaves totalExpenses untouched", () => {
-            const kpis: FinancialKPIs = {
-                totalIncome: 1000,
-                totalExpenses: 400,
-                totalExpensesCredit: 300,
-                totalTransfers: 50,
-                totalTransfersSavings: 20,
-                totalTransfersFunding: 10,
-                totalWithdrawals: 60,
-                netBalance: 900,
-                transactionCount: 5,
-                avgTransactionAmount: 100,
-                pendingTransactionsCount: 0,
-                currency: "USD",
-            };
-
-            const result = includeCreditInKpis(kpis);
-
-            // Credit now counts against the balance: 900 - 300 = 600.
-            expect(result.netBalance).toBe(600);
-            // Expenses already include credit in the raw KPIs — unchanged.
-            expect(result.totalExpenses).toBe(400);
-            expect(result.totalExpensesCredit).toBe(300);
-            expect(result.totalIncome).toBe(1000);
-        });
-
-        it("leaves netBalance unchanged when there is no credit spending", () => {
-            const kpis: FinancialKPIs = {
-                totalIncome: 500,
-                totalExpenses: 200,
-                totalExpensesCredit: 0,
-                totalTransfers: 0,
-                totalTransfersSavings: 0,
-                totalTransfersFunding: 0,
-                totalWithdrawals: 0,
-                netBalance: 300,
-                transactionCount: 3,
-                avgTransactionAmount: 100,
-                pendingTransactionsCount: 0,
-                currency: "USD",
-            };
-
-            expect(includeCreditInKpis(kpis).netBalance).toBe(300);
         });
     });
 

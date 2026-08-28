@@ -3,17 +3,33 @@ import {
     getInstitutionTypesAction,
     getCategoriesAction
 } from "@/app/actions/financial-settings";
+import { getBalanceScopeAction } from "@/app/actions/balance";
+import { getBankOverviewAction } from "@/app/actions/bank";
+import { DEFAULT_BALANCE_MODE } from "@/domain/entities/balance";
 import { SettingsDashboard } from "@/presentation/financial/components/settings/SettingsDashboard";
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export default async function FinancialSettingsPage() {
-    const [institutions, institutionTypes, categories] = await Promise.all([
+    const [institutions, institutionTypes, categories, scopeResult, bankOverviewResult] = await Promise.all([
         getInstitutionsAction(),
         getInstitutionTypesAction(),
-        getCategoriesAction()
+        getCategoriesAction(),
+        getBalanceScopeAction(),
+        getBankOverviewAction(),
     ]);
+
+    // Un fallo al leer bancos o el scope de balances no debe tumbar toda la
+    // pantalla: las pestañas de instituciones y categorías siguen funcionando,
+    // así que la de Balances arranca vacía en vez de romper la carga.
+    const balanceDefaultMode = scopeResult.success
+        ? (scopeResult.data.settings?.defaultMode ?? DEFAULT_BALANCE_MODE)
+        : DEFAULT_BALANCE_MODE;
+    const balanceRules = scopeResult.success ? scopeResult.data.rules : [];
+    const bankInstitutions = bankOverviewResult.success ? bankOverviewResult.data.institutions : [];
+    const bankAccounts = bankOverviewResult.success ? bankOverviewResult.data.accounts : [];
+    const bankCards = bankOverviewResult.success ? bankOverviewResult.data.cards : [];
 
     return (
         <div className="w-full flex flex-col min-h-screen bg-background">
@@ -26,6 +42,11 @@ export default async function FinancialSettingsPage() {
                     initialInstitutions={institutions}
                     institutionTypes={institutionTypes}
                     initialCategories={categories}
+                    balanceDefaultMode={balanceDefaultMode}
+                    balanceRules={balanceRules}
+                    bankInstitutions={bankInstitutions}
+                    bankAccounts={bankAccounts}
+                    bankCards={bankCards}
                 />
             </div>
         </div>

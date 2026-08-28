@@ -14,6 +14,7 @@ import { TransactionSummary } from "./TransactionSummary";
 import type { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import type { BalanceSet } from "@/application/services/balance-service";
 
 // ─── Props ───────────────────────────────────────────────────
 
@@ -24,6 +25,10 @@ interface TransactionTimelineProps {
     allFilteredTransactions?: FinancialTransaction[];
     /** Current URL search-params so infinite scroll can re-apply the same filters */
     searchFilters?: Record<string, any>;
+    /** Los tres balances del mismo rango, para el selector del resumen. */
+    balances?: BalanceSet | null;
+    /** Etiqueta legible del rango activo, para las explicaciones del selector. */
+    rangeLabel?: string;
 }
 
 // ─── Supabase row shape (snake_case) ─────────────────────────
@@ -154,7 +159,7 @@ function withFallbackDescription(draft: unknown): Record<string, unknown> {
 
 // ─── Component ───────────────────────────────────────────────
 
-export function TransactionTimeline({ initialTransactions, allFilteredTransactions, searchFilters }: TransactionTimelineProps) {
+export function TransactionTimeline({ initialTransactions, allFilteredTransactions, searchFilters, balances, rangeLabel }: TransactionTimelineProps) {
     const [transactions, setTransactions] = useState<FinancialTransaction[]>(initialTransactions);
     const [isFromCache, setIsFromCache] = useState(false);
     const [page, setPage] = useState(1);
@@ -428,7 +433,11 @@ export function TransactionTimeline({ initialTransactions, allFilteredTransactio
             )}
 
             {/* Use allFilteredTransactions for the summary if available, otherwise fallback to visible */}
-            <TransactionSummary transactions={allFilteredTransactions || visibleTransactions} />
+            <TransactionSummary
+                transactions={allFilteredTransactions || visibleTransactions}
+                balances={balances}
+                rangeLabel={rangeLabel}
+            />
 
             {visibleTransactions.length === 0 ? (
                 <div className="flex items-center justify-center py-12 text-muted-foreground">

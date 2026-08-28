@@ -19,7 +19,8 @@ import {
     InMemoryFinancialInstitutionTypeRepository,
     InMemoryFinancialCategoryRepository,
     InMemoryNotificationRepository,
-    InMemoryPushSubscriptionRepository
+    InMemoryPushSubscriptionRepository,
+    InMemoryBalanceSettingsRepository
 } from "./repositories/implementations";
 import {
     InMemoryBankInstitutionRepository,
@@ -61,7 +62,8 @@ import {
     SupabaseBankAccountBalanceSnapshotRepository,
     SupabaseBankCardStatementRepository,
     SupabaseBankMovementRepository,
-    SupabaseBankNumberObservationRepository
+    SupabaseBankNumberObservationRepository,
+    SupabaseBalanceSettingsRepository
 } from "./repositories/supabase"; // Need to create this index or import individually
 
 // ... Previous imports ...
@@ -122,6 +124,8 @@ export const financialCategoryRepository = singleton("financialCategoryRepo_v4",
 export const bankInstitutionRepository = singleton("bankInstitutionRepo", () => isSupabase ? new SupabaseBankInstitutionRepository() : new InMemoryBankInstitutionRepository());
 export const bankAccountRepository = singleton("bankAccountRepo", () => isSupabase ? new SupabaseBankAccountRepository() : new InMemoryBankAccountRepository());
 export const bankCardRepository = singleton("bankCardRepo", () => isSupabase ? new SupabaseBankCardRepository() : new InMemoryBankCardRepository());
+export const balanceSettingsRepository = singleton("balanceSettingsRepo", () =>
+    isSupabase ? new SupabaseBalanceSettingsRepository() : new InMemoryBalanceSettingsRepository());
 export const bankSnapshotRepository = singleton("bankSnapshotRepo", () => isSupabase ? new SupabaseBankAccountBalanceSnapshotRepository() : new InMemoryBankAccountBalanceSnapshotRepository());
 export const bankStatementRepository = singleton("bankStatementRepo", () => isSupabase ? new SupabaseBankCardStatementRepository() : new InMemoryBankCardStatementRepository());
 export const bankMovementRepository = singleton("bankMovementRepo", () => isSupabase
@@ -152,6 +156,7 @@ import { BankService } from "@/application/services/bank-service";
 import { BankIdentificationService } from "@/application/services/bank-identification-service";
 import { NotificationService } from "@/application/services/notification-service";
 import { PushSubscriptionService } from "@/application/services/push-subscription-service";
+import { BalanceService } from "@/application/services/balance-service";
 
 export const authService = new AuthService(userRepository, passwordResetTokenRepository);
 export const userService = new UserService(userRepository);
@@ -191,6 +196,15 @@ export const financialInboxService = new FinancialInboxService(
     bankCardRepository,
 );
 export const financialDashboardService = new FinancialDashboardService(financialTransactionRepository, financialCategoryRepository, financialInstitutionRepository, financialScannerTransactionRepository, bankCardRepository);
+export const balanceService = new BalanceService(
+    financialTransactionRepository,
+    bankAccountRepository,
+    bankCardRepository,
+    bankMovementRepository,
+    bankSnapshotRepository,
+    financialCategoryRepository,
+    balanceSettingsRepository,
+);
 export const financialSettingsService = new FinancialSettingsService(financialInstitutionTypeRepository, financialInstitutionRepository, financialCategoryRepository, financialTransactionRepository);
 export const notificationService = new NotificationService(notificationRepository);
 export const pushSubscriptionService = new PushSubscriptionService(pushSubscriptionRepository);

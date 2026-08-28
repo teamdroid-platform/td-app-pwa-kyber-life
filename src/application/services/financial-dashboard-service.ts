@@ -104,9 +104,9 @@ export interface DashboardOverview {
  * credit-card purchase. `FinancialTransactionService.enrichTransactions` already
  * runs every listed transaction through {@link isTransactionPaidWithCredit}, so
  * the dashboard has to do the same or the two screens disagree: the list defers
- * those expenses from the balance while the dashboard subtracts them, and the
- * "Incluir TC" toggle moves nothing because `totalExpensesCredit` only counted
- * the explicitly-flagged rows.
+ * those expenses from the balance while the dashboard subtracts them, and
+ * switching to PERIOD_WITH_CREDIT would move nothing because
+ * `totalExpensesCredit` only counted the explicitly-flagged rows.
  */
 function resolvePaidWithCredit(
     transactions: FinancialTransaction[],
