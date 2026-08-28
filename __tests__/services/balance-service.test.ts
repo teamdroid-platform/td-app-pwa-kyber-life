@@ -30,9 +30,13 @@ describe("BalanceService", () => {
         { ...baseTx, id: "4", amount: 50, paidWithCredit: true, bankCardId: "card-in" },
     ];
 
+    // Sin `institutionName`: findByOwnerId mapea filas crudas, no lo decora
+    // (eso lo hace BankService.namedByInstitution). El fixture refleja lo que
+    // el repositorio realmente devuelve, para que el nombre resuelto por
+    // accountLabel() sea el mismo que produce la ruta de producción.
     const accounts = [
-        { id: "acc-in", institutionId: "inst-in", accountType: "SAVINGS", status: "ACTIVE", isUnconfirmed: false, isDeleted: false, ownerUserId: userId, currency: "USD", createdAt: "", updatedAt: "", institutionName: "Banco A" },
-        { id: "acc-out", institutionId: "inst-out", accountType: "SAVINGS", status: "ACTIVE", isUnconfirmed: false, isDeleted: false, ownerUserId: userId, currency: "USD", createdAt: "", updatedAt: "", institutionName: "Banco B" },
+        { id: "acc-in", institutionId: "inst-in", accountType: "SAVINGS", lastFour: "1111", status: "ACTIVE", isUnconfirmed: false, isDeleted: false, ownerUserId: userId, currency: "USD", createdAt: "", updatedAt: "" },
+        { id: "acc-out", institutionId: "inst-out", accountType: "SAVINGS", lastFour: "2222", status: "ACTIVE", isUnconfirmed: false, isDeleted: false, ownerUserId: userId, currency: "USD", createdAt: "", updatedAt: "" },
     ];
 
     const cards = [
@@ -117,7 +121,9 @@ describe("BalanceService", () => {
 
         expect(set.total.value).toBe(1200);
         expect(set.total.accountsCounted).toBe(1);
-        expect(set.total.accountsWithoutSnapshot).toEqual([{ id: "acc-out", name: "Banco B" }]);
+        // "Ahorros XXXX2222": accountLabel() de tipo + número enmascarado, no la
+        // institución — el repositorio no la enriquece.
+        expect(set.total.accountsWithoutSnapshot).toEqual([{ id: "acc-out", name: "Ahorros XXXX2222" }]);
     });
 
     it("el scope filtra los balances de periodo pero no el total", async () => {

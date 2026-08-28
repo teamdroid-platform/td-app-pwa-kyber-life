@@ -14,6 +14,7 @@ import { computeTotalBalance, TotalBalanceAccount } from "../../domain/services/
 import { computeAccountBalance, computeCardDebt } from "../../domain/services/bank-balance";
 import { resolveScope, BalanceScope } from "../../domain/services/balance-scope";
 import { isTransactionPaidWithCredit, creditCardIdSet } from "../../lib/financial-utils";
+import { accountLabel } from "../../lib/bank-identity-label";
 
 export interface BalanceSet {
     defaultMode: BalanceMode;
@@ -110,7 +111,13 @@ export class BalanceService {
             const snapshot = await this.snapshotRepo.findLatestForAccount(account.id, now);
             return {
                 id: account.id,
-                name: account.institutionName ?? account.lastFour ?? account.id,
+                // `institutionName` is decorated by BankService.namedByInstitution,
+                // not by this repository (it maps raw rows only) — using it here
+                // would silently fall through to the raw UUID in production.
+                // `accountLabel` is the same "type + masked number" helper the
+                // settings tree uses, and it's built from fields this repository
+                // actually returns.
+                name: accountLabel(account),
                 balance: computeAccountBalance(snapshot, own),
                 hasSnapshot: snapshot !== null,
                 status: account.status,
