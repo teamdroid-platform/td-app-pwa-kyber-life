@@ -47,15 +47,30 @@ describe("BalanceModeSwitch", () => {
         expect(screen.getByText("$4.510,77")).toBeInTheDocument();
     });
 
-    it("explica cada cálculo", () => {
+    it("explica solo el cálculo del modo activo", () => {
         render(<Harness />);
         openPanel();
 
+        expect(screen.getByText(/Ingresos menos gastos reales/i)).toBeInTheDocument();
+        // Las otras dos explicaciones no están: describirían un número que no
+        // se está mirando.
+        expect(screen.queryByText(/6 cuentas con saldo declarado/i)).not.toBeInTheDocument();
+        expect(screen.queryByText(/\$198,69/)).not.toBeInTheDocument();
+    });
+
+    it("el rango se dice una sola vez, en la cabecera del panel", () => {
+        render(<Harness />);
+        openPanel();
+
+        expect(screen.getAllByText(/22 ago – 21 sep/i)).toHaveLength(1);
+    });
+
+    it("al cambiar de modo, la explicación pasa a ser la del nuevo", () => {
+        render(<Harness initial="TOTAL" />);
+        fireEvent.pointerDown(screen.getByRole("button", { name: /balance total/i }), { button: 0 });
+
         expect(screen.getByText(/6 cuentas con saldo declarado/i)).toBeInTheDocument();
-        // El rango aparece en dos explicaciones (periodo y con tarjetas), así
-        // que getAllByText en vez de getByText — ambas son coincidencias válidas.
-        expect(screen.getAllByText(/22 ago – 21 sep/i).length).toBeGreaterThan(0);
-        expect(screen.getByText(/\$198,69/)).toBeInTheDocument();
+        expect(screen.queryByText(/Ingresos menos gastos reales/i)).not.toBeInTheDocument();
     });
 
     it("elegir otro modo lo comunica y cierra el panel", () => {
