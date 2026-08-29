@@ -90,7 +90,9 @@ describe("BalanceModeSwitch", () => {
         expect(screen.getByText(/Suma de los saldos de tus 1 cuenta con saldo declarado/i)).toBeInTheDocument();
     });
 
-    it("avisa de transacciones excluidas por la configuración en modo periodo", () => {
+    // El aviso ámbar de transacciones excluidas se retiró: repetía en cada
+    // carga algo que el usuario ya configuró, y no había nada que hacer con él.
+    it("no anuncia las transacciones que la configuración dejó fuera", () => {
         const withExclusions: BalanceSet = {
             ...balances,
             period: { ...balances.period, excludedCount: 3 },
@@ -104,11 +106,6 @@ describe("BalanceModeSwitch", () => {
             />
         );
 
-        expect(screen.getByText(/3 transacciones fuera de tu configuración de balances/i)).toBeInTheDocument();
-    });
-
-    it("no avisa de transacciones excluidas cuando excludedCount es 0", () => {
-        render(<Harness />);
         expect(screen.queryByText(/fuera de tu configuración de balances/i)).not.toBeInTheDocument();
     });
 });

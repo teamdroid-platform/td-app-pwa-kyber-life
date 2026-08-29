@@ -76,7 +76,6 @@ export function BalanceModeSwitch({
     balances, mode, onModeChange, rangeLabel, size = "hero", className,
 }: BalanceModeSwitchProps) {
     const missing = balances.total.accountsWithoutSnapshot.length;
-    const excluded = balances.period.excludedCount;
 
     return (
         <div className={cn("flex flex-col gap-1", className)}>
@@ -129,20 +128,6 @@ export function BalanceModeSwitch({
                 </Link>
             )}
 
-            {/* Único indicio visible de por qué este número no cuadra con las
-                tiles de Ingresos/Gastos de al lado: esas muestran todo, este
-                balance ya filtró lo que la configuración de balances excluyó. */}
-            {(mode === "PERIOD" || mode === "PERIOD_WITH_CREDIT") && excluded > 0 && (
-                <Link
-                    href="/financial/settings"
-                    className="flex w-fit items-center gap-1.5 text-[11px] font-medium text-amber-500 hover:underline"
-                >
-                    <AlertCircle className="h-3 w-3 shrink-0" aria-hidden="true" />
-                    {excluded === 1
-                        ? "1 transacción fuera de tu configuración de balances"
-                        : `${excluded} transacciones fuera de tu configuración de balances`}
-                </Link>
-            )}
         </div>
     );
 }
