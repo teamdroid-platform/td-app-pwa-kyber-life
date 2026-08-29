@@ -38,12 +38,13 @@ export function balanceValue(balances: BalanceSet, mode: BalanceMode): number {
     return balances.period.value;
 }
 
-/** La línea que explica de dónde sale el número de cada modo. */
-export function balanceModeCopy(
-    mode: BalanceMode,
-    balances: BalanceSet,
-    rangeLabel: string,
-): string {
+/**
+ * La línea que explica de dónde sale el número de cada modo.
+ *
+ * Sin el rango: lo dice una sola vez la pastilla de la cabecera del panel, y
+ * repetirlo en dos de las tres frases era la mitad del muro de texto.
+ */
+export function balanceModeCopy(mode: BalanceMode, balances: BalanceSet): string {
     const money = (v: number) => formatCurrency(v, balances.currency);
 
     if (mode === "TOTAL") {
@@ -52,9 +53,9 @@ export function balanceModeCopy(
         return `Suma de los saldos de tus ${cuentas} con saldo declarado. No depende del rango ni de tu configuración.`;
     }
     if (mode === "PERIOD") {
-        return `Ingresos menos gastos reales del ${rangeLabel}, restando ahorros y sumando fondeos. Los consumos con tarjeta no cuentan hasta que pagas.`;
+        return "Ingresos menos gastos reales, restando ahorros y sumando fondeos. Los consumos con tarjeta no cuentan hasta que pagas.";
     }
-    return `Igual que el del periodo, restando además ${money(balances.withCredit.creditDeferred)} de consumos con tarjeta del ${rangeLabel}.`;
+    return `Igual que el del periodo, restando además ${money(balances.withCredit.creditDeferred)} de consumos con tarjeta.`;
 }
 
 interface BalanceModeSwitchProps {
@@ -90,8 +91,25 @@ export function BalanceModeSwitch({
                     <ChevronDown className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                 </DropdownMenuTrigger>
 
-                <DropdownMenuContent align="start" className="w-[min(22rem,calc(100vw-2rem))]">
+                {/* Los tres importes primero y alineados, que es lo que se viene
+                    a comparar; la explicación, solo la del que está activo. Las
+                    tres a la vez eran un muro de texto entre cifra y cifra, y dos
+                    de ellas describían un número que no se está mirando. */}
+                <DropdownMenuContent
+                    align="start"
+                    className="w-[min(22rem,calc(100vw-2rem))] overflow-hidden p-0"
+                >
+                    <div className="flex items-center justify-between gap-2 border-b border-border-base px-3 py-2">
+                        <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-text-tertiary">
+                            Balance
+                        </span>
+                        <span className="shrink-0 rounded-full border border-border-base px-2 py-0.5 text-[10px] text-text-tertiary">
+                            {rangeLabel}
+                        </span>
+                    </div>
+
                     <DropdownMenuRadioGroup
+                        className="p-1"
                         value={mode}
                         onValueChange={(next) => onModeChange(next as BalanceMode)}
                     >
@@ -99,20 +117,24 @@ export function BalanceModeSwitch({
                             <DropdownMenuRadioItem
                                 key={option}
                                 value={option}
-                                className="flex-col items-start gap-1 py-2.5"
+                                className="justify-between gap-3 py-2"
                             >
-                                <span className="flex w-full items-baseline justify-between gap-3">
-                                    <span className="font-medium">{MODE_SHORT[option]}</span>
-                                    <span className="tabular-nums font-semibold">
-                                        {formatCurrency(balanceValue(balances, option), balances.currency)}
-                                    </span>
-                                </span>
-                                <span className="text-xs leading-snug text-text-secondary">
-                                    {balanceModeCopy(option, balances, rangeLabel)}
+                                <span className="font-medium">{MODE_SHORT[option]}</span>
+                                <span className="tabular-nums font-semibold">
+                                    {formatCurrency(balanceValue(balances, option), balances.currency)}
                                 </span>
                             </DropdownMenuRadioItem>
                         ))}
                     </DropdownMenuRadioGroup>
+
+                    <div className="border-t border-border-base bg-bg-tertiary/25 px-3 py-2.5">
+                        <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-emerald-400">
+                            {MODE_SHORT[mode]}
+                        </p>
+                        <p className="mt-1 text-[11.5px] leading-relaxed text-text-secondary">
+                            {balanceModeCopy(mode, balances)}
+                        </p>
+                    </div>
                 </DropdownMenuContent>
             </DropdownMenu>
 
