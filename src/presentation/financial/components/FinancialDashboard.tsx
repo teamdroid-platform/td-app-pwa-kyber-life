@@ -166,6 +166,7 @@ export function FinancialDashboard() {
                 totalExpensesCredit: balances.withCredit.creditDeferred,
                 totalTransfersFunding: balances.period.funding,
                 totalTransfersSavings: balances.period.savings,
+                totalTransfersCrossScope: balances.period.crossScope,
                 netBalance: balances.period.value,
             }
             : null),

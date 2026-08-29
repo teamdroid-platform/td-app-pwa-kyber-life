@@ -9,7 +9,7 @@ import {
     IBankAccountBalanceSnapshotRepository,
 } from "../../domain/repositories/bank";
 import { IBalanceSettingsRepository } from "../../domain/repositories/balance";
-import { computeNetBalance, sumCreditExpenses, isIncomeType, isWithdrawalType, isSavingsTransfer, isFundingTransfer, DASHBOARD_ACTIVE_STATUSES } from "../../domain/services/financial-balance";
+import { computeNetBalance, crossScopeTransfer, sumCreditExpenses, isIncomeType, isWithdrawalType, isSavingsTransfer, isFundingTransfer, DASHBOARD_ACTIVE_STATUSES } from "../../domain/services/financial-balance";
 import { computeTotalBalance, TotalBalanceAccount } from "../../domain/services/balance-modes";
 import { computeAccountBalance, computeCardDebt } from "../../domain/services/bank-balance";
 import { resolveScope, BalanceScope } from "../../domain/services/balance-scope";
@@ -31,7 +31,8 @@ export interface BalanceSet {
      * `withCredit.creditDeferred` de ese gasto, así que la identidad que se
      * cumple es:
      *
-     *   income − expenses + withCredit.creditDeferred − savings + funding === value
+     *   income − expenses + withCredit.creditDeferred − savings + funding
+     *     + crossScope === value
      */
     period: {
         value: number;
@@ -39,6 +40,17 @@ export interface BalanceSet {
         expenses: number;
         savings: number;
         funding: number;
+        /**
+         * Neto de las transferencias que cruzan el borde del presupuesto:
+         * positivo si entró dinero desde una cuenta excluida, negativo si
+         * salió hacia una.
+         *
+         * Va aparte de `funding` porque no es lo mismo: `funding` lo declara
+         * el usuario poniéndole categoría, esto lo deduce la configuración de
+         * alcance. Sin exponerlo, `value` se movía sin que ningún renglón lo
+         * explicara y el desglose de la interfaz no cuadraba.
+         */
+        crossScope: number;
         excludedCount: number;
     };
     withCredit: {
@@ -189,12 +201,22 @@ export class BalanceService {
             .filter(t => isFundingTransfer(t, categoryNameById))
             .reduce((sum, t) => sum + Number(t.amount), 0);
 
+        // Del mismo `crossScopeTransfer` que usa `computeNetBalance`, para que
+        // el renglón no pueda desviarse del total que dice explicar. Las de
+        // ahorro y fondeo se saltan aquí igual que allí: ya llevan su signo.
+        const crossScope = transactions
+            .filter(t => t.type === "TRANSFER"
+                && !isSavingsTransfer(t, categoryNameById)
+                && !isFundingTransfer(t, categoryNameById))
+            .reduce((sum, t) => sum + crossScopeTransfer(t, scope), 0);
+
         return {
             value: computeNetBalance(transactions, categoryNameById, scope),
             income: round2(income),
             expenses: round2(expenses),
             savings: round2(savings),
             funding: round2(funding),
+            crossScope: round2(crossScope),
             excludedCount: transactions.length - inScope.length,
         };
     }

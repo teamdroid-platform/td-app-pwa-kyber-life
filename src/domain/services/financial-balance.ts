@@ -89,12 +89,44 @@ export function isFundingTransfer(t: BalanceTransaction, categoryNameById?: Read
  * omitted, behavior is unchanged. Non-transfer transactions linked to
  * anything excluded are skipped entirely. Transfers are special: the
  * category still wins first (a savings/funding transfer keeps its sign no
- * matter what its endpoints are), and only then does the scope decide —
- * moving money into an excluded account is treated as spending it (it
- * leaves the budgeted balance), moving it back out of one is treated as
- * income (it re-enters), and a transfer between two included — or two
- * excluded — accounts is neutral, same as today.
+ * matter what its endpoints are), and only then does the scope decide — see
+ * {@link crossScopeTransfer}.
  */
+/**
+ * Lo que una transferencia aporta al balance por cruzar el borde del
+ * presupuesto: `+amount` si entra, `-amount` si sale, `0` si es neutra.
+ *
+ * Mover dinero a una cuenta que no presupuestas es sacarlo del bolsillo;
+ * traerlo de vuelta es meterlo. Una transferencia entre dos cuentas incluidas
+ * —o entre dos excluidas— no mueve nada.
+ *
+ * **Las dos puntas tienen que conocerse.** `isAccountIncluded` responde
+ * «incluido» ante un id vacío, que es lo correcto para filtrar un gasto
+ * huérfano pero no para decidir un signo: sin saber a dónde fue el dinero no
+ * hay evidencia de que haya entrado al presupuesto. Sin esta condición, una
+ * transferencia que salía de una cuenta excluida hacia un tercero sin
+ * registrar —un anticipo, un pago a otra persona— se leía como «entró dinero»
+ * y sumaba su importe entero al balance del periodo.
+ *
+ * No aplica a las transferencias marcadas como ahorro o fondeo: esas ya
+ * llevan su signo por categoría y no llegan hasta aquí.
+ */
+export function crossScopeTransfer(
+    t: BalanceTransaction,
+    scope?: BalanceScope,
+): number {
+    if (!scope) return 0;
+    if (!t.bankSourceAccountId || !t.bankDestinationAccountId) return 0;
+
+    const fromIn = scope.isAccountIncluded(t.bankSourceAccountId);
+    const toIn = scope.isAccountIncluded(t.bankDestinationAccountId);
+    const amount = Number(t.amount);
+
+    if (fromIn && !toIn) return -amount;
+    if (!fromIn && toIn) return amount;
+    return 0;
+}
+
 export function computeNetBalance(
     transactions: readonly BalanceTransaction[],
     categoryNameById?: ReadonlyMap<string, string>,
@@ -110,14 +142,7 @@ export function computeNetBalance(
             // ahorro resta una sola vez, aunque su destino esté además excluido.
             if (isSavingsTransfer(t, categoryNameById)) { balance -= amount; continue; }
             if (isFundingTransfer(t, categoryNameById)) { balance += amount; continue; }
-            if (scope) {
-                const fromIn = scope.isAccountIncluded(t.bankSourceAccountId);
-                const toIn = scope.isAccountIncluded(t.bankDestinationAccountId);
-                // Mover dinero a una cuenta que no presupuestas es sacarlo del
-                // bolsillo; traerlo de vuelta es meterlo.
-                if (fromIn && !toIn) { balance -= amount; continue; }
-                if (!fromIn && toIn) { balance += amount; continue; }
-            }
+            balance += crossScopeTransfer(t, scope);
             continue;
         }
 

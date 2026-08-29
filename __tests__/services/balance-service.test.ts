@@ -83,8 +83,55 @@ describe("BalanceService", () => {
         // expenses es gasto bruto (incluye lo pagado con tarjeta); value lo difiere
         // exactamente en withCredit.creditDeferred. La relación documentada en
         // BalanceSet.period debe sostenerse siempre, no solo en este fixture.
-        const { income, expenses, savings, funding, value } = set.period;
-        expect(income - expenses + set.withCredit.creditDeferred - savings + funding).toBe(value);
+        const { income, expenses, savings, funding, crossScope, value } = set.period;
+        expect(income - expenses + set.withCredit.creditDeferred - savings + funding + crossScope).toBe(value);
+    });
+
+    describe("transferencias que cruzan el borde de la configuración", () => {
+        const excludeOut = [{
+            id: "r1", ownerUserId: userId, targetType: "INSTITUTION", targetId: "inst-out",
+            included: false, createdAt: "", updatedAt: "", isDeleted: false,
+        }];
+
+        /** Solo la transferencia, para leer su aporte sin ruido alrededor. */
+        function onlyTransfer(from: string | null, to: string | null): FinancialTransaction[] {
+            return [{
+                ...baseTx, id: "t1", type: "TRANSFER", amount: 32000,
+                bankSourceAccountId: from, bankDestinationAccountId: to,
+            }];
+        }
+
+        // El caso real que inflaba el balance en +$32.000: un anticipo que
+        // salió de una cuenta excluida hacia un tercero sin registrar.
+        it("una salida hacia un destino desconocido no aporta nada", async () => {
+            const set = await buildService(excludeOut, onlyTransfer("acc-out", null))
+                .getBalanceSet(userId, {});
+
+            expect(set.period.crossScope).toBe(0);
+            expect(set.period.value).toBe(0);
+        });
+
+        it("entre dos cuentas conocidas sí aporta, y el renglón lo explica", async () => {
+            const set = await buildService(excludeOut, onlyTransfer("acc-out", "acc-in"))
+                .getBalanceSet(userId, {});
+
+            expect(set.period.crossScope).toBe(32000);
+            expect(set.period.value).toBe(32000);
+        });
+
+        it("la identidad se sostiene con un cruce de por medio", async () => {
+            const set = await buildService(excludeOut, [
+                ...transactions,
+                {
+                    ...baseTx, id: "t1", type: "TRANSFER", amount: 900,
+                    bankSourceAccountId: "acc-in", bankDestinationAccountId: "acc-out",
+                },
+            ]).getBalanceSet(userId, {});
+
+            const { income, expenses, savings, funding, crossScope, value } = set.period;
+            expect(crossScope).toBe(-900);
+            expect(income - expenses + set.withCredit.creditDeferred - savings + funding + crossScope).toBe(value);
+        });
     });
 
     it("mantiene la identidad con scope activo, incluyendo un gasto con tarjeta sin bankCardId excluido por su cuenta origen", async () => {
