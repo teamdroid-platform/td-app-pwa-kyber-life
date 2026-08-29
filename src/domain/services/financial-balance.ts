@@ -1,4 +1,5 @@
 import { FinancialTransaction, FinancialTransactionType } from "../entities/financial";
+import { BalanceScope } from "./balance-scope";
 
 /**
  * Category name that marks a TRANSFER as money leaving the user's available
@@ -50,7 +51,13 @@ export function transactionTypeBucket(type: FinancialTransactionType): Transacti
     return "expense";
 }
 
-type BalanceTransaction = Pick<FinancialTransaction, "type" | "amount" | "categoryId" | "categoryName" | "paidWithCredit">;
+type BalanceTransaction = Pick<
+    FinancialTransaction,
+    "type" | "amount" | "categoryId" | "categoryName" | "paidWithCredit"
+> & Partial<Pick<
+    FinancialTransaction,
+    "bankSourceAccountId" | "bankDestinationAccountId" | "bankCardId"
+>>;
 
 function resolveCategoryName(t: BalanceTransaction, categoryNameById?: ReadonlyMap<string, string>): string | undefined {
     if (t.categoryName) return t.categoryName;
@@ -77,25 +84,74 @@ export function isFundingTransfer(t: BalanceTransaction, categoryNameById?: Read
  * `categoryNameById` is only needed when `categoryName` isn't already
  * populated on the transactions (e.g. raw repository reads); already-enriched
  * transaction lists (with `categoryName` set) can omit it.
+ *
+ * `scope` restricts the balance to a subset of accounts/cards (Task 1). When
+ * omitted, behavior is unchanged. Non-transfer transactions linked to
+ * anything excluded are skipped entirely. Transfers are special: the
+ * category still wins first (a savings/funding transfer keeps its sign no
+ * matter what its endpoints are), and only then does the scope decide — see
+ * {@link crossScopeTransfer}.
  */
+/**
+ * Lo que una transferencia aporta al balance por cruzar el borde del
+ * presupuesto: `+amount` si entra, `-amount` si sale, `0` si es neutra.
+ *
+ * Mover dinero a una cuenta que no presupuestas es sacarlo del bolsillo;
+ * traerlo de vuelta es meterlo. Una transferencia entre dos cuentas incluidas
+ * —o entre dos excluidas— no mueve nada.
+ *
+ * **Las dos puntas tienen que conocerse.** `isAccountIncluded` responde
+ * «incluido» ante un id vacío, que es lo correcto para filtrar un gasto
+ * huérfano pero no para decidir un signo: sin saber a dónde fue el dinero no
+ * hay evidencia de que haya entrado al presupuesto. Sin esta condición, una
+ * transferencia que salía de una cuenta excluida hacia un tercero sin
+ * registrar —un anticipo, un pago a otra persona— se leía como «entró dinero»
+ * y sumaba su importe entero al balance del periodo.
+ *
+ * No aplica a las transferencias marcadas como ahorro o fondeo: esas ya
+ * llevan su signo por categoría y no llegan hasta aquí.
+ */
+export function crossScopeTransfer(
+    t: BalanceTransaction,
+    scope?: BalanceScope,
+): number {
+    if (!scope) return 0;
+    if (!t.bankSourceAccountId || !t.bankDestinationAccountId) return 0;
+
+    const fromIn = scope.isAccountIncluded(t.bankSourceAccountId);
+    const toIn = scope.isAccountIncluded(t.bankDestinationAccountId);
+    const amount = Number(t.amount);
+
+    if (fromIn && !toIn) return -amount;
+    if (!fromIn && toIn) return amount;
+    return 0;
+}
+
 export function computeNetBalance(
     transactions: readonly BalanceTransaction[],
     categoryNameById?: ReadonlyMap<string, string>,
+    scope?: BalanceScope,
 ): number {
     let balance = 0;
 
     for (const t of transactions) {
         const amount = Number(t.amount);
+
+        if (t.type === "TRANSFER") {
+            // La categoría manda sobre el scope: una transferencia marcada como
+            // ahorro resta una sola vez, aunque su destino esté además excluido.
+            if (isSavingsTransfer(t, categoryNameById)) { balance -= amount; continue; }
+            if (isFundingTransfer(t, categoryNameById)) { balance += amount; continue; }
+            balance += crossScopeTransfer(t, scope);
+            continue;
+        }
+
+        if (scope && !scope.isTransactionIncluded(t)) continue;
+
         if (isIncomeType(t.type)) {
             balance += amount;
         } else if (isWithdrawalType(t.type)) {
             // no-op: cash changes form, still available
-        } else if (t.type === "TRANSFER") {
-            if (isSavingsTransfer(t, categoryNameById)) {
-                balance -= amount;
-            } else if (isFundingTransfer(t, categoryNameById)) {
-                balance += amount;
-            }
         } else if (!t.paidWithCredit) {
             balance -= amount;
         }
@@ -107,18 +163,29 @@ export function computeNetBalance(
 /**
  * Total of expenses paid with a credit card — the amount {@link computeNetBalance}
  * defers from the available balance. Subtract it from the net balance to get the
- * balance "as if the card were already paid" (the "Incluir gastos con tarjeta"
- * toggle ON). Only expense-like transactions can be `paidWithCredit`; income,
- * withdrawals and transfers are ignored.
+ * balance for PERIOD_WITH_CREDIT. Only expense-like transactions can be
+ * `paidWithCredit`; income, withdrawals and transfers are ignored.
+ *
+ * `scope` restricts the sum to the same rows `computeNetBalance`/`buildPeriod`
+ * would count (Task 1); omitted, behavior is unchanged. Gated on
+ * `isTransactionIncluded`, not `isCardIncluded` alone: a credit expense can be
+ * excluded via its source/destination account even with no card linked (e.g.
+ * `paidWithCredit` inferred from description/notes), and using a narrower
+ * predicate here than `buildPeriod` uses would let `withCredit.value` subtract
+ * money the scope asked the app to ignore.
  */
-export function sumCreditExpenses(transactions: readonly BalanceTransaction[]): number {
+export function sumCreditExpenses(
+    transactions: readonly BalanceTransaction[],
+    scope?: BalanceScope,
+): number {
     let sum = 0;
     for (const t of transactions) {
         if (
             t.paidWithCredit &&
             !isIncomeType(t.type) &&
             !isWithdrawalType(t.type) &&
-            t.type !== "TRANSFER"
+            t.type !== "TRANSFER" &&
+            (!scope || scope.isTransactionIncluded(t))
         ) {
             sum += Number(t.amount);
         }

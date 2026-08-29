@@ -1,4 +1,4 @@
-import { buildKpiModalConfig } from "@/presentation/financial/lib/kpi-modal-config";
+import { buildKpiModalConfig, type KpiBreakdownInputs } from "@/presentation/financial/lib/kpi-modal-config";
 import type { FinancialKPIs } from "@/application/services/financial-dashboard-service";
 
 function makeKpis(over: Partial<FinancialKPIs> = {}): FinancialKPIs {
@@ -48,5 +48,65 @@ describe("buildKpiModalConfig — balance", () => {
         expect(on.note).toBeUndefined();
         expect(on.total.amount).toBe(1494.23);
         expect(on.rows.some((r) => r.label === "Gastos con tarjeta")).toBe(false);
+    });
+
+    it("PERIOD and PERIOD_WITH_CREDIT share the same netBalance input — the mode only decides whether it's subtracted here", () => {
+        // Shape a caller builds from BalanceSet.period / .withCredit.creditDeferred
+        // (see FinancialDashboard's balanceBreakdownInputs): netBalance is
+        // period.value in BOTH modes; includeCredit is what differs.
+        const periodShaped = {
+            totalIncome: 5000,
+            totalExpenses: 300,
+            totalExpensesCredit: 50,
+            totalTransfersFunding: 0,
+            totalTransfersSavings: 0,
+            netBalance: 4700,
+        };
+
+        const period = buildKpiModalConfig("balance", periodShaped, false);
+        expect(period.total.amount).toBe(4700);
+
+        const withCredit = buildKpiModalConfig("balance", periodShaped, true);
+        expect(withCredit.total.amount).toBe(4650);
+    });
+});
+
+describe("buildKpiModalConfig — traspasos entre cuentas dentro y fuera de la configuración", () => {
+    /** `totalTransfersCrossScope` solo existe en el tipo del modal, no en los KPI. */
+    function crossScopeKpis(crossScope: number, netBalance: number): KpiBreakdownInputs {
+        return { ...makeKpis({ netBalance }), totalTransfersCrossScope: crossScope };
+    }
+
+    /** Los renglones tienen que sumar el total que encabeza el modal. */
+    function sumRows(cfg: ReturnType<typeof buildKpiModalConfig>): number {
+        const total = cfg.rows.reduce(
+            (sum, row) => sum + (row.tone === "negative" ? -row.amount : row.amount), 0,
+        );
+        return Math.round(total * 100) / 100;
+    }
+
+    it("suma un renglón cuando entró dinero desde una cuenta que no presupuestas", () => {
+        const cfg = buildKpiModalConfig("balance", crossScopeKpis(500, 1994.23));
+
+        const row = cfg.rows.find(r => r.label.startsWith("Traspasos desde"));
+        expect(row?.amount).toBe(500);
+        expect(row?.tone).toBe("positive");
+        expect(sumRows(cfg)).toBe(cfg.total.amount);
+    });
+
+    it("resta un renglón cuando salió hacia una de ellas", () => {
+        const cfg = buildKpiModalConfig("balance", crossScopeKpis(-500, 994.23));
+
+        const row = cfg.rows.find(r => r.label.startsWith("Traspasos a"));
+        expect(row?.amount).toBe(500);
+        expect(row?.tone).toBe("negative");
+        expect(sumRows(cfg)).toBe(cfg.total.amount);
+    });
+
+    it("sin cruces, no aparece ningún renglón de traspasos", () => {
+        const cfg = buildKpiModalConfig("balance", makeKpis());
+
+        expect(cfg.rows.some(r => r.label.startsWith("Traspasos"))).toBe(false);
+        expect(sumRows(cfg)).toBe(cfg.total.amount);
     });
 });

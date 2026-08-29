@@ -79,3 +79,6 @@ graphify-out/manifest.json
 .claude/settings.local.json
 .claude/**/*.local.*
 CLAUDE.local.md
+
+# Workspace de subagent-driven-development (ledger, briefs, reportes)
+/.superpowers/

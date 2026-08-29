@@ -20,15 +20,42 @@ function currency(n: number): string {
 }
 
 /**
- * Builds the content for a KpiBreakdownModal from the raw (untoggled) KPIs —
- * shared by every dashboard that lets a user tap a Balance/Ingresos/Gastos
- * tile to see "how was this number calculated".
- *
- * `includeCredit` mirrors the "Incluir gastos con tarjeta" toggle: when ON, the
- * balance detail counts the credit-card-paid expenses (so the total and the
- * note match the toggled hero card); when OFF, they are shown as deferred.
+ * The only fields any of the three breakdowns read. Kept narrow on purpose:
+ * for `kind === "balance"` the caller must NOT pass the raw, unscoped,
+ * PERIOD-only `FinancialKPIs` — it must build this from the figures of the
+ * BalanceMode currently on screen (`BalanceSet.period` for income/expenses/
+ * savings/funding/netBalance, `BalanceSet.withCredit.creditDeferred` for the
+ * credit portion), or the modal ends up explaining a different number than
+ * the one that opened it. `FinancialKPIs` itself satisfies this type
+ * structurally, so "ingresos"/"gastos" (unaffected by the balance mode) keep
+ * passing it unchanged.
  */
-export function buildKpiModalConfig(kind: KpiModalKind, kpis: FinancialKPIs, includeCredit = false): KpiModalConfig {
+export type KpiBreakdownInputs = Pick<
+    FinancialKPIs,
+    "totalIncome" | "totalExpenses" | "totalExpensesCredit" | "totalTransfersFunding" | "totalTransfersSavings" | "netBalance"
+> & {
+    /**
+     * `BalanceSet.period.crossScope`: el neto de las transferencias que
+     * cruzan el borde de la configuración de balances. Sin este renglón el
+     * desglose no suma el total que dice explicar. Opcional porque
+     * «ingresos» y «gastos» siguen recibiendo un `FinancialKPIs` crudo, que
+     * no lo tiene.
+     */
+    totalTransfersCrossScope?: number;
+};
+
+/**
+ * Builds the content for a KpiBreakdownModal — shared by every dashboard that
+ * lets a user tap a Balance/Ingresos/Gastos tile to see "how was this number
+ * calculated".
+ *
+ * `includeCredit` mirrors the active BalanceMode: pass `mode ===
+ * "PERIOD_WITH_CREDIT"` for `kind === "balance"` so the total and the note
+ * match whichever balance the user has on screen (PERIOD and
+ * PERIOD_WITH_CREDIT share the same `netBalance` input — PERIOD's own value —
+ * and only differ in whether the credit portion gets subtracted here).
+ */
+export function buildKpiModalConfig(kind: KpiModalKind, kpis: KpiBreakdownInputs, includeCredit = false): KpiModalConfig {
     const realExpenses = Math.max(0, kpis.totalExpenses - kpis.totalExpensesCredit);
 
     if (kind === "balance") {
@@ -48,6 +75,22 @@ export function buildKpiModalConfig(kind: KpiModalKind, kpis: FinancialKPIs, inc
         }
         if (kpis.totalTransfersSavings > 0) {
             rows.push({ label: "Ahorro apartado", amount: kpis.totalTransfersSavings, tone: "negative", hint: "Transferencias a ahorros e inversiones" });
+        }
+        // Lo que entra o sale por el borde de la configuración de balances.
+        // Sin este renglón el desglose no sumaba el total que encabeza.
+        const crossScope = kpis.totalTransfersCrossScope ?? 0;
+        if (crossScope !== 0) {
+            rows.push(crossScope > 0
+                ? {
+                    label: "Traspasos desde cuentas fuera de tu configuración",
+                    amount: crossScope, tone: "positive",
+                    hint: "Dinero que entró al balance desde cuentas que no presupuestas",
+                }
+                : {
+                    label: "Traspasos a cuentas fuera de tu configuración",
+                    amount: Math.abs(crossScope), tone: "negative",
+                    hint: "Dinero que salió del balance hacia cuentas que no presupuestas",
+                });
         }
         return {
             title: "Detalle del balance",

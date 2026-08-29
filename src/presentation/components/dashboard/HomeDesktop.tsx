@@ -1,7 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import { Bell, Landmark } from "lucide-react";
 import { formatMoney, formatPercent, type AlertItem, type DonutSlice } from "@/lib/home-overview";
+import { cn } from "@/lib/utils";
 import { CaptureCard } from "./home/CaptureCard";
 import { StatTile } from "./home/StatTile";
 import { TrendCard } from "./home/TrendCard";
@@ -9,12 +11,16 @@ import { CategoryDonutCard } from "./home/CategoryDonutCard";
 import { QuickAccess } from "./home/QuickAccess";
 import { RecentActivityCard, type ActivityItem } from "./home/RecentActivityCard";
 import { AlertsCard } from "./home/AlertsCard";
+import { CARD } from "./home/ui";
+import { BalanceModeSwitch, balanceValue } from "@/presentation/financial/components/BalanceModeSwitch";
+import type { BalanceSet } from "@/application/services/balance-service";
+import type { BalanceMode } from "@/domain/entities/balance";
 
 /** Todo lo que el servidor midió para esta pantalla, ya en cifras. */
 export interface HomeMetrics {
     currency: string;
-    /** Suma de los últimos cortes de saldo conocidos. */
-    totalBalance: number;
+    /** Los tres balances del mes corriente, para el selector de la cifra de saldo. */
+    balances: BalanceSet;
     accounts: number;
     /** De esas cuentas, cuántas tienen un corte con el que sumar. */
     accountsWithBalance: number;
@@ -28,8 +34,7 @@ export interface HomeMetrics {
     pendingTransactions: number;
     /** Un punto por día del periodo. */
     series: { dates: string[]; income: number[]; expenses: number[]; net: number[] };
-    /** Saldo y gasto acumulados del periodo, para las miniaturas de las cifras. */
-    balanceSeries: number[];
+    /** Gasto acumulado del periodo, para la miniatura de la cifra de gastos. */
     expensesSeries: number[];
     /** Gasto del súper por categoría, sobre todo el historial de compras. */
     purchases: { slices: DonutSlice[]; total: number };
@@ -57,6 +62,10 @@ export interface HomeDesktopProps {
  * pagado igual la espera de las consultas que lo llenan.
  */
 export function HomeDesktop({ metrics, alerts }: HomeDesktopProps) {
+    // Arranca en el modo de ajustes; no se recuerda entre cargas, a propósito.
+    const [balanceMode, setBalanceMode] = useState<BalanceMode>(() => metrics.balances.defaultMode);
+    const balanceValueStr = formatMoney(balanceValue(metrics.balances, balanceMode), metrics.currency);
+
     return (
         <div className="grid gap-5 lg:grid-cols-12">
 
@@ -64,16 +73,26 @@ export function HomeDesktop({ metrics, alerts }: HomeDesktopProps) {
 
             {/* ── Las cuatro cifras del periodo ── */}
             <div className="lg:col-span-8 lg:col-start-5 lg:row-start-1 lg:grid lg:grid-cols-4 lg:gap-3">
-                <StatTile
-                    href="/financial/balances"
-                    label="Saldo total"
-                    value={formatMoney(metrics.totalBalance, metrics.currency)}
-                    note={`${metrics.monthNet >= 0 ? "+" : "−"}${formatMoney(Math.abs(metrics.monthNet), metrics.currency)} ${metrics.periodLabel.toLowerCase()}`}
-                    trend={metrics.monthNet === 0 ? "flat" : metrics.monthNet > 0 ? "up" : "down"}
-                    tint="emerald"
-                    series={metrics.balanceSeries}
-                    gradientId="home-spark-balance"
-                />
+                {/* No es un `StatTile`: lleva el selector de balance como
+                    etiqueta, y ese control ya es interactivo — envolverlo en un
+                    `<Link>` como los demás abriría un `<a>` dentro de otro `<a>`
+                    (el aviso de "N cuentas sin saldo declarado" del propio
+                    selector) en cuanto el modo activo fuera Total. */}
+                <div className={cn(CARD, "relative flex flex-col justify-center gap-2 overflow-hidden p-3.5")}>
+                    <BalanceModeSwitch
+                        balances={metrics.balances}
+                        mode={balanceMode}
+                        onModeChange={setBalanceMode}
+                        rangeLabel={metrics.periodLabel}
+                        size="compact"
+                    />
+                    <span className={cn(
+                        "relative block whitespace-nowrap font-bold leading-none tracking-tight text-text-primary",
+                        balanceValueStr.length > 13 ? "text-[17px]" : balanceValueStr.length > 10 ? "text-[19px]" : "text-[22px]",
+                    )}>
+                        {balanceValueStr}
+                    </span>
+                </div>
                 <StatTile
                     href="/financial/transactions"
                     label={`Gastos ${metrics.periodLabel.toLowerCase()}`}

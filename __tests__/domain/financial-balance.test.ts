@@ -1,7 +1,12 @@
 import { computeNetBalance, sumCreditExpenses, transactionTypeBucket } from "@/domain/services/financial-balance";
+import type { BalanceScope } from "@/domain/services/balance-scope";
 import type { FinancialTransaction } from "@/domain/entities/financial";
 
-type Tx = Pick<FinancialTransaction, "type" | "amount" | "paidWithCredit" | "categoryName">;
+type Tx = Pick<
+    FinancialTransaction,
+    "type" | "amount" | "paidWithCredit" | "categoryName"
+    | "bankSourceAccountId" | "bankDestinationAccountId"
+>;
 
 const income = (amount: number): Tx => ({ type: "INCOME", amount, paidWithCredit: false });
 const cashExpense = (amount: number): Tx => ({ type: "EXPENSE", amount, paidWithCredit: false });
@@ -59,6 +64,53 @@ describe("financial-balance", () => {
             const deferred = computeNetBalance(txs); // 800
             const withCredit = deferred - sumCreditExpenses(txs); // 800 - 300
             expect(withCredit).toBe(500);
+        });
+    });
+
+    describe("transferencias que cruzan el borde del presupuesto", () => {
+        /** Las cuentas que empiezan por «fuera» están excluidas; el resto entra. */
+        const scope: BalanceScope = {
+            isAccountIncluded: id => !String(id ?? "").startsWith("fuera"),
+            isCardIncluded: () => true,
+            isTransactionIncluded: () => true,
+            isUnrestricted: false,
+        };
+
+        const transfer = (amount: number, from?: string | null, to?: string | null): Tx => ({
+            type: "TRANSFER", amount, paidWithCredit: false,
+            bankSourceAccountId: from ?? null,
+            bankDestinationAccountId: to ?? null,
+        });
+
+        it("sale del presupuesto: resta", () => {
+            expect(computeNetBalance([transfer(500, "dentro", "fuera")], undefined, scope)).toBe(-500);
+        });
+
+        it("vuelve al presupuesto: suma", () => {
+            expect(computeNetBalance([transfer(500, "fuera", "dentro")], undefined, scope)).toBe(500);
+        });
+
+        it("entre dos cuentas del mismo lado: neutra", () => {
+            expect(computeNetBalance([transfer(500, "dentro", "otra")], undefined, scope)).toBe(0);
+            expect(computeNetBalance([transfer(500, "fuera", "fuera2")], undefined, scope)).toBe(0);
+        });
+
+        // El caso que inflaba el balance: un anticipo que salió de una cuenta
+        // excluida hacia un tercero sin registrar. Sin destino no hay evidencia
+        // de que el dinero entrara al presupuesto, y se leía como que sí.
+        it("sin destino conocido no suma, aunque el origen esté excluido", () => {
+            expect(computeNetBalance([transfer(32000, "fuera", null)], undefined, scope)).toBe(0);
+        });
+
+        it("sin origen conocido tampoco resta", () => {
+            expect(computeNetBalance([transfer(32000, null, "fuera")], undefined, scope)).toBe(0);
+        });
+
+        it("la categoría sigue mandando sobre el scope", () => {
+            const ahorro: Tx = {
+                ...transfer(200, "fuera", "dentro"), categoryName: "Ahorros e Inversiones",
+            };
+            expect(computeNetBalance([ahorro], undefined, scope)).toBe(-200);
         });
     });
 });

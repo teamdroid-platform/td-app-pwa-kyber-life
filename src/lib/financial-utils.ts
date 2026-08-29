@@ -119,8 +119,9 @@ function isPaymentToCardDescription(text: string | null | undefined): boolean {
  *
  * This is the single source of truth for "was this paid with credit" — the
  * transactions list (`enrichTransactions`) and the financial dashboard
- * (`resolvePaidWithCredit`) both run every transaction through it, so the
- * balance and the "Incluir TC" toggle agree on both screens.
+ * (`resolvePaidWithCredit`) both run every transaction through it, so PERIOD
+ * and PERIOD_WITH_CREDIT (see `BalanceModeSwitch`) defer/subtract the exact
+ * same rows on both screens.
  *
  * `creditCardIds` holds the ids of the user's CREDIT cards. Omit it and rules
  * 1 and 3 still apply, so callers without a card repository keep working.

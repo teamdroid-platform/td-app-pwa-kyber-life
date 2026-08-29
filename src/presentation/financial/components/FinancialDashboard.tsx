@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { UnifiedTrendChart } from "./UnifiedTrendChart";
 import { CategoryPieChart } from "./CategoryPieChart";
@@ -17,12 +17,15 @@ import { RobotLoader } from "@/components/ui/RobotLoader";
 import { defaultHubCustomRange, STANDARD_PERIOD_PRESETS } from "@/lib/date-range";
 import { cn } from "@/lib/utils";
 import { BalanceHeroCard } from "./BalanceHeroCard";
+import { BalanceModeSwitch, balanceValue } from "./BalanceModeSwitch";
 import { QuickSummary } from "./QuickSummary";
 import { KpiBreakdownModal } from "./KpiBreakdownModal";
-import { buildKpiModalConfig, type KpiModalKind } from "../lib/kpi-modal-config";
+import { buildKpiModalConfig, type KpiModalKind, type KpiBreakdownInputs } from "../lib/kpi-modal-config";
+import { getBalanceSetAction } from "@/app/actions/balance";
+import type { BalanceSet } from "@/application/services/balance-service";
+import type { BalanceMode } from "@/domain/entities/balance";
 import {
     excludeCreditFromKpis,
-    includeCreditInKpis,
     excludeCreditFromCategoryBreakdown,
     excludeCreditFromInstitutionBreakdown,
     excludeCreditFromDailyBreakdown,
@@ -51,9 +54,6 @@ export function FinancialDashboard() {
     const [customEndDate, setCustomEndDate] = useState<string>(() => defaultHubCustomRange().end);
     const [categoryLimit, setCategoryLimit] = useState<number>(5);
     const [institutionLimit, setInstitutionLimit] = useState<number>(5);
-    // Off by default: amounts and charts show only real (cash) spending until
-    // the user opts into seeing credit-card-paid transactions too.
-    const [showCredit, setShowCredit] = useState(false);
     // Mobile-only: filters collapsed by default (accordion), matching the
     // transactions list screen's "Filtros de Búsqueda" pattern.
     const [filtersExpanded, setFiltersExpanded] = useState(false);
@@ -108,28 +108,81 @@ export function FinancialDashboard() {
     const { kpis: rawKpis, monthly, typeBreakdown, categoryBreakdown: rawCategoryBreakdown, institutionBreakdown: rawInstitutionBreakdown, dailyBreakdown: rawDailyBreakdown, loading, refetching, refresh } =
         useFinancialDashboard(startDate, endDate);
 
+    // Los tres balances, cargados aparte de los KPIs: el selector los necesita
+    // los tres a la vez, y no vuelve al servidor al cambiar de modo. El modo
+    // arranca en `null` y se resuelve al de ajustes (`defaultMode`) en cuanto
+    // llega la respuesta — a propósito no se recuerda entre cargas.
+    const [balances, setBalances] = useState<BalanceSet | null>(null);
+    const [balanceMode, setBalanceMode] = useState<BalanceMode | null>(null);
+
+    useEffect(() => {
+        let cancelled = false;
+        getBalanceSetAction(startDate, endDate).then((result) => {
+            if (cancelled || !result.success) return;
+            setBalances(result.data);
+            setBalanceMode((current) => current ?? result.data.defaultMode);
+        });
+        return () => { cancelled = true; };
+    }, [startDate, endDate]);
+
+    // Los KPIs y los tres desgloses muestran siempre el gasto real (sin
+    // tarjeta): el balance con tarjeta ahora lo resuelve el selector de modo,
+    // así que no hace falta un segundo control que exprese lo mismo.
     const kpis = useMemo(
-        () => (rawKpis ? (showCredit ? includeCreditInKpis(rawKpis) : excludeCreditFromKpis(rawKpis)) : rawKpis),
-        [rawKpis, showCredit],
-    );
-    const categoryBreakdown = useMemo(
-        () => (showCredit ? rawCategoryBreakdown : excludeCreditFromCategoryBreakdown(rawCategoryBreakdown)),
-        [rawCategoryBreakdown, showCredit],
-    );
-    const institutionBreakdown = useMemo(
-        () => (showCredit ? rawInstitutionBreakdown : excludeCreditFromInstitutionBreakdown(rawInstitutionBreakdown)),
-        [rawInstitutionBreakdown, showCredit],
-    );
-    const dailyBreakdown = useMemo(
-        () => (showCredit ? rawDailyBreakdown : excludeCreditFromDailyBreakdown(rawDailyBreakdown)),
-        [rawDailyBreakdown, showCredit],
+        () => (rawKpis ? excludeCreditFromKpis(rawKpis) : rawKpis),
+        [rawKpis],
     );
 
-    // Always shows the full detail (real + credit), regardless of the toggle.
-    const kpiModalConfig = useMemo(
-        () => (openKpiModal && rawKpis ? buildKpiModalConfig(openKpiModal, rawKpis, showCredit) : null),
-        [openKpiModal, rawKpis, showCredit],
+    // El balance activo del hero: el del modo elegido en cuanto los tres
+    // balances llegaron; mientras tanto, el `netBalance` de siempre, para que
+    // el número no parpadee a "0,00" en la primera carga.
+    const activeBalance = balances && balanceMode
+        ? balanceValue(balances, balanceMode)
+        : (kpis?.netBalance ?? 0);
+
+    const categoryBreakdown = useMemo(
+        () => excludeCreditFromCategoryBreakdown(rawCategoryBreakdown),
+        [rawCategoryBreakdown],
     );
+    const institutionBreakdown = useMemo(
+        () => excludeCreditFromInstitutionBreakdown(rawInstitutionBreakdown),
+        [rawInstitutionBreakdown],
+    );
+    const dailyBreakdown = useMemo(
+        () => excludeCreditFromDailyBreakdown(rawDailyBreakdown),
+        [rawDailyBreakdown],
+    );
+
+    // El desglose de "balance" debe explicar el número que lo abrió, no el
+    // netBalance crudo (que es PERIOD sin scope): PERIOD y PERIOD_WITH_CREDIT
+    // comparten el mismo period.value de entrada y solo difieren en si el
+    // consumo con tarjeta se resta aquí (includeCredit). TOTAL no tiene un
+    // desglose de ingresos/gastos que mostrar — ver el onDetails del hero.
+    const balanceBreakdownInputs: KpiBreakdownInputs | null = useMemo(
+        () => (balances
+            ? {
+                totalIncome: balances.period.income,
+                totalExpenses: balances.period.expenses,
+                totalExpensesCredit: balances.withCredit.creditDeferred,
+                totalTransfersFunding: balances.period.funding,
+                totalTransfersSavings: balances.period.savings,
+                totalTransfersCrossScope: balances.period.crossScope,
+                netBalance: balances.period.value,
+            }
+            : null),
+        [balances],
+    );
+
+    const kpiModalConfig = useMemo(() => {
+        if (!openKpiModal) return null;
+        if (openKpiModal === "balance") {
+            // TOTAL no ofrece esta afinidad (ver onDetails más abajo); si el modo
+            // cambia a TOTAL mientras el modal ya está abierto, se cierra solo.
+            if (!balanceBreakdownInputs || balanceMode === "TOTAL" || !balanceMode) return null;
+            return buildKpiModalConfig("balance", balanceBreakdownInputs, balanceMode === "PERIOD_WITH_CREDIT");
+        }
+        return rawKpis ? buildKpiModalConfig(openKpiModal, rawKpis) : null;
+    }, [openKpiModal, rawKpis, balanceBreakdownInputs, balanceMode]);
 
     const totalCategoryExpenses = useMemo(() => {
         if (!categoryBreakdown) return 0;
@@ -162,9 +215,14 @@ export function FinancialDashboard() {
         () => ({
             onChange: () => {
                 refresh();
+                // Los tres balances también quedan obsoletos con la edición: sin
+                // esto, el hero seguiría mostrando el número de antes del cambio.
+                getBalanceSetAction(startDate, endDate).then((result) => {
+                    if (result.success) setBalances(result.data);
+                });
             },
         }),
-        [refresh],
+        [refresh, startDate, endDate],
     );
 
     const { isPollingFallback } = useFinancialRealtime({
@@ -281,16 +339,35 @@ export function FinancialDashboard() {
             {/* KPI section: hero balance panel + quick summary (all breakpoints) */}
             <div className="space-y-4">
                 <BalanceHeroCard
-                    value={`${(kpis?.netBalance ?? 0) >= 0 ? "+" : "-"}${formatCurrency(kpis?.netBalance ?? 0)}`}
-                    negative={(kpis?.netBalance ?? 0) < 0}
-                    creditSpent={rawKpis?.totalExpensesCredit ?? 0}
-                    onDetails={rawKpis ? () => setOpenKpiModal("balance") : undefined}
+                    value={`${activeBalance >= 0 ? "+" : "-"}${formatCurrency(activeBalance)}`}
+                    negative={activeBalance < 0}
+                    // TOTAL ignora el rango, así que el gasto con tarjeta del
+                    // periodo no es un dato relevante para él — ahí la pill
+                    // muestra la deuda de tarjeta en pie (no se resta del
+                    // total, solo se exhibe al lado). Los dos modos de periodo
+                    // muestran el gasto con tarjeta del rango, tomado de
+                    // `withCredit.creditDeferred` y no de los KPIs: es la misma
+                    // cifra que el modal desglosa y la única que respeta las
+                    // cuentas y tarjetas excluidas en la configuración. Los KPIs
+                    // solo cubren el hueco mientras los balances cargan.
+                    creditAmount={balanceMode === "TOTAL"
+                        ? (balances?.total.creditDebt ?? 0)
+                        : (balances?.withCredit.creditDeferred ?? rawKpis?.totalExpensesCredit ?? 0)}
+                    creditKind={balanceMode === "TOTAL" ? "debt" : "spent"}
+                    onDetails={balanceMode && balanceMode !== "TOTAL" ? () => setOpenKpiModal("balance") : undefined}
+                    modeSwitch={balances && balanceMode ? (
+                        <BalanceModeSwitch
+                            balances={balances}
+                            mode={balanceMode}
+                            onModeChange={setBalanceMode}
+                            rangeLabel={formatRangeLabel(filterType, startDate, endDate)}
+                            size="hero"
+                        />
+                    ) : undefined}
                 />
                 <QuickSummary
                     kpis={kpis}
                     dailyBreakdown={dailyBreakdown}
-                    showCredit={showCredit}
-                    onToggleCredit={setShowCredit}
                     onOpenModal={rawKpis ? (kind) => setOpenKpiModal(kind) : undefined}
                 />
             </div>

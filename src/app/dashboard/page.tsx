@@ -1,5 +1,5 @@
 import {
-    analyticsService, bankService, financialDashboardService, financialInboxService,
+    analyticsService, balanceService, bankService, financialDashboardService, financialInboxService,
     initializeContainer, userRepository,
 } from "@/infrastructure/container";
 import { cookies, headers } from "next/headers";
@@ -12,6 +12,7 @@ import { DONUT_COLORS } from "@/presentation/components/dashboard/home/CategoryD
 import { isIncomeType } from "@/domain/services/financial-balance";
 import type { ActivityItem } from "@/presentation/components/dashboard/home/RecentActivityCard";
 import type { DashboardOverview, FinancialKPIs } from "@/application/services/financial-dashboard-service";
+import type { BalanceSet } from "@/application/services/balance-service";
 import type { FinancialTransaction } from "@/domain/entities/financial";
 
 /**
@@ -88,19 +89,22 @@ export default async function DashboardPage() {
     //
     // Las cuatro consultas del tablero se lanzan solo cuando se va a dibujar:
     // son las caras, y en un teléfono no se ve ninguna.
-    const [board, pendingScans, overview, previous, recent, purchaseCategories] = await Promise.all([
+    const [board, pendingScans, overview, previous, recent, purchaseCategories, balanceSet] = await Promise.all([
         bankService.getBalanceBoard(userId),
         financialInboxService.getUnprocessedTransactions(userId),
         withDashboard ? financialDashboardService.getDashboardOverview(userId, startOfMonth, endOfMonth, 1) : null,
         withDashboard ? financialDashboardService.getKPIs(userId, startOfPrevious, endOfPrevious) : null,
         withDashboard ? financialDashboardService.getRecentTransactions(userId, 4) : [],
         withDashboard ? analyticsService.getTopCategories(userId, 5) : [],
+        // Los tres balances del mes corriente, para el selector de la tarjeta
+        // que hoy pinta `monthNet`. Solo se piden junto al resto del tablero.
+        withDashboard ? balanceService.getBalanceSet(userId, { startDate: startOfMonth, endDate: endOfMonth }) : null,
     ]);
 
     const balances = sumBalances(board);
 
-    const metrics = overview && previous
-        ? buildMetrics({ overview, previous, recent, purchaseCategories, balances, now })
+    const metrics = overview && previous && balanceSet
+        ? buildMetrics({ overview, previous, recent, purchaseCategories, balances, balanceSet, now })
         : null;
 
     return (
@@ -115,12 +119,13 @@ export default async function DashboardPage() {
 }
 
 /** Las cifras del tablero, a partir de lo que devolvieron los servicios. */
-function buildMetrics({ overview, previous, recent, purchaseCategories, balances, now }: {
+function buildMetrics({ overview, previous, recent, purchaseCategories, balances, balanceSet, now }: {
     overview: DashboardOverview;
     previous: FinancialKPIs;
     recent: FinancialTransaction[];
     purchaseCategories: { name: string; value: number; percentage: number }[];
     balances: ReturnType<typeof sumBalances>;
+    balanceSet: BalanceSet;
     now: Date;
 }): HomeMetrics {
     const daily = overview.dailyBreakdown;
@@ -147,7 +152,7 @@ function buildMetrics({ overview, previous, recent, purchaseCategories, balances
 
     return {
         currency: overview.kpis.currency,
-        totalBalance: balances.total,
+        balances: balanceSet,
         accounts: balances.accounts,
         accountsWithBalance: balances.accountsWithBalance,
         monthIncome: overview.kpis.totalIncome,
@@ -161,7 +166,6 @@ function buildMetrics({ overview, previous, recent, purchaseCategories, balances
             expenses: daily.map(day => day.expenses),
             net: daily.map(day => day.net),
         },
-        balanceSeries: cumulative(daily.map(day => day.net)),
         expensesSeries: cumulative(daily.map(day => day.expenses)),
         purchases: {
             slices,

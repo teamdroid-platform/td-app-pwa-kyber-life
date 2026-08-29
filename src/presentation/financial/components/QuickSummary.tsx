@@ -3,7 +3,6 @@
 import { TrendingUp, TrendingDown, ArrowRightLeft, Wallet } from "lucide-react";
 import type { FinancialKPIs, DailyBreakdown } from "@/application/services/financial-dashboard-service";
 import type { KpiModalKind } from "../lib/kpi-modal-config";
-import { CreditToggle } from "./CreditToggle";
 import { SparkStatCard, type SparkStatCardProps } from "@/presentation/components/dashboard/spark-stat-card";
 
 function formatCurrency(value: number): string {
@@ -13,18 +12,15 @@ function formatCurrency(value: number): string {
 interface QuickSummaryProps {
     kpis: FinancialKPIs | null;
     dailyBreakdown: DailyBreakdown[];
-    showCredit: boolean;
-    onToggleCredit: (checked: boolean) => void;
     /** Opens a KPI breakdown modal (only Ingresos/Gastos have one). */
     onOpenModal?: (kind: KpiModalKind) => void;
 }
 
 /**
  * "Resumen rápido": the four KPI cards in a single 4-column grid (all visible at
- * once), each rendered with the shared {@link SparkStatCard} atom. Keeps the
- * shared "Incluir TC" toggle in its header.
+ * once), each rendered with the shared {@link SparkStatCard} atom.
  */
-export function QuickSummary({ kpis, dailyBreakdown, showCredit, onToggleCredit, onOpenModal }: QuickSummaryProps) {
+export function QuickSummary({ kpis, dailyBreakdown, onOpenModal }: QuickSummaryProps) {
     const cards: SparkStatCardProps[] = [
         {
             label: "Ingresos",
@@ -68,10 +64,7 @@ export function QuickSummary({ kpis, dailyBreakdown, showCredit, onToggleCredit,
 
     return (
         <div className="space-y-2">
-            <div className="flex items-center justify-between gap-2">
-                <h2 className="text-[15px] font-semibold text-text-primary">Resumen rápido</h2>
-                <CreditToggle checked={showCredit} onChange={onToggleCredit} />
-            </div>
+            <h2 className="text-[15px] font-semibold text-text-primary">Resumen rápido</h2>
 
             <div className="grid grid-cols-4 gap-2 sm:gap-3">
                 {cards.map((card) => (

@@ -2,6 +2,7 @@ import { render, screen, within } from "@testing-library/react";
 import { HomeDesktop, type HomeMetrics } from "@/presentation/components/dashboard/HomeDesktop";
 import { buildAlerts } from "@/lib/home-overview";
 import { formatMoney } from "@/lib/home-overview";
+import type { BalanceSet } from "@/application/services/balance-service";
 
 // El diálogo de captura navega al resumen tras interpretar.
 jest.mock("next/navigation", () => ({
@@ -19,9 +20,20 @@ function money(amount: number): string {
     return formatMoney(amount).replace(/ /g, " ");
 }
 
+// `period.value` deliberadamente distinto de `monthNet` (5209.2, más abajo):
+// coinciden en la app real casi siempre, pero un test que los confunda no
+// notaría si el selector mostrara el número equivocado.
+const BALANCES: BalanceSet = {
+    defaultMode: "PERIOD",
+    currency: "USD",
+    total: { value: 24560, accountsCounted: 6, accountsWithoutSnapshot: [], creditDebt: 0 },
+    period: { value: 5100.75, income: 8450, expenses: 3240.8, savings: 0, funding: 0, crossScope: 0, excludedCount: 0 },
+    withCredit: { value: 4902.06, creditDeferred: 198.69 },
+};
+
 const METRICS: HomeMetrics = {
     currency: "USD",
-    totalBalance: 24560,
+    balances: BALANCES,
     accounts: 6,
     accountsWithBalance: 6,
     monthIncome: 8450,
@@ -35,7 +47,6 @@ const METRICS: HomeMetrics = {
         expenses: [80, 120, 300],
         net: [20, 130, 100],
     },
-    balanceSeries: [20, 150, 250],
     expensesSeries: [80, 200, 500],
     purchases: {
         slices: [
@@ -73,11 +84,22 @@ describe("HomeDesktop", () => {
     it("encabeza con las cifras del periodo, cada una hacia donde se explica", () => {
         render(<HomeDesktop {...BASE} />);
 
-        expect(screen.getByRole("link", { name: /Saldo total/ })).toHaveAttribute("href", "/financial/balances");
-        expect(screen.getByText(money(24560))).toBeInTheDocument();
         expect(screen.getByRole("link", { name: /Gastos este mes/ })).toHaveAttribute("href", "/financial/transactions");
         expect(screen.getByText(/4,3 % vs periodo anterior/)).toBeInTheDocument();
         expect(screen.getByRole("link", { name: /Cuentas conectadas/ })).toHaveAttribute("href", "/financial/banks");
+    });
+
+    it("la tarjeta de saldo lleva el selector de balance, sin duplicar el Total", () => {
+        render(<HomeDesktop {...BASE} />);
+
+        // Arranca en el modo por defecto de ajustes (PERIOD) con su valor.
+        expect(screen.getByRole("button", { name: /balance del periodo/i })).toBeInTheDocument();
+        expect(screen.getByText(money(5100.75))).toBeInTheDocument();
+        // Ya no hay una tarjeta fija de "Saldo total": el Total es una de las
+        // tres opciones del selector, y tenerlo dos veces en la misma pantalla
+        // se contradice.
+        expect(screen.queryByRole("link", { name: /Saldo total/ })).not.toBeInTheDocument();
+        expect(screen.queryByText(/^Saldo total$/)).not.toBeInTheDocument();
     });
 
     it("sin gasto el periodo anterior, no inventa un porcentaje", () => {
