@@ -33,7 +33,16 @@ function currency(n: number): string {
 export type KpiBreakdownInputs = Pick<
     FinancialKPIs,
     "totalIncome" | "totalExpenses" | "totalExpensesCredit" | "totalTransfersFunding" | "totalTransfersSavings" | "netBalance"
->;
+> & {
+    /**
+     * `BalanceSet.period.crossScope`: el neto de las transferencias que
+     * cruzan el borde de la configuración de balances. Sin este renglón el
+     * desglose no suma el total que dice explicar. Opcional porque
+     * «ingresos» y «gastos» siguen recibiendo un `FinancialKPIs` crudo, que
+     * no lo tiene.
+     */
+    totalTransfersCrossScope?: number;
+};
 
 /**
  * Builds the content for a KpiBreakdownModal — shared by every dashboard that
@@ -66,6 +75,22 @@ export function buildKpiModalConfig(kind: KpiModalKind, kpis: KpiBreakdownInputs
         }
         if (kpis.totalTransfersSavings > 0) {
             rows.push({ label: "Ahorro apartado", amount: kpis.totalTransfersSavings, tone: "negative", hint: "Transferencias a ahorros e inversiones" });
+        }
+        // Lo que entra o sale por el borde de la configuración de balances.
+        // Sin este renglón el desglose no sumaba el total que encabeza.
+        const crossScope = kpis.totalTransfersCrossScope ?? 0;
+        if (crossScope !== 0) {
+            rows.push(crossScope > 0
+                ? {
+                    label: "Traspasos desde cuentas fuera de tu configuración",
+                    amount: crossScope, tone: "positive",
+                    hint: "Dinero que entró al balance desde cuentas que no presupuestas",
+                }
+                : {
+                    label: "Traspasos a cuentas fuera de tu configuración",
+                    amount: Math.abs(crossScope), tone: "negative",
+                    hint: "Dinero que salió del balance hacia cuentas que no presupuestas",
+                });
         }
         return {
             title: "Detalle del balance",

@@ -8,7 +8,7 @@ const balances: BalanceSet = {
     defaultMode: "PERIOD",
     currency: "USD",
     total: { value: 4812.3, accountsCounted: 6, accountsWithoutSnapshot: [{ id: "a", name: "Austro" }], creditDebt: 371.26 },
-    period: { value: 4709.46, income: 5000, expenses: 290.54, savings: 0, funding: 0, excludedCount: 0 },
+    period: { value: 4709.46, income: 5000, expenses: 290.54, savings: 0, funding: 0, crossScope: 0, excludedCount: 0 },
     withCredit: { value: 4510.77, creditDeferred: 198.69 },
 };
 

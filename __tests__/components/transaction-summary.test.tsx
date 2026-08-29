@@ -73,7 +73,7 @@ describe("TransactionSummary", () => {
             defaultMode: "PERIOD",
             currency: "USD",
             total: { value: 5000, accountsCounted: 2, accountsWithoutSnapshot: [], creditDebt: 0 },
-            period: { value: 900, income: 1000, expenses: 100, savings: 0, funding: 0, excludedCount: 0 },
+            period: { value: 900, income: 1000, expenses: 100, savings: 0, funding: 0, crossScope: 0, excludedCount: 0 },
             withCredit: { value: 850, creditDeferred: 50 },
         };
         const transactions: FinancialTransaction[] = [
