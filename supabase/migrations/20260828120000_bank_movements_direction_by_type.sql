@@ -28,14 +28,17 @@ DROP VIEW IF EXISTS bank_movements;
 
 CREATE VIEW bank_movements AS
     -- Ingresos: entra a la cuenta, esté anotada como origen o como destino.
+    -- Manda el destino cuando está puesto —ahí es donde aterrizó el dinero— y
+    -- el origen solo cubre el caso torcido: la cuenta anotada de ese lado
+    -- porque el comprobante la ponía primero, sin ninguna otra.
     SELECT t.id AS transaction_id, t.owner_user_id, t.date,
-           COALESCE(t.bank_source_account_id, t.bank_destination_account_id) AS account_id,
+           COALESCE(t.bank_destination_account_id, t.bank_source_account_id) AS account_id,
            NULL::UUID AS card_id,
            'IN'::TEXT AS direction, t.amount, t.currency,
            t.description, t.merchant, t.category_id
       FROM financial_transactions t
      WHERE t.type IN ('INCOME', 'DEPOSIT', 'REFUND')
-       AND COALESCE(t.bank_source_account_id, t.bank_destination_account_id) IS NOT NULL
+       AND COALESCE(t.bank_destination_account_id, t.bank_source_account_id) IS NOT NULL
        AND t.status NOT IN ('REJECTED', 'DELETED', 'DUPLICATE')
     UNION ALL
     -- Transferencias y retiros: sale de una punta y entra en la otra.
