@@ -122,6 +122,7 @@ export class FinancialTransactionService {
             ? await this.bankService.syncTransactionBankLinks(dto.ownerUserId, {
                 merchant: dto.merchant ?? dto.institutionName ?? null,
                 currency: dto.currency,
+                type: dto.type,
                 paidWithCredit: dto.paidWithCredit ?? false,
                 institutionKind: dto.bankInstitutionKind ?? null,
                 ownership: dto.scannedOwnership ?? null,
@@ -241,6 +242,7 @@ export class FinancialTransactionService {
             ? await this.bankService.syncTransactionBankLinks(userId, {
                 merchant: data.merchant ?? institutionName ?? tx.merchant ?? null,
                 currency: data.currency ?? tx.currency,
+                type: data.type ?? tx.type,
                 paidWithCredit: data.paidWithCredit ?? tx.paidWithCredit ?? false,
                 institutionKind: bankInstitutionKind ?? null,
                 ownership: scannedOwnership ?? null,

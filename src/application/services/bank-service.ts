@@ -20,6 +20,7 @@ import {
     computeAccountBalance, computeCardDebt, computeAvailableCredit,
     computeStatementDue, runningBalances, statementPeriodFor,
 } from "@/domain/services/bank-balance";
+import { isIncomeType } from "@/domain/services/financial-balance";
 import { ISSUER_NAME, inferInstitutionKind } from "@/lib/bank-institution-kind";
 import { parseBankNumber } from "@/lib/bank-number-fingerprint";
 import { resolveFingerprint, type Resolution } from "@/lib/bank-number-match";
@@ -196,6 +197,11 @@ export interface TransactionBankSyncInput {
     merchant?: string | null;
     currency?: string | null;
     paidWithCredit?: boolean | null;
+    /**
+     * Tipo de la transacción. Decide de qué lado queda la cuenta del usuario:
+     * en un ingreso el dinero entra, así que su cuenta es el destino.
+     */
+    type?: FinancialTransaction["type"] | null;
     /** Tipo de emisor declarado por el usuario. Gana sobre la inferencia. */
     institutionKind?: BankInstitution["kind"] | null;
     /** Lo que el usuario eligió a mano. Nunca se pisa. */
@@ -226,6 +232,31 @@ export interface ResolvedBankLinks {
  */
 function isOriginEntry(entry: ScannedAccountEntry): boolean {
     return entry.type?.toLowerCase().startsWith("orig") ?? false;
+}
+
+/**
+ * Pone la cuenta del usuario del lado que le corresponde según el tipo.
+ *
+ * «Origen» y «destino» en un escaneo dicen de qué lado del comprobante salió la
+ * cuenta, no hacia dónde fue el dinero: el escáner marca como origen la cuenta
+ * protagonista del documento, también en un comprobante de ingreso. Guardar un
+ * sueldo con la cuenta en el origen la dejaba entregando dinero que en realidad
+ * recibió, y el saldo se iba al revés.
+ *
+ * Solo mueve el dato cuando el otro lado está libre: si el usuario llenó los
+ * dos extremos, lo que él eligió manda.
+ */
+function accountSideByType(
+    links: ResolvedBankLinks, type?: FinancialTransaction["type"] | null,
+): ResolvedBankLinks {
+    if (!type || !isIncomeType(type)) return links;
+    if (!links.bankSourceAccountId || links.bankDestinationAccountId) return links;
+
+    return {
+        ...links,
+        bankDestinationAccountId: links.bankSourceAccountId,
+        bankSourceAccountId: null,
+    };
 }
 
 /**
@@ -351,22 +382,22 @@ export class BankService {
 
         // Sin números que identificar, lo único que puede nacer es el emisor.
         if (scan.accounts.length === 0) {
-            return {
+            return accountSideByType({
                 ...chosen,
                 bankInstitutionId: chosen.bankInstitutionId
                     ?? await this.resolveInstitution(userId, scan),
-            };
+            }, input.type);
         }
 
         const resolved = await this.resolveScannedAccounts(userId, scan);
 
-        return {
+        return accountSideByType({
             bankSourceAccountId: chosen.bankSourceAccountId ?? resolved.bankSourceAccountId,
             bankDestinationAccountId: chosen.bankDestinationAccountId ?? resolved.bankDestinationAccountId,
             bankCardId: chosen.bankCardId ?? resolved.bankCardId,
             bankInstitutionId: chosen.bankInstitutionId ?? resolved.bankInstitutionId,
             bankCounterpartyObservationId: resolved.bankCounterpartyObservationId,
-        };
+        }, input.type);
     }
 
     // ─── Identificación desde un escaneo ─────────────────────
