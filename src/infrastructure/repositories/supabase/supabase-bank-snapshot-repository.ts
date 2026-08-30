@@ -69,7 +69,14 @@ export class SupabaseBankAccountBalanceSnapshotRepository implements IBankAccoun
         return (data ?? []).map(mapToEntity);
     }
 
-    /** El ancla del saldo: el corte más reciente que no está en el futuro. */
+    /**
+     * El ancla del saldo: el corte más reciente que no está en el futuro.
+     *
+     * Empatados por fecha, gana el último declarado. Corregir el saldo del
+     * mismo día es lo más normal —uno mira el banco, escribe una cifra y la
+     * enmienda al momento— y sin este desempate Postgres devolvía cualquiera
+     * de los dos: la app se quedaba con el valor viejo.
+     */
     async findLatestForAccount(accountId: UUID, reference: ISODate): Promise<BankAccountBalanceSnapshot | null> {
         const supabase = await createClient();
         const { data, error } = await supabase
@@ -77,6 +84,7 @@ export class SupabaseBankAccountBalanceSnapshotRepository implements IBankAccoun
             .eq("account_id", accountId).eq("is_deleted", false)
             .lte("as_of", reference)
             .order("as_of", { ascending: false })
+            .order("created_at", { ascending: false })
             .limit(1).maybeSingle();
 
         if (error || !data) return null;

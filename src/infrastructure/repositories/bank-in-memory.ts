@@ -78,9 +78,16 @@ export class InMemoryBankAccountBalanceSnapshotRepository
     implements IBankAccountBalanceSnapshotRepository {
 
     async findByAccountId(accountId: UUID): Promise<BankAccountBalanceSnapshot[]> {
+        // Empatados por fecha, primero el último declarado: corregir el saldo
+        // del mismo día tiene que ganarle al valor que enmienda. Se invierte
+        // antes de ordenar porque `sort` es estable y dos cortes seguidos
+        // pueden compartir `createdAt` al milisegundo — entonces decide el
+        // orden de llegada, y el último en llegar es la corrección.
         return (await this.findAll())
             .filter(s => s.accountId === accountId)
-            .sort((a, b) => b.asOf.localeCompare(a.asOf));
+            .reverse()
+            .sort((a, b) => b.asOf.localeCompare(a.asOf)
+                || (b.createdAt ?? "").localeCompare(a.createdAt ?? ""));
     }
 
     async findLatestForAccount(accountId: UUID, reference: ISODate): Promise<BankAccountBalanceSnapshot | null> {

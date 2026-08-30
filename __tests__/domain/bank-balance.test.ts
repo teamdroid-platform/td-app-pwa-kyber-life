@@ -125,3 +125,35 @@ describe("statementPeriodFor", () => {
         expect(p.dueDate).toBe("2026-09-05");
     });
 });
+
+describe("el corte manual manda sobre lo anterior", () => {
+    const account = "acc-1";
+
+    /** Un movimiento con lo mínimo que mira computeAccountBalance. */
+    function mov(date: string, direction: "IN" | "OUT", amount: number) {
+        return { date, direction, amount } as unknown as Parameters<typeof computeAccountBalance>[1][number];
+    }
+
+    function snapshot(asOf: string, balance: number) {
+        return { accountId: account, asOf, balance } as unknown as Parameters<typeof computeAccountBalance>[0];
+    }
+
+    it("ignora todo lo anterior al corte y suma solo lo posterior", () => {
+        const movimientos = [
+            mov("2026-08-01T10:00:00Z", "OUT", 500),   // antes del corte
+            mov("2026-08-20T05:00:00Z", "OUT", 40),    // justo en el corte
+            mov("2026-08-21T10:00:00Z", "IN", 100),
+            mov("2026-08-22T10:00:00Z", "OUT", 30),
+        ];
+
+        expect(computeAccountBalance(snapshot("2026-08-20T05:00:00Z", 214.39), movimientos))
+            .toBe(284.39);
+    });
+
+    it("sin corte declarado, suma todo el historial", () => {
+        expect(computeAccountBalance(null, [
+            mov("2026-08-01T10:00:00Z", "IN", 100),
+            mov("2026-08-02T10:00:00Z", "OUT", 40),
+        ])).toBe(60);
+    });
+});

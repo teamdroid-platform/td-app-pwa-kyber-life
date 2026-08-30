@@ -112,3 +112,21 @@ describe("registerBalanceSnapshots", () => {
         ])).rejects.toThrow(/revisadas/i);
     });
 });
+
+describe("dos cortes el mismo día", () => {
+    it("el saldo usa el último declarado, no el que corrige", async () => {
+        const { service } = buildService();
+        const inst = await service.createInstitution(USER, { name: "Banco Pichincha", kind: "BANK" });
+        const account = await service.createAccount(USER, {
+            institutionId: inst.id, accountType: "SAVINGS", lastFour: "9558",
+        });
+
+        const mismaFecha = "2026-08-22T05:00:00.000Z";
+        await service.registerBalanceSnapshot(USER, account.id, 3818.71, mismaFecha);
+        // El usuario se corrige un rato después, sin cambiar la fecha del corte.
+        await service.registerBalanceSnapshot(USER, account.id, 3816.83, mismaFecha);
+
+        const [entry] = await service.getBalanceBoard(USER);
+        expect(entry.lastBalance).toBe(3816.83);
+    });
+});

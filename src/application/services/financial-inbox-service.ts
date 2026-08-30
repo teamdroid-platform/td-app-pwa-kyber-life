@@ -157,6 +157,7 @@ export class FinancialInboxService {
                 scannedAccounts: scannerTx.accounts ?? [],
                 merchant: dto.merchant ?? scannerTx.merchant ?? null,
                 currency: scannerTx.currency ?? 'USD',
+                type: transactionType,
                 paidWithCredit: effectivePaidWithCredit,
                 institutionKind: dto.bankInstitutionKind ?? null,
                 ownership: dto.scannedOwnership ?? null,
