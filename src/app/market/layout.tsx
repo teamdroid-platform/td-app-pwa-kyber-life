@@ -1,7 +1,8 @@
 import { AppLayout } from "@/presentation/components/layout/AppLayout";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { initializeContainer, userRepository } from "@/infrastructure/container";
+import { initializeContainer, userRepository, periodSettingsService } from "@/infrastructure/container";
+import { PeriodSettingsProvider } from "@/presentation/components/period/PeriodSettingsProvider";
 
 export default async function MarketLayout({
     children,
@@ -40,5 +41,13 @@ export default async function MarketLayout({
         redirect("/auth/login");
     }
 
-    return <AppLayout user={user}>{children}</AppLayout>;
+    const cycleStartDay = await periodSettingsService.getCycleStartDay(user.id, 'MARKET');
+
+    return (
+        <AppLayout user={user}>
+            <PeriodSettingsProvider cycleStartDay={cycleStartDay}>
+                {children}
+            </PeriodSettingsProvider>
+        </AppLayout>
+    );
 }
