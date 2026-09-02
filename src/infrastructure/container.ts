@@ -20,7 +20,8 @@ import {
     InMemoryFinancialCategoryRepository,
     InMemoryNotificationRepository,
     InMemoryPushSubscriptionRepository,
-    InMemoryBalanceSettingsRepository
+    InMemoryBalanceSettingsRepository,
+    InMemoryPeriodSettingsRepository
 } from "./repositories/implementations";
 import {
     InMemoryBankInstitutionRepository,
@@ -65,6 +66,7 @@ import {
     SupabaseBankNumberObservationRepository,
     SupabaseBalanceSettingsRepository
 } from "./repositories/supabase"; // Need to create this index or import individually
+import { SupabasePeriodSettingsRepository } from "./repositories/supabase/supabase-period-settings-repository";
 
 // ... Previous imports ...
 
@@ -126,6 +128,8 @@ export const bankAccountRepository = singleton("bankAccountRepo", () => isSupaba
 export const bankCardRepository = singleton("bankCardRepo", () => isSupabase ? new SupabaseBankCardRepository() : new InMemoryBankCardRepository());
 export const balanceSettingsRepository = singleton("balanceSettingsRepo", () =>
     isSupabase ? new SupabaseBalanceSettingsRepository() : new InMemoryBalanceSettingsRepository());
+export const periodSettingsRepository = singleton("periodSettingsRepo", () =>
+    isSupabase ? new SupabasePeriodSettingsRepository() : new InMemoryPeriodSettingsRepository());
 export const bankSnapshotRepository = singleton("bankSnapshotRepo", () => isSupabase ? new SupabaseBankAccountBalanceSnapshotRepository() : new InMemoryBankAccountBalanceSnapshotRepository());
 export const bankStatementRepository = singleton("bankStatementRepo", () => isSupabase ? new SupabaseBankCardStatementRepository() : new InMemoryBankCardStatementRepository());
 export const bankMovementRepository = singleton("bankMovementRepo", () => isSupabase
