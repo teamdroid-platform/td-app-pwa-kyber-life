@@ -6,6 +6,8 @@ import { PaginationParams, PaginatedResult, TransactionSearchFilters } from "@/d
 import { DASHBOARD_ACTIVE_STATUSES } from "@/domain/services/financial-balance";
 import { IBalanceSettingsRepository } from "@/domain/repositories/balance";
 import { BalanceMode, BalanceScopeRule, BalanceScopeTargetType, BalanceSettings } from "@/domain/entities/balance";
+import { IPeriodSettingsRepository } from "@/domain/repositories/period";
+import { PeriodScope, PeriodSettings } from "@/domain/entities/period";
 
 export class InMemoryFinancialTransactionAuditLogRepository extends InMemoryRepository<FinancialTransactionAuditLog> implements IFinancialTransactionAuditLogRepository {
     async findByTransactionId(transactionId: UUID): Promise<FinancialTransactionAuditLog[]> {
@@ -530,5 +532,32 @@ export class InMemoryBalanceSettingsRepository implements IBalanceSettingsReposi
 
     async clearRules(userId: UUID): Promise<void> {
         this.rules.delete(userId);
+    }
+}
+
+export class InMemoryPeriodSettingsRepository implements IPeriodSettingsRepository {
+    /** Clave `${userId}:${scope}`, para que los dos ámbitos convivan sin pisarse. */
+    private settings = new Map<string, PeriodSettings>();
+
+    private key(ownerUserId: UUID, scope: PeriodScope): string {
+        return `${ownerUserId}:${scope}`;
+    }
+
+    async findByOwner(ownerUserId: UUID, scope: PeriodScope): Promise<PeriodSettings | null> {
+        return this.settings.get(this.key(ownerUserId, scope)) ?? null;
+    }
+
+    async findAllByOwner(ownerUserId: UUID): Promise<PeriodSettings[]> {
+        return [...this.settings.values()].filter(s => s.ownerUserId === ownerUserId);
+    }
+
+    async upsert(
+        ownerUserId: UUID,
+        scope: PeriodScope,
+        cycleStartDay: number,
+    ): Promise<PeriodSettings> {
+        const saved: PeriodSettings = { ownerUserId, scope, cycleStartDay };
+        this.settings.set(this.key(ownerUserId, scope), saved);
+        return saved;
     }
 }
