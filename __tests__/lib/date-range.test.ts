@@ -3,8 +3,6 @@ import {
     toDateTimeLocalValue,
     isoToWallClockInput,
     wallClockInputToISO,
-    defaultHubCustomRange,
-    computeDateRange,
     cycleRangeContaining,
     cycleToDate,
     cyclePreviousRange,
@@ -64,153 +62,6 @@ describe("date-range", () => {
         });
     });
 
-    describe("defaultHubCustomRange (billing cycle 22 → 21)", () => {
-        it("uses the current cycle when the day is >= 22", () => {
-            expect(defaultHubCustomRange(new Date(2026, 5, 22))).toEqual({
-                start: "2026-06-22",
-                end: "2026-07-21",
-            });
-        });
-
-        it("keeps the same cycle for any day up to the 21st (does not roll early)", () => {
-            // July 5 is still inside the Jun-22 → Jul-21 cycle, NOT Jul-22 → Aug-21.
-            expect(defaultHubCustomRange(new Date(2026, 6, 5))).toEqual({
-                start: "2026-06-22",
-                end: "2026-07-21",
-            });
-            // The 21st is the last day of the cycle.
-            expect(defaultHubCustomRange(new Date(2026, 6, 21))).toEqual({
-                start: "2026-06-22",
-                end: "2026-07-21",
-            });
-        });
-
-        it("rolls forward only once the day reaches the 22nd", () => {
-            expect(defaultHubCustomRange(new Date(2026, 6, 22))).toEqual({
-                start: "2026-07-22",
-                end: "2026-08-21",
-            });
-        });
-
-        it("handles year rollover in both directions", () => {
-            // Late December → cycle ends next January.
-            expect(defaultHubCustomRange(new Date(2026, 11, 25))).toEqual({
-                start: "2026-12-22",
-                end: "2027-01-21",
-            });
-            // Early January → cycle started the previous December.
-            expect(defaultHubCustomRange(new Date(2027, 0, 10))).toEqual({
-                start: "2026-12-22",
-                end: "2027-01-21",
-            });
-        });
-
-        it("handles a sub-22 day in February (anchors to January)", () => {
-            expect(defaultHubCustomRange(new Date(2026, 1, 15))).toEqual({
-                start: "2026-01-22",
-                end: "2026-02-21",
-            });
-        });
-
-        describe("default reference resolves 'now' in APP_TIMEZONE (UTC-5)", () => {
-            afterEach(() => {
-                jest.useRealTimers();
-            });
-
-            it("does NOT roll forward on the evening of the 21st (bug: UTC already the 22nd)", () => {
-                // 2026-06-22T04:01Z === 2026-06-21 23:01 in America/Guayaquil (UTC-5).
-                // The UTC day is the 22nd, but the user's local day is still the 21st,
-                // so the current cycle (May 22 → Jun 21) must remain selected.
-                jest.useFakeTimers().setSystemTime(new Date("2026-06-22T04:01:00.000Z"));
-                expect(defaultHubCustomRange()).toEqual({
-                    start: "2026-05-22",
-                    end: "2026-06-21",
-                });
-            });
-
-            it("rolls forward once it is actually the 22nd in APP_TIMEZONE", () => {
-                // 2026-06-22T05:01Z === 2026-06-22 00:01 in UTC-5.
-                jest.useFakeTimers().setSystemTime(new Date("2026-06-22T05:01:00.000Z"));
-                expect(defaultHubCustomRange()).toEqual({
-                    start: "2026-06-22",
-                    end: "2026-07-21",
-                });
-            });
-        });
-    });
-
-    describe("computeDateRange", () => {
-        it("returns no bounds for 'all'", () => {
-            expect(computeDateRange("all")).toEqual({ startDate: undefined, endDate: undefined });
-        });
-
-        it("expands a custom range to full days (00:00 → 23:59:59)", () => {
-            const { startDate, endDate } = computeDateRange("custom", "2026-06-22", "2026-07-21");
-            expect(startDate).toBeDefined();
-            expect(endDate).toBeDefined();
-
-            const start = new Date(startDate!);
-            expect(start.getFullYear()).toBe(2026);
-            expect(start.getMonth()).toBe(5); // June
-            expect(start.getDate()).toBe(22);
-            expect(start.getHours()).toBe(0);
-            expect(start.getMinutes()).toBe(0);
-            expect(start.getSeconds()).toBe(0);
-
-            const end = new Date(endDate!);
-            expect(end.getMonth()).toBe(6); // July
-            expect(end.getDate()).toBe(21);
-            expect(end.getHours()).toBe(23);
-            expect(end.getMinutes()).toBe(59);
-            expect(end.getSeconds()).toBe(59);
-        });
-
-        it("returns no bounds for 'custom' without dates", () => {
-            expect(computeDateRange("custom")).toEqual({ startDate: undefined, endDate: undefined });
-        });
-
-        describe("relative presets (anchored to 'now')", () => {
-            beforeEach(() => {
-                jest.useFakeTimers();
-                jest.setSystemTime(new Date(2026, 5, 22, 10, 30, 0)); // 2026-06-22 10:30
-            });
-            afterEach(() => {
-                jest.useRealTimers();
-            });
-
-            it("'today' spans the current day from 00:00 to 23:59:59", () => {
-                const { startDate, endDate } = computeDateRange("today");
-                const start = new Date(startDate!);
-                const end = new Date(endDate!);
-                expect(start.getDate()).toBe(22);
-                expect(start.getHours()).toBe(0);
-                expect(end.getDate()).toBe(22);
-                expect(end.getHours()).toBe(23);
-                expect(end.getMinutes()).toBe(59);
-            });
-
-            it("'month' starts on the 1st of the current month", () => {
-                const { startDate, endDate } = computeDateRange("month");
-                const start = new Date(startDate!);
-                expect(start.getDate()).toBe(1);
-                expect(start.getMonth()).toBe(5); // June
-                expect(start.getHours()).toBe(0);
-                expect(new Date(endDate!).getDate()).toBe(22); // up to "now"
-            });
-        });
-
-        it("'today' uses the APP_TIMEZONE day, not the UTC day, near midnight", () => {
-            // 2026-06-22T04:01Z === 2026-06-21 23:01 in America/Guayaquil (UTC-5).
-            // The UTC day is already the 22nd, but "today" for the user is the 21st.
-            jest.useFakeTimers().setSystemTime(new Date("2026-06-22T04:01:00.000Z"));
-            const { startDate } = computeDateRange("today");
-            const start = new Date(startDate!);
-            expect(start.getMonth()).toBe(5); // June
-            expect(start.getDate()).toBe(21);
-            jest.useRealTimers();
-        });
-    });
-
     describe("cycleRangeContaining", () => {
         it("con corte 22, una fecha anterior al corte ancla el mes previo", () => {
             expect(cycleRangeContaining(22, new Date(2026, 8, 2))).toEqual({
@@ -234,6 +85,26 @@ describe("date-range", () => {
             expect(cycleRangeContaining(22, new Date(2027, 0, 10))).toEqual({
                 start: "2026-12-22",
                 end: "2027-01-21",
+            });
+        });
+
+        it("cruza el año hacia adelante", () => {
+            // Migrado de defaultHubCustomRange ("handles year rollover in both
+            // directions"): diciembre con día >= 22 hace que el fin del ciclo (21
+            // del mes siguiente) caiga en enero del año siguiente.
+            expect(cycleRangeContaining(22, new Date(2026, 11, 25))).toEqual({
+                start: "2026-12-22",
+                end: "2027-01-21",
+            });
+        });
+
+        it("con corte 22, un día anterior al corte en febrero ancla enero", () => {
+            // Migrado de defaultHubCustomRange ("handles a sub-22 day in
+            // February"): ningún otro caso de este describe usa corte 22 con
+            // referencia en febrero.
+            expect(cycleRangeContaining(22, new Date(2026, 1, 15))).toEqual({
+                start: "2026-01-22",
+                end: "2026-02-21",
             });
         });
 
@@ -276,6 +147,35 @@ describe("date-range", () => {
             const diaDespues = new Date(`${enero.end}T00:00:00`);
             diaDespues.setDate(diaDespues.getDate() + 1);
             expect(toDateInputValue(diaDespues)).toBe(febrero.start);
+        });
+
+        describe("con reference por defecto ('ahora' resuelto en APP_TIMEZONE, UTC-5)", () => {
+            // Migrado de defaultHubCustomRange ("default reference resolves 'now'
+            // in APP_TIMEZONE"): cubre el parámetro por defecto (reference =
+            // zonedNow()), que ningún otro test de este describe ejercita.
+            afterEach(() => {
+                jest.useRealTimers();
+            });
+
+            it("no rueda en la noche del día de corte (el día UTC ya es el siguiente)", () => {
+                // 2026-06-22T04:01Z === 2026-06-21 23:01 en America/Guayaquil (UTC-5).
+                // El día UTC ya es el 22, pero el día local del usuario sigue siendo
+                // el 21, así que el ciclo vigente (22 mayo → 21 junio) sigue activo.
+                jest.useFakeTimers().setSystemTime(new Date("2026-06-22T04:01:00.000Z"));
+                expect(cycleRangeContaining(22)).toEqual({
+                    start: "2026-05-22",
+                    end: "2026-06-21",
+                });
+            });
+
+            it("rueda en cuanto es realmente el día de corte en APP_TIMEZONE", () => {
+                // 2026-06-22T05:01Z === 2026-06-22 00:01 en UTC-5.
+                jest.useFakeTimers().setSystemTime(new Date("2026-06-22T05:01:00.000Z"));
+                expect(cycleRangeContaining(22)).toEqual({
+                    start: "2026-06-22",
+                    end: "2026-07-21",
+                });
+            });
         });
     });
 

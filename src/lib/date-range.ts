@@ -20,11 +20,6 @@ export const STANDARD_PERIOD_PRESETS: { id: Exclude<RangeFilterType, "custom">; 
     { id: "month", label: "Mes" },
 ];
 
-export interface ResolvedRange {
-    startDate?: string;
-    endDate?: string;
-}
-
 /**
  * Canonical timezone the app uses to decide "what calendar day is it now".
  *
@@ -116,82 +111,6 @@ export function wallClockInputToISO(value?: string | null): string | undefined {
     const d = new Date(`${normalized}Z`);
     if (isNaN(d.getTime())) return undefined;
     return d.toISOString();
-}
-
-/**
- * Convert a filter selection into an ISO date range.
- * - "all": no bounds.
- * - "today": start/end of the current day.
- * - "week": Monday of the current week → now.
- * - "month": first day of the current month → now.
- * - "custom": the provided YYYY-MM-DD strings, expanded to full days.
- *
- * The relative presets ("today"/"week"/"month") anchor to "now" resolved in
- * {@link APP_TIMEZONE}, so the current day/week/month is the user's local one
- * rather than the day of the machine running the code (UTC on the server).
- */
-export function computeDateRange(
-    filterType: RangeFilterType,
-    customStart?: string,
-    customEnd?: string,
-): ResolvedRange {
-    const now = zonedNow();
-
-    if (filterType === "all") return { startDate: undefined, endDate: undefined };
-
-    if (filterType === "today") {
-        const start = new Date(now);
-        start.setHours(0, 0, 0, 0);
-        const end = new Date(now);
-        end.setHours(23, 59, 59, 999);
-        return { startDate: start.toISOString(), endDate: end.toISOString() };
-    }
-
-    if (filterType === "week") {
-        const start = new Date(now);
-        start.setDate(now.getDate() - now.getDay() + (now.getDay() === 0 ? -6 : 1)); // Monday
-        start.setHours(0, 0, 0, 0);
-        const end = new Date(now);
-        end.setHours(23, 59, 59, 999);
-        return { startDate: start.toISOString(), endDate: end.toISOString() };
-    }
-
-    if (filterType === "month") {
-        const start = new Date(now.getFullYear(), now.getMonth(), 1);
-        const end = new Date(now);
-        end.setHours(23, 59, 59, 999);
-        return { startDate: start.toISOString(), endDate: end.toISOString() };
-    }
-
-    if (filterType === "custom") {
-        return {
-            startDate: customStart ? new Date(customStart + "T00:00:00").toISOString() : undefined,
-            endDate: customEnd ? new Date(customEnd + "T23:59:59").toISOString() : undefined,
-        };
-    }
-
-    return {};
-}
-
-/**
- * Default custom range used across every date-range filter: the billing cycle
- * that *contains* the reference date — from the 22nd of one month (00:00) to the
- * 21st of the next (23:59). The cycle only rolls forward once we pass the 21st
- * at 23:59 (i.e. starting on the 22nd):
- *   - day >= 22 → [this month 22, next month 21]
- *   - day <= 21 → [previous month 22, this month 21]
- * (The full-day expansion is applied by computeDateRange for "custom".)
- * Returns YYYY-MM-DD strings for the date inputs.
- *
- * `reference` is interpreted through its local components. It defaults to "now"
- * resolved in {@link APP_TIMEZONE}, so the cycle rolls over on the user's local
- * day rather than the server's UTC day (see {@link zonedNow}).
- */
-export function defaultHubCustomRange(reference: Date = zonedNow()): { start: string; end: string } {
-    const anchorMonth = reference.getDate() >= 22 ? reference.getMonth() : reference.getMonth() - 1;
-    const start = new Date(reference.getFullYear(), anchorMonth, 22);
-    const end = new Date(reference.getFullYear(), anchorMonth + 1, 21);
-    return { start: toDateInputValue(start), end: toDateInputValue(end) };
 }
 
 /** Días que tiene un mes. `month` puede desbordar (−1, 12): Date lo normaliza. */
