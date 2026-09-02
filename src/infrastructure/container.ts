@@ -161,6 +161,7 @@ import { BankIdentificationService } from "@/application/services/bank-identific
 import { NotificationService } from "@/application/services/notification-service";
 import { PushSubscriptionService } from "@/application/services/push-subscription-service";
 import { BalanceService } from "@/application/services/balance-service";
+import { PeriodSettingsService } from "@/application/services/period-settings-service";
 
 export const authService = new AuthService(userRepository, passwordResetTokenRepository);
 export const userService = new UserService(userRepository);
@@ -209,6 +210,7 @@ export const balanceService = new BalanceService(
     financialCategoryRepository,
     balanceSettingsRepository,
 );
+export const periodSettingsService = new PeriodSettingsService(periodSettingsRepository);
 export const financialSettingsService = new FinancialSettingsService(financialInstitutionTypeRepository, financialInstitutionRepository, financialCategoryRepository, financialTransactionRepository);
 export const notificationService = new NotificationService(notificationRepository);
 export const pushSubscriptionService = new PushSubscriptionService(pushSubscriptionRepository);
