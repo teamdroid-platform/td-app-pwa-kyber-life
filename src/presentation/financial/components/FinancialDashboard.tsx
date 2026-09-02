@@ -14,7 +14,8 @@ import { useFinancialRealtime } from "../hooks/useFinancialRealtime";
 import { Filter, ChevronDown } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RobotLoader } from "@/components/ui/RobotLoader";
-import { defaultHubCustomRange, STANDARD_PERIOD_PRESETS } from "@/lib/date-range";
+import { STANDARD_PERIOD_PRESETS, cycleToDate, toFullDayIsoRange } from "@/lib/date-range";
+import { useCycleRange, useCycleStartDay } from "@/presentation/components/period/PeriodSettingsProvider";
 import { cn } from "@/lib/utils";
 import { BalanceHeroCard } from "./BalanceHeroCard";
 import { BalanceModeSwitch, balanceValue } from "./BalanceModeSwitch";
@@ -50,8 +51,10 @@ const DASHBOARD_TABS = [
 
 export function FinancialDashboard() {
     const [filterType, setFilterType] = useState<"all" | "today" | "week" | "month" | "custom">("custom");
-    const [customStartDate, setCustomStartDate] = useState<string>(() => defaultHubCustomRange().start);
-    const [customEndDate, setCustomEndDate] = useState<string>(() => defaultHubCustomRange().end);
+    const cycleStartDay = useCycleStartDay();
+    const defaultCycle = useCycleRange();
+    const [customStartDate, setCustomStartDate] = useState<string>(defaultCycle.start);
+    const [customEndDate, setCustomEndDate] = useState<string>(defaultCycle.end);
     const [categoryLimit, setCategoryLimit] = useState<number>(5);
     const [institutionLimit, setInstitutionLimit] = useState<number>(5);
     // Mobile-only: filters collapsed by default (accordion), matching the
@@ -89,10 +92,9 @@ export function FinancialDashboard() {
         }
 
         if (filterType === "month") {
-            const start = new Date(now.getFullYear(), now.getMonth(), 1);
-            const end = new Date(now);
-            end.setHours(23, 59, 59, 999);
-            return { startDate: start.toISOString(), endDate: end.toISOString() };
+            // "Mes" es lo que llevas del ciclo, contado desde tu día de corte.
+            const { startDate, endDate } = toFullDayIsoRange(cycleToDate(cycleStartDay));
+            return { startDate, endDate };
         }
 
         if (filterType === "custom") {
@@ -103,7 +105,7 @@ export function FinancialDashboard() {
         }
 
         return {};
-    }, [filterType, debouncedStartDate, debouncedEndDate]);
+    }, [filterType, debouncedStartDate, debouncedEndDate, cycleStartDay]);
 
     const { kpis: rawKpis, monthly, typeBreakdown, categoryBreakdown: rawCategoryBreakdown, institutionBreakdown: rawInstitutionBreakdown, dailyBreakdown: rawDailyBreakdown, loading, refetching, refresh } =
         useFinancialDashboard(startDate, endDate);

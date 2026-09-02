@@ -19,7 +19,8 @@ import { FinancialCategory, FinancialInstitution } from "@/domain/entities/finan
 import { useState, useEffect, useCallback } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { defaultHubCustomRange, STANDARD_PERIOD_PRESETS } from "@/lib/date-range";
+import { STANDARD_PERIOD_PRESETS } from "@/lib/date-range";
+import { useCycleRange } from "@/presentation/components/period/PeriodSettingsProvider";
 import { PeriodFilter } from "@/components/ui/period-filter";
 
 // ─── Date Preset Helpers ─────────────────────────────────────
@@ -62,12 +63,6 @@ function toLocalDateValue(iso: string): string {
     return `${year}-${month}-${day}`;
 }
 
-function getDefaultCustomDates() {
-    // Billing cycle that contains today (22nd of one month → 21st of the next).
-    const { start, end } = defaultHubCustomRange();
-    return { from: start, to: end };
-}
-
 // ─── Component ───────────────────────────────────────────────
 
 export interface TransactionFiltersProps {
@@ -101,9 +96,9 @@ export function TransactionFilters({ categories = [], institutions = [] }: Trans
     );
 
     // ── Custom date inputs (local YYYY-MM-DD) ────────────────
-    const defaultCustom = getDefaultCustomDates();
-    const [customFrom, setCustomFrom] = useState(urlDateFrom ? toLocalDateValue(urlDateFrom) : defaultCustom.from);
-    const [customTo, setCustomTo] = useState(urlDateTo ? toLocalDateValue(urlDateTo) : defaultCustom.to);
+    const cycle = useCycleRange();
+    const [customFrom, setCustomFrom] = useState(urlDateFrom ? toLocalDateValue(urlDateFrom) : cycle.start);
+    const [customTo, setCustomTo] = useState(urlDateTo ? toLocalDateValue(urlDateTo) : cycle.end);
 
     // Debounce search update
     useEffect(() => {
@@ -194,8 +189,8 @@ export function TransactionFilters({ categories = [], institutions = [] }: Trans
         setDateFrom("");
         setDateTo("");
         setActivePreset("all");
-        setCustomFrom(defaultCustom.from);
-        setCustomTo(defaultCustom.to);
+        setCustomFrom(cycle.start);
+        setCustomTo(cycle.end);
         const params = new URLSearchParams(searchParams.toString());
         params.delete("dateFrom");
         params.delete("dateTo");
