@@ -19,8 +19,8 @@ import { FinancialCategory, FinancialInstitution } from "@/domain/entities/finan
 import { useState, useEffect, useCallback } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { STANDARD_PERIOD_PRESETS } from "@/lib/date-range";
-import { useCycleRange } from "@/presentation/components/period/PeriodSettingsProvider";
+import { STANDARD_PERIOD_PRESETS, cycleToDate, toFullDayIsoRange } from "@/lib/date-range";
+import { useCycleRange, useCycleStartDay } from "@/presentation/components/period/PeriodSettingsProvider";
 import { PeriodFilter } from "@/components/ui/period-filter";
 
 // ─── Date Preset Helpers ─────────────────────────────────────
@@ -28,7 +28,10 @@ import { PeriodFilter } from "@/components/ui/period-filter";
 type DatePreset = "today" | "week" | "month" | "all" | "custom";
 
 
-function getPresetRange(preset: Exclude<DatePreset, "custom">): { from: string; to: string; range?: string } {
+function getPresetRange(
+    preset: Exclude<DatePreset, "custom">,
+    cycleStartDay: number,
+): { from: string; to: string; range?: string } {
     const now = new Date();
     const toDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
     const toStr = toDate.toISOString();
@@ -45,8 +48,9 @@ function getPresetRange(preset: Exclude<DatePreset, "custom">): { from: string; 
             return { from: from.toISOString(), to: toStr };
         }
         case "month": {
-            const from = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0);
-            return { from: from.toISOString(), to: toStr };
+            // "Mes" es lo que llevas del ciclo, contado desde tu día de corte.
+            const { startDate, endDate } = toFullDayIsoRange(cycleToDate(cycleStartDay));
+            return { from: startDate, to: endDate };
         }
         case "all": {
             return { from: "", to: "", range: "all" };
@@ -97,6 +101,7 @@ export function TransactionFilters({ categories = [], institutions = [] }: Trans
 
     // ── Custom date inputs (local YYYY-MM-DD) ────────────────
     const cycle = useCycleRange();
+    const cycleStartDay = useCycleStartDay();
     const [customFrom, setCustomFrom] = useState(urlDateFrom ? toLocalDateValue(urlDateFrom) : cycle.start);
     const [customTo, setCustomTo] = useState(urlDateTo ? toLocalDateValue(urlDateTo) : cycle.end);
 
@@ -166,7 +171,7 @@ export function TransactionFilters({ categories = [], institutions = [] }: Trans
 
     const handlePresetClick = (preset: Exclude<DatePreset, "custom">) => {
         setActivePreset(preset);
-        const { from, to, range } = getPresetRange(preset);
+        const { from, to, range } = getPresetRange(preset, cycleStartDay);
         applyDateFilter(from, to, range);
     };
 
