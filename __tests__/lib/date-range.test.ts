@@ -5,6 +5,11 @@ import {
     wallClockInputToISO,
     defaultHubCustomRange,
     computeDateRange,
+    cycleRangeContaining,
+    cycleToDate,
+    cyclePreviousRange,
+    toFullDayDates,
+    toFullDayIsoRange,
 } from "@/lib/date-range";
 
 describe("date-range", () => {
@@ -203,6 +208,127 @@ describe("date-range", () => {
             expect(start.getMonth()).toBe(5); // June
             expect(start.getDate()).toBe(21);
             jest.useRealTimers();
+        });
+    });
+
+    describe("cycleRangeContaining", () => {
+        it("con corte 22, una fecha anterior al corte ancla el mes previo", () => {
+            expect(cycleRangeContaining(22, new Date(2026, 8, 2))).toEqual({
+                start: "2026-08-22",
+                end: "2026-09-21",
+            });
+        });
+
+        it("rueda exactamente el día del corte", () => {
+            expect(cycleRangeContaining(22, new Date(2026, 8, 21))).toEqual({
+                start: "2026-08-22",
+                end: "2026-09-21",
+            });
+            expect(cycleRangeContaining(22, new Date(2026, 8, 22))).toEqual({
+                start: "2026-09-22",
+                end: "2026-10-21",
+            });
+        });
+
+        it("cruza el año hacia atrás", () => {
+            expect(cycleRangeContaining(22, new Date(2027, 0, 10))).toEqual({
+                start: "2026-12-22",
+                end: "2027-01-21",
+            });
+        });
+
+        it("con corte 1 devuelve el mes natural completo, de 30 días", () => {
+            expect(cycleRangeContaining(1, new Date(2026, 8, 15))).toEqual({
+                start: "2026-09-01",
+                end: "2026-09-30",
+            });
+        });
+
+        it("con corte 1 devuelve el mes natural completo, de 31 días", () => {
+            expect(cycleRangeContaining(1, new Date(2026, 9, 15))).toEqual({
+                start: "2026-10-01",
+                end: "2026-10-31",
+            });
+        });
+
+        it("con corte 1 resuelve febrero sin caso especial", () => {
+            expect(cycleRangeContaining(1, new Date(2026, 1, 15))).toEqual({
+                start: "2026-02-01",
+                end: "2026-02-28",
+            });
+        });
+
+        it("con corte 31 recorta el ancla al último día real de febrero", () => {
+            expect(cycleRangeContaining(31, new Date(2026, 1, 15))).toEqual({
+                start: "2026-01-31",
+                end: "2026-02-27",
+            });
+        });
+
+        it("con corte 31 encadena ciclos desiguales sin huecos ni solapes", () => {
+            const enero = cycleRangeContaining(31, new Date(2026, 1, 15));
+            const febrero = cycleRangeContaining(31, new Date(2026, 2, 15));
+
+            expect(enero).toEqual({ start: "2026-01-31", end: "2026-02-27" });
+            expect(febrero).toEqual({ start: "2026-02-28", end: "2026-03-30" });
+
+            // El día siguiente al fin de un ciclo es el inicio del siguiente.
+            const diaDespues = new Date(`${enero.end}T00:00:00`);
+            diaDespues.setDate(diaDespues.getDate() + 1);
+            expect(toDateInputValue(diaDespues)).toBe(febrero.start);
+        });
+    });
+
+    describe("cycleToDate", () => {
+        it("arranca en el inicio del ciclo y termina en la referencia", () => {
+            expect(cycleToDate(22, new Date(2026, 8, 10))).toEqual({
+                start: "2026-08-22",
+                end: "2026-09-10",
+            });
+        });
+
+        it("con corte 1 es el mes natural hasta hoy", () => {
+            expect(cycleToDate(1, new Date(2026, 8, 10))).toEqual({
+                start: "2026-09-01",
+                end: "2026-09-10",
+            });
+        });
+    });
+
+    describe("cyclePreviousRange", () => {
+        it("devuelve el ciclo inmediatamente anterior", () => {
+            expect(cyclePreviousRange(22, new Date(2026, 8, 2))).toEqual({
+                start: "2026-07-22",
+                end: "2026-08-21",
+            });
+        });
+
+        it("con corte 31 no solapa aunque los ciclos midan distinto", () => {
+            // El ciclo actual es 2026-02-28 → 2026-03-30; el anterior, 2026-01-31 → 2026-02-27.
+            expect(cyclePreviousRange(31, new Date(2026, 2, 15))).toEqual({
+                start: "2026-01-31",
+                end: "2026-02-27",
+            });
+        });
+    });
+
+    describe("toFullDayDates / toFullDayIsoRange", () => {
+        it("expande a día completo, del primer al último milisegundo", () => {
+            const { start, end } = toFullDayDates({ start: "2026-08-22", end: "2026-09-21" });
+            expect(start.getHours()).toBe(0);
+            expect(start.getMinutes()).toBe(0);
+            expect(end.getHours()).toBe(23);
+            expect(end.getMinutes()).toBe(59);
+            expect(end.getSeconds()).toBe(59);
+            expect(end.getMilliseconds()).toBe(999);
+        });
+
+        it("la versión ISO devuelve los mismos instantes serializados", () => {
+            const dates = toFullDayDates({ start: "2026-08-22", end: "2026-09-21" });
+            expect(toFullDayIsoRange({ start: "2026-08-22", end: "2026-09-21" })).toEqual({
+                startDate: dates.start.toISOString(),
+                endDate: dates.end.toISOString(),
+            });
         });
     });
 });

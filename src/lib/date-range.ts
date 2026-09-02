@@ -193,3 +193,91 @@ export function defaultHubCustomRange(reference: Date = zonedNow()): { start: st
     const end = new Date(reference.getFullYear(), anchorMonth + 1, 21);
     return { start: toDateInputValue(start), end: toDateInputValue(end) };
 }
+
+/** Días que tiene un mes. `month` puede desbordar (−1, 12): Date lo normaliza. */
+function daysInMonth(year: number, month: number): number {
+    return new Date(year, month + 1, 0).getDate();
+}
+
+/**
+ * El día de corte, recortado al último día real del mes. Con corte 31, febrero
+ * ancla el 28: no hay forma de anclar un día que no existe.
+ */
+function anchorDay(year: number, month: number, startDay: number): number {
+    return Math.min(startDay, daysInMonth(year, month));
+}
+
+/**
+ * Ciclo que contiene `reference`, con extremos en YYYY-MM-DD.
+ *
+ * El fin es la víspera del ancla siguiente, nunca un día guardado: así dos
+ * ciclos consecutivos no pueden dejar hueco ni solaparse, ni siquiera cuando
+ * miden distinto por el recorte de los meses cortos.
+ *
+ * `reference` se lee por sus componentes locales y por defecto es "ahora"
+ * resuelto en {@link APP_TIMEZONE}, para que el ciclo ruede con el día local
+ * del usuario y no con el día UTC del servidor (ver {@link zonedNow}).
+ */
+export function cycleRangeContaining(
+    startDay: number,
+    reference: Date = zonedNow(),
+): { start: string; end: string } {
+    const year = reference.getFullYear();
+    const month = reference.getMonth();
+
+    const anchorThisMonth = anchorDay(year, month, startDay);
+    const anchorMonth = reference.getDate() >= anchorThisMonth ? month : month - 1;
+
+    const start = new Date(year, anchorMonth, anchorDay(year, anchorMonth, startDay));
+    const nextAnchor = new Date(year, anchorMonth + 1, anchorDay(year, anchorMonth + 1, startDay));
+    const end = new Date(nextAnchor);
+    end.setDate(nextAnchor.getDate() - 1);
+
+    return { start: toDateInputValue(start), end: toDateInputValue(end) };
+}
+
+/** Ciclo actual hasta `reference` inclusive — el preset "Mes" de Finanzas. */
+export function cycleToDate(
+    startDay: number,
+    reference: Date = zonedNow(),
+): { start: string; end: string } {
+    return {
+        start: cycleRangeContaining(startDay, reference).start,
+        end: toDateInputValue(reference),
+    };
+}
+
+/**
+ * El ciclo inmediatamente anterior al que contiene `reference`.
+ *
+ * Se calcula retrocediendo un día desde el inicio del ciclo actual, no restando
+ * un mes: con corte 31 los ciclos no miden lo mismo y restar meses produciría
+ * solapes.
+ */
+export function cyclePreviousRange(
+    startDay: number,
+    reference: Date = zonedNow(),
+): { start: string; end: string } {
+    const current = cycleRangeContaining(startDay, reference);
+    const dayBefore = new Date(`${current.start}T00:00:00`);
+    dayBefore.setDate(dayBefore.getDate() - 1);
+    return cycleRangeContaining(startDay, dayBefore);
+}
+
+/** Expande un rango YYYY-MM-DD a Dates locales de día completo. */
+export function toFullDayDates(
+    range: { start: string; end: string },
+): { start: Date; end: Date } {
+    const start = new Date(`${range.start}T00:00:00`);
+    const end = new Date(`${range.end}T00:00:00`);
+    end.setHours(23, 59, 59, 999);
+    return { start, end };
+}
+
+/** Lo mismo que {@link toFullDayDates}, serializado para las consultas. */
+export function toFullDayIsoRange(
+    range: { start: string; end: string },
+): { startDate: string; endDate: string } {
+    const { start, end } = toFullDayDates(range);
+    return { startDate: start.toISOString(), endDate: end.toISOString() };
+}
