@@ -10,7 +10,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { InstitutionManager } from "./InstitutionManager";
 import { CategoryManager } from "./CategoryManager";
 import { BalanceScopeManager } from "./BalanceScopeManager";
-import { Building2, Tags, Scale } from "lucide-react";
+import { Building2, Tags, Scale, CalendarRange } from "lucide-react";
+import { PeriodSettingsManager } from "@/presentation/components/period/PeriodSettingsManager";
 
 interface SettingsDashboardProps {
     initialInstitutions: FinancialInstitution[];
@@ -21,6 +22,7 @@ interface SettingsDashboardProps {
     bankInstitutions: BankInstitution[];
     bankAccounts: BankAccountWithBalance[];
     bankCards: BankCardWithDebt[];
+    financialCycleStartDay: number;
 }
 
 /**
@@ -37,6 +39,7 @@ export function SettingsDashboard({
     bankInstitutions,
     bankAccounts,
     bankCards,
+    financialCycleStartDay,
 }: SettingsDashboardProps) {
     // Las etiquetas de cuenta/tarjeta se calculan al mostrar, no se guardan:
     // mismo criterio que el resto del módulo Bancos (ver bank-identity-label.ts).
@@ -55,7 +58,7 @@ export function SettingsDashboard({
 
     return (
         <Tabs defaultValue="institutions" className="w-full">
-            <TabsList className="grid w-full grid-cols-3 mb-8 bg-muted/50 p-1 rounded-xl">
+            <TabsList className="grid w-full grid-cols-4 mb-8 bg-muted/50 p-1 rounded-xl">
                 <TabsTrigger value="institutions" className="flex items-center gap-2 rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm py-2">
                     <Building2 className="w-4 h-4" />
                     <span className="hidden sm:inline font-medium">Instituciones</span>
@@ -67,6 +70,10 @@ export function SettingsDashboard({
                 <TabsTrigger value="balances" className="flex items-center gap-2 rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm py-2">
                     <Scale className="w-4 h-4" />
                     <span className="hidden sm:inline font-medium">Balances</span>
+                </TabsTrigger>
+                <TabsTrigger value="periods" className="flex items-center gap-2 rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm py-2">
+                    <CalendarRange className="w-4 h-4" />
+                    <span className="hidden sm:inline font-medium">Periodos</span>
                 </TabsTrigger>
             </TabsList>
             <TabsContent value="institutions" className="mt-0">
@@ -83,6 +90,9 @@ export function SettingsDashboard({
                     accounts={scopeAccounts}
                     cards={scopeCards}
                 />
+            </TabsContent>
+            <TabsContent value="periods" className="mt-0">
+                <PeriodSettingsManager scope="FINANCIAL" cycleStartDay={financialCycleStartDay} />
             </TabsContent>
         </Tabs>
     );

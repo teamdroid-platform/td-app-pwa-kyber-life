@@ -3,7 +3,8 @@ import { TransactionTimeline } from "@/presentation/financial/components/Transac
 import { TransactionFilters } from "@/presentation/financial/components/TransactionFilters";
 import { searchPaginatedTransactionsAction, searchAllFilteredTransactionsAction } from "@/app/actions/financial-transactions";
 import type { FinancialTransaction } from "@/domain/entities/financial";
-import { balanceService } from "@/infrastructure/container";
+import { DEFAULT_CYCLE_START_DAY } from "@/domain/entities/period";
+import { balanceService, periodSettingsService } from "@/infrastructure/container";
 import { requireUserId } from "@/infrastructure/supabase/auth-user";
 import { getCategoriesAction, getInstitutionsAction } from "@/app/actions/financial-settings";
 import { Button } from "@/components/ui/button";
@@ -11,7 +12,7 @@ import { Plus, Inbox as InboxIcon, PieChart } from "lucide-react";
 import Link from "next/link";
 import { TransactionTabs } from "@/presentation/financial/components/TransactionTabs";
 import { NewTransactionDialog } from "@/presentation/financial/components/ai-capture/NewTransactionDialog";
-import { defaultHubCustomRange } from "@/lib/date-range";
+import { cycleRangeContaining, toFullDayIsoRange } from "@/lib/date-range";
 
 // Always render fresh on the server so a type-filter navigation refetches the
 // correctly filtered first page instead of serving a cached route payload.
@@ -25,6 +26,22 @@ function formatRangeLabel(startISO?: string, endISO?: string): string {
     const start = fmt(startISO);
     const end = fmt(endISO);
     return start === end ? start : `${start} – ${end}`;
+}
+
+/**
+ * Día de corte de Finanzas para el usuario autenticado. `requireUserId()` lanza
+ * "Unauthorized" cuando no hay sesión de Supabase que resolver —los modos MOCK
+ * y MEMORY, donde la sesión vive en la cookie `kyber_session`—, así que aquí se
+ * atrapa y se degrada al defecto del ámbito en vez de tumbar la página, con el
+ * mismo criterio tolerante que ya usa `getAllCycleStartDaysAction`.
+ */
+async function resolveFinancialCycleStartDay(): Promise<number> {
+    try {
+        const userId = await requireUserId();
+        return await periodSettingsService.getCycleStartDay(userId, 'FINANCIAL');
+    } catch {
+        return DEFAULT_CYCLE_START_DAY.FINANCIAL;
+    }
 }
 
 export default async function TransactionsPage({
@@ -48,12 +65,15 @@ export default async function TransactionsPage({
     let dateFrom = typeof params.dateFrom === 'string' ? params.dateFrom : undefined;
     let dateTo = typeof params.dateTo === 'string' ? params.dateTo : undefined;
 
-    // Default range: the billing cycle that contains today (22nd of one month →
-    // 21st of the next), matching every other date-range filter.
+    // Rango por defecto: el ciclo que contiene hoy, con el día de corte que el
+    // usuario haya guardado para Finanzas. Si no hay sesión que resolver —modos
+    // MOCK y MEMORY, donde la sesión es la cookie y no Supabase— se degrada al
+    // defecto en vez de tumbar la pantalla.
     if (!dateFrom && !dateTo && range !== 'all') {
-        const cycle = defaultHubCustomRange();
-        dateFrom = new Date(`${cycle.start}T00:00:00`).toISOString();
-        dateTo = new Date(`${cycle.end}T23:59:59`).toISOString();
+        const cycleStartDay = await resolveFinancialCycleStartDay();
+        const iso = toFullDayIsoRange(cycleRangeContaining(cycleStartDay));
+        dateFrom = iso.startDate;
+        dateTo = iso.endDate;
     }
 
     const [initialResult, allFilteredResult, categories, institutions] = await Promise.all([

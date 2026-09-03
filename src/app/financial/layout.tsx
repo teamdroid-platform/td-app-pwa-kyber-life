@@ -1,8 +1,9 @@
 import { AppLayout } from "@/presentation/components/layout/AppLayout";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { initializeContainer, userRepository } from "@/infrastructure/container";
+import { initializeContainer, userRepository, periodSettingsService } from "@/infrastructure/container";
 import { FinancialRealtimeProvider } from "@/presentation/financial/components/FinancialRealtimeProvider";
+import { PeriodSettingsProvider } from "@/presentation/components/period/PeriodSettingsProvider";
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -76,14 +77,18 @@ export default async function FinancialLayout({
         redirect("/auth/login");
     }
 
+    const cycleStartDay = await periodSettingsService.getCycleStartDay(user.id, 'FINANCIAL');
+
     return (
         <AppLayout user={user}>
             <div className="flex flex-col w-full h-full">
                 <main className="flex-1 w-full flex flex-col items-center">
                     <div className="w-full max-w-5xl">
-                        <FinancialRealtimeProvider>
-                            {children}
-                        </FinancialRealtimeProvider>
+                        <PeriodSettingsProvider cycleStartDay={cycleStartDay}>
+                            <FinancialRealtimeProvider>
+                                {children}
+                            </FinancialRealtimeProvider>
+                        </PeriodSettingsProvider>
                     </div>
                 </main>
             </div>

@@ -5,11 +5,12 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { PeriodFilter } from "@/components/ui/period-filter";
 import { formatRangeLabel } from "@/components/ui/range-calendar";
-import { defaultHubCustomRange, STANDARD_PERIOD_PRESETS } from "@/lib/date-range";
+import { cycleRangeContaining, toFullDayIsoRange, STANDARD_PERIOD_PRESETS } from "@/lib/date-range";
+import { useCycleRange, useCycleStartDay } from "@/presentation/components/period/PeriodSettingsProvider";
 
 export type FilterType = "all" | "today" | "week" | "month" | "custom";
 
-const getDateRange = (type: FilterType): { start?: string, end?: string } => {
+const getDateRange = (type: FilterType, cycleStartDay: number): { start?: string, end?: string } => {
     const now = new Date();
     
     if (type === "today") {
@@ -30,11 +31,10 @@ const getDateRange = (type: FilterType): { start?: string, end?: string } => {
         return { start: start.toISOString(), end: end.toISOString() };
     }
     if (type === "month") {
-        const start = new Date(now.getFullYear(), now.getMonth(), 1);
-        start.setHours(0, 0, 0, 0);
-        const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-        end.setHours(23, 59, 59, 999);
-        return { start: start.toISOString(), end: end.toISOString() };
+        // En Compras, "Mes" es el ciclo entero: se analiza un periodo cerrado,
+        // no lo que se lleva gastado. Con día 1 es exactamente el mes natural.
+        const { startDate, endDate } = toFullDayIsoRange(cycleRangeContaining(cycleStartDay));
+        return { start: startDate, end: endDate };
     }
     return {};
 };
@@ -42,7 +42,10 @@ const getDateRange = (type: FilterType): { start?: string, end?: string } => {
 export function MarketDateFilterBar() {
     const router = useRouter();
     const searchParams = useSearchParams();
-    
+
+    const cycleStartDay = useCycleStartDay();
+    const cycle = useCycleRange();
+
     const [filterType, setFilterType] = useState<FilterType>("month");
     const [customStartDate, setCustomStartDate] = useState<string>("");
     const [customEndDate, setCustomEndDate] = useState<string>("");
@@ -56,7 +59,7 @@ export function MarketDateFilterBar() {
 
         // No (valid) filter in the URL → default to the current month and hydrate it.
         if (!type || !validTypes.includes(type)) {
-            const range = getDateRange("month");
+            const range = getDateRange("month", cycleStartDay);
             setFilterType("month");
             const params = new URLSearchParams(searchParams);
             params.set("filter", "month");
@@ -94,7 +97,7 @@ export function MarketDateFilterBar() {
         // Hydrate missing dates (fixes bookmarks without dates).
         if (type !== "all" && (!start || !end)) {
             if (type === "custom") {
-                const def = defaultHubCustomRange();
+                const def = cycle;
                 setCustomStartDate(def.start);
                 setCustomEndDate(def.end);
                 const params = new URLSearchParams(searchParams);
@@ -102,7 +105,7 @@ export function MarketDateFilterBar() {
                 params.set("endDate", new Date(def.end + "T23:59:59.999").toISOString());
                 router.replace(`?${params.toString()}`, { scroll: false });
             } else {
-                const range = getDateRange(type);
+                const range = getDateRange(type, cycleStartDay);
                 if (range.start && range.end) {
                     const params = new URLSearchParams(searchParams);
                     params.set("startDate", range.start);
@@ -111,7 +114,7 @@ export function MarketDateFilterBar() {
                 }
             }
         }
-    }, [searchParams, router]);
+    }, [searchParams, router, cycleStartDay, cycle]);
 
     const updateFilter = (type: FilterType, start?: string, end?: string) => {
         const params = new URLSearchParams(searchParams);
@@ -131,7 +134,7 @@ export function MarketDateFilterBar() {
             params.delete("startDate");
             params.delete("endDate");
         } else {
-            const range = getDateRange(type);
+            const range = getDateRange(type, cycleStartDay);
             if (range.start) params.set("startDate", range.start);
             if (range.end) params.set("endDate", range.end);
         }
@@ -145,9 +148,9 @@ export function MarketDateFilterBar() {
         if (type !== "custom") {
             updateFilter(type);
         } else {
-            // For custom, reuse existing dates or fall back to the default 22..21 cycle.
+            // Personalizado: si ya hay fechas elegidas se reutilizan; si no, cae al ciclo de Compras que el usuario tenga configurado (mes natural por defecto).
             if (!customStartDate || !customEndDate) {
-                const def = defaultHubCustomRange();
+                const def = cycle;
                 setCustomStartDate(def.start);
                 setCustomEndDate(def.end);
                 updateFilter("custom", def.start, def.end);

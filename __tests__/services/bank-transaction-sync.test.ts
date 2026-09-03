@@ -156,3 +156,57 @@ describe("syncTransactionBankLinks — con números enmascarados", () => {
         expect(links.bankSourceAccountId).toBe(elegida.id);
     });
 });
+
+describe("de qué lado queda la cuenta, según el tipo", () => {
+    // El escáner marca como «origen» la cuenta protagonista del comprobante,
+    // también en uno de ingreso. Guardada así, la cuenta entregaba el dinero
+    // que en realidad recibió y su saldo se movía al revés.
+    it("un ingreso guarda su cuenta en el destino, aunque llegue como origen", async () => {
+        const { service } = build();
+
+        const links = await service.syncTransactionBankLinks(USER, {
+            type: "INCOME",
+            merchant: "Banco Pichincha",
+            bankSourceAccountId: "acc-1",
+        });
+
+        expect(links.bankDestinationAccountId).toBe("acc-1");
+        expect(links.bankSourceAccountId).toBeNull();
+    });
+
+    it("un gasto no se toca: su cuenta entrega el dinero", async () => {
+        const { service } = build();
+
+        const links = await service.syncTransactionBankLinks(USER, {
+            type: "EXPENSE",
+            merchant: "Banco Pichincha",
+            bankSourceAccountId: "acc-1",
+        });
+
+        expect(links.bankSourceAccountId).toBe("acc-1");
+        expect(links.bankDestinationAccountId).toBeNull();
+    });
+
+    it("con las dos puntas puestas, manda lo que eligió el usuario", async () => {
+        const { service } = build();
+
+        const links = await service.syncTransactionBankLinks(USER, {
+            type: "DEPOSIT",
+            bankSourceAccountId: "acc-1",
+            bankDestinationAccountId: "acc-2",
+        });
+
+        expect(links.bankSourceAccountId).toBe("acc-1");
+        expect(links.bankDestinationAccountId).toBe("acc-2");
+    });
+
+    it("sin tipo declarado, nada se mueve", async () => {
+        const { service } = build();
+
+        const links = await service.syncTransactionBankLinks(USER, {
+            bankSourceAccountId: "acc-1",
+        });
+
+        expect(links.bankSourceAccountId).toBe("acc-1");
+    });
+});

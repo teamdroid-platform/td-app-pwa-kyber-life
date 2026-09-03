@@ -1,8 +1,12 @@
 /**
- * Shared date-range resolution for dashboard filters.
+ * Utilidades de fechas compartidas por los filtros de rango de la app.
  *
- * Extracted from FinancialDashboard so the financial dashboard and the main
- * dashboard hub compute the same ISO range for "today / week / month / custom".
+ * Reúne tres responsabilidades: formatear fechas para los inputs (`<input
+ * type="date">` y `datetime-local`); el reloj anclado a {@link APP_TIMEZONE}
+ * ({@link zonedNow}), para que "hoy" se resuelva en el día local del usuario y
+ * no en el día UTC del servidor; y el cálculo del ciclo mensual a partir de un
+ * día de corte configurable (`cycleRangeContaining`, `cycleToDate`,
+ * `cyclePreviousRange`).
  */
 
 export type RangeFilterType = "all" | "today" | "week" | "month" | "custom";
@@ -19,11 +23,6 @@ export const STANDARD_PERIOD_PRESETS: { id: Exclude<RangeFilterType, "custom">; 
     { id: "week", label: "Semana" },
     { id: "month", label: "Mes" },
 ];
-
-export interface ResolvedRange {
-    startDate?: string;
-    endDate?: string;
-}
 
 /**
  * Canonical timezone the app uses to decide "what calendar day is it now".
@@ -118,78 +117,90 @@ export function wallClockInputToISO(value?: string | null): string | undefined {
     return d.toISOString();
 }
 
-/**
- * Convert a filter selection into an ISO date range.
- * - "all": no bounds.
- * - "today": start/end of the current day.
- * - "week": Monday of the current week → now.
- * - "month": first day of the current month → now.
- * - "custom": the provided YYYY-MM-DD strings, expanded to full days.
- *
- * The relative presets ("today"/"week"/"month") anchor to "now" resolved in
- * {@link APP_TIMEZONE}, so the current day/week/month is the user's local one
- * rather than the day of the machine running the code (UTC on the server).
- */
-export function computeDateRange(
-    filterType: RangeFilterType,
-    customStart?: string,
-    customEnd?: string,
-): ResolvedRange {
-    const now = zonedNow();
-
-    if (filterType === "all") return { startDate: undefined, endDate: undefined };
-
-    if (filterType === "today") {
-        const start = new Date(now);
-        start.setHours(0, 0, 0, 0);
-        const end = new Date(now);
-        end.setHours(23, 59, 59, 999);
-        return { startDate: start.toISOString(), endDate: end.toISOString() };
-    }
-
-    if (filterType === "week") {
-        const start = new Date(now);
-        start.setDate(now.getDate() - now.getDay() + (now.getDay() === 0 ? -6 : 1)); // Monday
-        start.setHours(0, 0, 0, 0);
-        const end = new Date(now);
-        end.setHours(23, 59, 59, 999);
-        return { startDate: start.toISOString(), endDate: end.toISOString() };
-    }
-
-    if (filterType === "month") {
-        const start = new Date(now.getFullYear(), now.getMonth(), 1);
-        const end = new Date(now);
-        end.setHours(23, 59, 59, 999);
-        return { startDate: start.toISOString(), endDate: end.toISOString() };
-    }
-
-    if (filterType === "custom") {
-        return {
-            startDate: customStart ? new Date(customStart + "T00:00:00").toISOString() : undefined,
-            endDate: customEnd ? new Date(customEnd + "T23:59:59").toISOString() : undefined,
-        };
-    }
-
-    return {};
+/** Días que tiene un mes. `month` puede desbordar (−1, 12): Date lo normaliza. */
+function daysInMonth(year: number, month: number): number {
+    return new Date(year, month + 1, 0).getDate();
 }
 
 /**
- * Default custom range used across every date-range filter: the billing cycle
- * that *contains* the reference date — from the 22nd of one month (00:00) to the
- * 21st of the next (23:59). The cycle only rolls forward once we pass the 21st
- * at 23:59 (i.e. starting on the 22nd):
- *   - day >= 22 → [this month 22, next month 21]
- *   - day <= 21 → [previous month 22, this month 21]
- * (The full-day expansion is applied by computeDateRange for "custom".)
- * Returns YYYY-MM-DD strings for the date inputs.
- *
- * `reference` is interpreted through its local components. It defaults to "now"
- * resolved in {@link APP_TIMEZONE}, so the cycle rolls over on the user's local
- * day rather than the server's UTC day (see {@link zonedNow}).
+ * El día de corte, recortado al último día real del mes. Con corte 31, febrero
+ * ancla el 28: no hay forma de anclar un día que no existe.
  */
-export function defaultHubCustomRange(reference: Date = zonedNow()): { start: string; end: string } {
-    const anchorMonth = reference.getDate() >= 22 ? reference.getMonth() : reference.getMonth() - 1;
-    const start = new Date(reference.getFullYear(), anchorMonth, 22);
-    const end = new Date(reference.getFullYear(), anchorMonth + 1, 21);
+function anchorDay(year: number, month: number, startDay: number): number {
+    return Math.min(startDay, daysInMonth(year, month));
+}
+
+/**
+ * Ciclo que contiene `reference`, con extremos en YYYY-MM-DD.
+ *
+ * El fin es la víspera del ancla siguiente, nunca un día guardado: así dos
+ * ciclos consecutivos no pueden dejar hueco ni solaparse, ni siquiera cuando
+ * miden distinto por el recorte de los meses cortos.
+ *
+ * `reference` se lee por sus componentes locales y por defecto es "ahora"
+ * resuelto en {@link APP_TIMEZONE}, para que el ciclo ruede con el día local
+ * del usuario y no con el día UTC del servidor (ver {@link zonedNow}).
+ */
+export function cycleRangeContaining(
+    startDay: number,
+    reference: Date = zonedNow(),
+): { start: string; end: string } {
+    const year = reference.getFullYear();
+    const month = reference.getMonth();
+
+    const anchorThisMonth = anchorDay(year, month, startDay);
+    const anchorMonth = reference.getDate() >= anchorThisMonth ? month : month - 1;
+
+    const start = new Date(year, anchorMonth, anchorDay(year, anchorMonth, startDay));
+    const nextAnchor = new Date(year, anchorMonth + 1, anchorDay(year, anchorMonth + 1, startDay));
+    const end = new Date(nextAnchor);
+    end.setDate(nextAnchor.getDate() - 1);
+
     return { start: toDateInputValue(start), end: toDateInputValue(end) };
+}
+
+/** Ciclo actual hasta `reference` inclusive — el preset "Mes" de Finanzas. */
+export function cycleToDate(
+    startDay: number,
+    reference: Date = zonedNow(),
+): { start: string; end: string } {
+    return {
+        start: cycleRangeContaining(startDay, reference).start,
+        end: toDateInputValue(reference),
+    };
+}
+
+/**
+ * El ciclo inmediatamente anterior al que contiene `reference`.
+ *
+ * Se calcula retrocediendo un día desde el inicio del ciclo actual, no restando
+ * un mes: con corte 31 los ciclos no miden lo mismo y restar meses produciría
+ * solapes.
+ */
+export function cyclePreviousRange(
+    startDay: number,
+    reference: Date = zonedNow(),
+): { start: string; end: string } {
+    const current = cycleRangeContaining(startDay, reference);
+    const dayBefore = new Date(`${current.start}T00:00:00`);
+    dayBefore.setDate(dayBefore.getDate() - 1);
+    return cycleRangeContaining(startDay, dayBefore);
+}
+
+/** Expande un rango YYYY-MM-DD a Dates locales de día completo. */
+export function toFullDayDates(
+    range: { start: string; end: string },
+): { start: Date; end: Date } {
+    const start = new Date(`${range.start}T00:00:00`);
+    const end = new Date(`${range.end}T00:00:00`);
+    end.setHours(23, 59, 59, 999);
+    return { start, end };
+}
+
+/** Lo mismo que {@link toFullDayDates}, serializado para las consultas. */
+export function toFullDayIsoRange(
+    range: { start: string; end: string },
+): { startDate: string; endDate: string } {
+    const { start, end } = toFullDayDates(range);
+    return { startDate: start.toISOString(), endDate: end.toISOString() };
 }
