@@ -2,11 +2,17 @@ import { MarketSettingsDashboard } from "@/presentation/market/components/settin
 import SupermarketsTab from "./components/supermarkets/supermarkets-tab";
 import CategoriesTab from "./components/categories/categories-tab";
 import UnitsTab from "./components/units/units-tab";
+import { getAllCycleStartDaysAction } from "@/app/actions/period-settings";
+import { DEFAULT_CYCLE_START_DAY } from "@/domain/entities/period";
+import { PeriodSettingsManager } from "@/presentation/components/period/PeriodSettingsManager";
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-export default function MarketSettingsPage() {
+export default async function MarketSettingsPage() {
+    const cyclesResult = await getAllCycleStartDaysAction();
+    const cycles = cyclesResult.success ? cyclesResult.data : DEFAULT_CYCLE_START_DAY;
+
     return (
         <div className="w-full flex flex-col min-h-screen bg-background">
             <div className="w-full border-b bg-card/50 backdrop-blur-sm p-6 md:px-8">
@@ -18,6 +24,13 @@ export default function MarketSettingsPage() {
                     supermarketsTab={<SupermarketsTab />}
                     categoriesTab={<CategoriesTab />}
                     unitsTab={<UnitsTab />}
+                    periodsTab={
+                        <PeriodSettingsManager
+                            scope="MARKET"
+                            cycleStartDay={cycles.MARKET}
+                            financialCycleStartDay={cycles.FINANCIAL}
+                        />
+                    }
                 />
             </div>
         </div>

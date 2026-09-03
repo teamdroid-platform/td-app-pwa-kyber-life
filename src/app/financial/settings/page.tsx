@@ -5,20 +5,24 @@ import {
 } from "@/app/actions/financial-settings";
 import { getBalanceScopeAction } from "@/app/actions/balance";
 import { getBankOverviewAction } from "@/app/actions/bank";
+import { getAllCycleStartDaysAction } from "@/app/actions/period-settings";
 import { DEFAULT_BALANCE_MODE } from "@/domain/entities/balance";
+import { DEFAULT_CYCLE_START_DAY } from "@/domain/entities/period";
 import { SettingsDashboard } from "@/presentation/financial/components/settings/SettingsDashboard";
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export default async function FinancialSettingsPage() {
-    const [institutions, institutionTypes, categories, scopeResult, bankOverviewResult] = await Promise.all([
-        getInstitutionsAction(),
-        getInstitutionTypesAction(),
-        getCategoriesAction(),
-        getBalanceScopeAction(),
-        getBankOverviewAction(),
-    ]);
+    const [institutions, institutionTypes, categories, scopeResult, bankOverviewResult, cyclesResult] =
+        await Promise.all([
+            getInstitutionsAction(),
+            getInstitutionTypesAction(),
+            getCategoriesAction(),
+            getBalanceScopeAction(),
+            getBankOverviewAction(),
+            getAllCycleStartDaysAction(),
+        ]);
 
     // Un fallo al leer bancos o el scope de balances no debe tumbar toda la
     // pantalla: las pestañas de instituciones y categorías siguen funcionando,
@@ -30,6 +34,9 @@ export default async function FinancialSettingsPage() {
     const bankInstitutions = bankOverviewResult.success ? bankOverviewResult.data.institutions : [];
     const bankAccounts = bankOverviewResult.success ? bankOverviewResult.data.accounts : [];
     const bankCards = bankOverviewResult.success ? bankOverviewResult.data.cards : [];
+    const financialCycleStartDay = cyclesResult.success
+        ? cyclesResult.data.FINANCIAL
+        : DEFAULT_CYCLE_START_DAY.FINANCIAL;
 
     return (
         <div className="w-full flex flex-col min-h-screen bg-background">
@@ -47,6 +54,7 @@ export default async function FinancialSettingsPage() {
                     bankInstitutions={bankInstitutions}
                     bankAccounts={bankAccounts}
                     bankCards={bankCards}
+                    financialCycleStartDay={financialCycleStartDay}
                 />
             </div>
         </div>

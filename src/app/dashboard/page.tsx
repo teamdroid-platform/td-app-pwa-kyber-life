@@ -1,7 +1,8 @@
 import {
     analyticsService, balanceService, bankService, financialDashboardService, financialInboxService,
-    initializeContainer, userRepository,
+    initializeContainer, periodSettingsService, userRepository,
 } from "@/infrastructure/container";
+import { cycleRangeContaining, cyclePreviousRange, toFullDayDates, zonedNow } from "@/lib/date-range";
 import { cookies, headers } from "next/headers";
 import { userAgent } from "next/server";
 import { redirect } from "next/navigation";
@@ -43,13 +44,22 @@ async function wantsDashboard(): Promise<boolean> {
     return device.type !== "mobile";
 }
 
-/** El mes corriente y el anterior, para poder comparar el gasto contra algo. */
-function periods(now: Date) {
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
-    const startOfPrevious = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const endOfPrevious = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
-    return { startOfMonth, endOfMonth, startOfPrevious, endOfPrevious };
+/**
+ * El ciclo corriente y el anterior, para poder comparar el gasto contra algo.
+ *
+ * Sigue el día de corte que el usuario tenga en Finanzas: si el tablero midiera
+ * meses naturales, su cifra no cuadraría con la de /financial para nadie que
+ * tenga un corte distinto del día 1.
+ */
+function periods(cycleStartDay: number, now: Date) {
+    const current = toFullDayDates(cycleRangeContaining(cycleStartDay, now));
+    const previous = toFullDayDates(cyclePreviousRange(cycleStartDay, now));
+    return {
+        startOfMonth: current.start,
+        endOfMonth: current.end,
+        startOfPrevious: previous.start,
+        endOfPrevious: previous.end,
+    };
 }
 
 export default async function DashboardPage() {
@@ -80,7 +90,10 @@ export default async function DashboardPage() {
     }
 
     const now = new Date();
-    const { startOfMonth, endOfMonth, startOfPrevious, endOfPrevious } = periods(now);
+    const cycleStartDay = await periodSettingsService.getCycleStartDay(userId, 'FINANCIAL');
+    // Referencia propia en el día local del usuario: `now` es el reloj UTC del servidor, reservado para las etiquetas relativas de `buildMetrics`.
+    const cycleReferenceNow = zonedNow();
+    const { startOfMonth, endOfMonth, startOfPrevious, endOfPrevious } = periods(cycleStartDay, cycleReferenceNow);
     const withDashboard = await wantsDashboard();
 
     // Todo en paralelo: son lecturas independientes y encadenarlas solo suma

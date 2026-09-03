@@ -20,7 +20,8 @@ import {
     InMemoryFinancialCategoryRepository,
     InMemoryNotificationRepository,
     InMemoryPushSubscriptionRepository,
-    InMemoryBalanceSettingsRepository
+    InMemoryBalanceSettingsRepository,
+    InMemoryPeriodSettingsRepository
 } from "./repositories/implementations";
 import {
     InMemoryBankInstitutionRepository,
@@ -65,6 +66,7 @@ import {
     SupabaseBankNumberObservationRepository,
     SupabaseBalanceSettingsRepository
 } from "./repositories/supabase"; // Need to create this index or import individually
+import { SupabasePeriodSettingsRepository } from "./repositories/supabase/supabase-period-settings-repository";
 
 // ... Previous imports ...
 
@@ -126,6 +128,8 @@ export const bankAccountRepository = singleton("bankAccountRepo", () => isSupaba
 export const bankCardRepository = singleton("bankCardRepo", () => isSupabase ? new SupabaseBankCardRepository() : new InMemoryBankCardRepository());
 export const balanceSettingsRepository = singleton("balanceSettingsRepo", () =>
     isSupabase ? new SupabaseBalanceSettingsRepository() : new InMemoryBalanceSettingsRepository());
+export const periodSettingsRepository = singleton("periodSettingsRepo", () =>
+    isSupabase ? new SupabasePeriodSettingsRepository() : new InMemoryPeriodSettingsRepository());
 export const bankSnapshotRepository = singleton("bankSnapshotRepo", () => isSupabase ? new SupabaseBankAccountBalanceSnapshotRepository() : new InMemoryBankAccountBalanceSnapshotRepository());
 export const bankStatementRepository = singleton("bankStatementRepo", () => isSupabase ? new SupabaseBankCardStatementRepository() : new InMemoryBankCardStatementRepository());
 export const bankMovementRepository = singleton("bankMovementRepo", () => isSupabase
@@ -157,6 +161,7 @@ import { BankIdentificationService } from "@/application/services/bank-identific
 import { NotificationService } from "@/application/services/notification-service";
 import { PushSubscriptionService } from "@/application/services/push-subscription-service";
 import { BalanceService } from "@/application/services/balance-service";
+import { PeriodSettingsService } from "@/application/services/period-settings-service";
 
 export const authService = new AuthService(userRepository, passwordResetTokenRepository);
 export const userService = new UserService(userRepository);
@@ -205,6 +210,7 @@ export const balanceService = new BalanceService(
     financialCategoryRepository,
     balanceSettingsRepository,
 );
+export const periodSettingsService = new PeriodSettingsService(periodSettingsRepository);
 export const financialSettingsService = new FinancialSettingsService(financialInstitutionTypeRepository, financialInstitutionRepository, financialCategoryRepository, financialTransactionRepository);
 export const notificationService = new NotificationService(notificationRepository);
 export const pushSubscriptionService = new PushSubscriptionService(pushSubscriptionRepository);
