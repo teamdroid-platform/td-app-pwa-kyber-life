@@ -29,6 +29,7 @@ dos semánticas distintas:
 |---|---|---|---|
 | `FinancialDashboard.tsx:53` | ciclo 22→21 precargado en "Personalizado" | cliente | `/financial` |
 | `FinancialDashboard.tsx:92` | preset "Mes" = día 1 → **hoy** | cliente | `/financial` |
+| `TransactionFilters.tsx:47` | preset "Mes" = día 1 → **hoy** | cliente | `/financial/transactions` |
 | `TransactionFilters.tsx:67` | ciclo 22→21 precargado | cliente | `/financial/transactions` |
 | `transactions/page.tsx:54` | ciclo 22→21 por defecto | servidor | `/financial/transactions` |
 | `MarketDateFilterBar.tsx:33` | preset "Mes" = día 1 → **último día del mes** | cliente | `/market/analytics` |
@@ -95,16 +96,17 @@ entrada más en ese `Record` sin tocar el esquema.
 
 ### Cambios visibles para un usuario que no configure nada
 
-Tres, y ninguno afecta a datos: solo al rango que cada pantalla trae puesto al abrirse.
+Cuatro, y ninguno afecta a datos: solo al rango que cada pantalla trae puesto al abrirse.
 
 | Pantalla | Antes | Después (con los defectos 22 y 1) |
 |---|---|---|
 | `/financial`, preset "Mes" | 1 sep – hoy | 22 ago – hoy |
+| `/financial/transactions`, preset "Mes" | 1 sep – hoy | 22 ago – hoy |
 | `/dashboard`, KPI comparativo | 1–30 sep contra 1–31 ago | 22 ago – 21 sep contra 22 jul – 21 ago |
 | `/market/analytics`, "Personalizado" | 22 ago – 21 sep | 1 sep – 30 sep |
 
-Los dos primeros son consecuencia directa de aplicar el ciclo financiero donde antes había mes
-calendario. El tercero corrige una incoherencia que ya existía: esa pantalla precargaba un
+Los tres primeros son consecuencia directa de aplicar el ciclo financiero donde antes había mes
+calendario. El cuarto corrige una incoherencia que ya existía: esa pantalla precargaba un
 ciclo 22→21 heredado de Finanzas mientras su propio preset "Mes" usaba el mes natural.
 
 Lo que **no** cambia es el preset "Mes" de Compras: ya es día 1 → último día, y
