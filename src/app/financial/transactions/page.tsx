@@ -3,6 +3,7 @@ import { TransactionTimeline } from "@/presentation/financial/components/Transac
 import { TransactionFilters } from "@/presentation/financial/components/TransactionFilters";
 import { searchPaginatedTransactionsAction, searchAllFilteredTransactionsAction } from "@/app/actions/financial-transactions";
 import type { FinancialTransaction } from "@/domain/entities/financial";
+import { DEFAULT_CYCLE_START_DAY } from "@/domain/entities/period";
 import { balanceService, periodSettingsService } from "@/infrastructure/container";
 import { requireUserId } from "@/infrastructure/supabase/auth-user";
 import { getCategoriesAction, getInstitutionsAction } from "@/app/actions/financial-settings";
@@ -27,6 +28,22 @@ function formatRangeLabel(startISO?: string, endISO?: string): string {
     return start === end ? start : `${start} – ${end}`;
 }
 
+/**
+ * Día de corte de Finanzas para el usuario autenticado. `requireUserId()` lanza
+ * "Unauthorized" cuando no hay sesión de Supabase que resolver —los modos MOCK
+ * y MEMORY, donde la sesión vive en la cookie `kyber_session`—, así que aquí se
+ * atrapa y se degrada al defecto del ámbito en vez de tumbar la página, con el
+ * mismo criterio tolerante que ya usa `getAllCycleStartDaysAction`.
+ */
+async function resolveFinancialCycleStartDay(): Promise<number> {
+    try {
+        const userId = await requireUserId();
+        return await periodSettingsService.getCycleStartDay(userId, 'FINANCIAL');
+    } catch {
+        return DEFAULT_CYCLE_START_DAY.FINANCIAL;
+    }
+}
+
 export default async function TransactionsPage({
     searchParams,
 }: {
@@ -49,10 +66,11 @@ export default async function TransactionsPage({
     let dateTo = typeof params.dateTo === 'string' ? params.dateTo : undefined;
 
     // Rango por defecto: el ciclo que contiene hoy, con el día de corte que el
-    // usuario haya guardado para Finanzas.
+    // usuario haya guardado para Finanzas. Si no hay sesión que resolver —modos
+    // MOCK y MEMORY, donde la sesión es la cookie y no Supabase— se degrada al
+    // defecto en vez de tumbar la pantalla.
     if (!dateFrom && !dateTo && range !== 'all') {
-        const userId = await requireUserId();
-        const cycleStartDay = await periodSettingsService.getCycleStartDay(userId, 'FINANCIAL');
+        const cycleStartDay = await resolveFinancialCycleStartDay();
         const iso = toFullDayIsoRange(cycleRangeContaining(cycleStartDay));
         dateFrom = iso.startDate;
         dateTo = iso.endDate;

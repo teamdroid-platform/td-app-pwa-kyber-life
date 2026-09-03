@@ -2,7 +2,7 @@ import {
     analyticsService, balanceService, bankService, financialDashboardService, financialInboxService,
     initializeContainer, periodSettingsService, userRepository,
 } from "@/infrastructure/container";
-import { cycleRangeContaining, cyclePreviousRange, toFullDayDates } from "@/lib/date-range";
+import { cycleRangeContaining, cyclePreviousRange, toFullDayDates, zonedNow } from "@/lib/date-range";
 import { cookies, headers } from "next/headers";
 import { userAgent } from "next/server";
 import { redirect } from "next/navigation";
@@ -91,7 +91,9 @@ export default async function DashboardPage() {
 
     const now = new Date();
     const cycleStartDay = await periodSettingsService.getCycleStartDay(userId, 'FINANCIAL');
-    const { startOfMonth, endOfMonth, startOfPrevious, endOfPrevious } = periods(cycleStartDay, now);
+    // Referencia propia en el día local del usuario: `now` es el reloj UTC del servidor, reservado para las etiquetas relativas de `buildMetrics`.
+    const cycleReferenceNow = zonedNow();
+    const { startOfMonth, endOfMonth, startOfPrevious, endOfPrevious } = periods(cycleStartDay, cycleReferenceNow);
     const withDashboard = await wantsDashboard();
 
     // Todo en paralelo: son lecturas independientes y encadenarlas solo suma

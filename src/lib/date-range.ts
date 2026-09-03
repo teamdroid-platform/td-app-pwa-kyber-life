@@ -1,8 +1,12 @@
 /**
- * Shared date-range resolution for dashboard filters.
+ * Utilidades de fechas compartidas por los filtros de rango de la app.
  *
- * Extracted from FinancialDashboard so the financial dashboard and the main
- * dashboard hub compute the same ISO range for "today / week / month / custom".
+ * Reúne tres responsabilidades: formatear fechas para los inputs (`<input
+ * type="date">` y `datetime-local`); el reloj anclado a {@link APP_TIMEZONE}
+ * ({@link zonedNow}), para que "hoy" se resuelva en el día local del usuario y
+ * no en el día UTC del servidor; y el cálculo del ciclo mensual a partir de un
+ * día de corte configurable (`cycleRangeContaining`, `cycleToDate`,
+ * `cyclePreviousRange`).
  */
 
 export type RangeFilterType = "all" | "today" | "week" | "month" | "custom";

@@ -148,7 +148,7 @@ export function PeriodSettingsManager({
                     <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
                     <p>
                         En los meses que no llegan al día {day}, el ciclo empieza el último día
-                        disponible. Con día 31, febrero va del 31 de enero al 27 de febrero.
+                        disponible, así que ese ciclo puede quedar más corto que un mes completo.
                     </p>
                 </div>
             )}

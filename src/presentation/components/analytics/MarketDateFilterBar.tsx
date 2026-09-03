@@ -148,7 +148,7 @@ export function MarketDateFilterBar() {
         if (type !== "custom") {
             updateFilter(type);
         } else {
-            // For custom, reuse existing dates or fall back to the default 22..21 cycle.
+            // Personalizado: si ya hay fechas elegidas se reutilizan; si no, cae al ciclo de Compras que el usuario tenga configurado (mes natural por defecto).
             if (!customStartDate || !customEndDate) {
                 const def = cycle;
                 setCustomStartDate(def.start);
