@@ -347,7 +347,16 @@ Un solo componente, `PeriodSettingsManager({ scope })`, montado dos veces. La pe
 
   ¿Qué día empieza tu mes financiero?          ¿Qué día empieza tu mes de compras?
 
-    [  22  ▾ ]   ( Mes natural — día 1 )         [   1  ▾ ]   ( Mes natural — día 1 )
+   ┌──┬──┬──┬──┬──┬──┬──┐              ┌──┬──┬──┬──┬──┬──┬──┐
+   │ 1│ 2│ 3│ 4│ 5│ 6│ 7│              │▓1│ 2│ 3│ 4│ 5│ 6│ 7│
+   │ 8│ 9│10│11│12│13│14│              │ 8│ 9│10│11│12│13│14│
+   │15│16│17│18│19│20│21│              │15│16│17│18│19│20│21│
+   │▓2│23│24│25│26│27│28│              │22│23│24│25│26│27│28│
+   │29│30│31│  │  │  │  │              │29│30│31│  │  │  │  │
+   └──┴──┴──┴──┴──┴──┴──┘              └──┴──┴──┴──┴──┴──┴──┘
+   El día 1 es el mes natural. Los     (los 29–31 con borde discontinuo)
+   días 29 a 31 no existen en
+   todos los meses.
 
   Tu ciclo actual                              Tu ciclo actual
     22 ago – 21 sep 2026                         1 sep – 30 sep 2026
@@ -364,12 +373,18 @@ Un solo componente, `PeriodSettingsManager({ scope })`, montado dos veces. La pe
 
 Detalles que fija el diseño:
 
-- **Mobile-first.** El selector es un `Select` de shadcn a ancho completo con las 31 opciones;
-  el atajo "Mes natural — día 1" es un botón secundario que solo cambia el valor del selector,
-  sin guardar.
+- **Mobile-first.** El selector es una rejilla de 7 columnas con los 31 días, no un desplegable:
+  a ancho de móvil un `Select` gastaba toda la fila para mostrar un número de dos cifras, y
+  obligaba a abrir un popover para ver las opciones. La rejilla llena el ancho, deja los 31 días
+  a un toque y hace innecesario el botón "Mes natural — día 1", porque el día 1 es una celda más.
+  Cada celda es un `input type="radio"` visualmente oculto con su `label`, así que la navegación
+  con flechas y el anuncio del lector de pantalla salen del comportamiento nativo del grupo de
+  radios; el `aria-label` marca los dos extremos con significado ("Día 1 — mes natural",
+  "Día 29 — mes corto"). Los días 29 a 31 llevan borde discontinuo, para advertir del recorte
+  antes de elegirlos y no solo después.
 - **Vista previa en vivo.** El ciclo actual y los dos siguientes se recalculan con
-  `cycleRangeContaining` sobre el valor del selector, antes de guardar. El usuario ve el efecto
-  de su elección sin comprometerla.
+  `cycleRangeContaining` sobre el día marcado en la rejilla, antes de guardar. El usuario ve el
+  efecto de su elección sin comprometerla.
 - **Aviso de recorte.** Visible solo si el día elegido es ≥ 29, porque es el único caso en que
   el ciclo puede resultar más corto que un mes.
 - **Referencia cruzada.** La pestaña de Compras muestra el ciclo financiero vigente como texto
@@ -388,9 +403,10 @@ Detalles que fija el diseño:
 - `__tests__/services/period-settings-service.test.ts` — defecto por ámbito sin fila
   (`FINANCIAL` → 22, `MARKET` → 1); una fila de un ámbito no filtra al otro; rechazo de 0, 32 y
   no enteros.
-- `__tests__/components/PeriodSettingsManager.test.tsx` — jsdom: la vista previa sigue al
-  selector sin guardar; el aviso de recorte aparece solo con días ≥ 29; el guardado llama la
-  acción con el `scope` correcto.
+- `__tests__/components/PeriodSettingsManager.test.tsx` — jsdom: la rejilla ofrece los 31 días y
+  marca el guardado; la vista previa sigue a la celda elegida sin guardar; el aviso de recorte
+  aparece solo con días ≥ 29; el guardado llama la acción con el `scope` correcto y con el día
+  elegido en la rejilla, no con el que llegó por props.
 
 ## 10. Riesgos
 

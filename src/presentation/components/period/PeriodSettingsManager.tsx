@@ -9,9 +9,6 @@ import { MAX_CYCLE_START_DAY, MIN_CYCLE_START_DAY } from "@/domain/entities/peri
 import { cycleRangeContaining } from "@/lib/date-range";
 import { setCycleStartDayAction } from "@/app/actions/period-settings";
 import { Button } from "@/components/ui/button";
-import {
-    Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
 
 const SCOPE_QUESTION: Record<PeriodScope, string> = {
     FINANCIAL: "¿Qué día empieza tu mes financiero?",
@@ -30,6 +27,19 @@ const DAYS = Array.from(
     { length: MAX_CYCLE_START_DAY - MIN_CYCLE_START_DAY + 1 },
     (_, i) => MIN_CYCLE_START_DAY + i,
 );
+
+/**
+ * El nombre con el que un lector de pantalla anuncia cada celda.
+ *
+ * Los dos extremos con significado propio lo dicen: el día 1 es el mes
+ * natural, y los que un mes corto puede no tener quedan advertidos antes de
+ * elegirlos, no solo después.
+ */
+function dayLabel(day: number): string {
+    if (day === MIN_CYCLE_START_DAY) return `Día ${day} — mes natural`;
+    if (day >= SHORT_MONTH_THRESHOLD) return `Día ${day} — mes corto`;
+    return `Día ${day}`;
+}
 
 /** «22 ago – 21 sep 2026», con el año una sola vez al final. */
 function formatCycle(range: { start: string; end: string }): string {
@@ -102,27 +112,40 @@ export function PeriodSettingsManager({
                 <p className="text-sm text-muted-foreground">{SCOPE_HINT[scope]}</p>
             </div>
 
-            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                <Select value={String(day)} onValueChange={value => setDay(Number(value))}>
-                    <SelectTrigger className="w-full sm:w-32" aria-label="Día de inicio">
-                        <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {DAYS.map(d => (
-                            <SelectItem key={d} value={String(d)}>{d}</SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
+            <fieldset className="space-y-3">
+                <legend className="sr-only">Día de inicio del mes</legend>
 
-                <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setDay(MIN_CYCLE_START_DAY)}
-                    className="w-full sm:w-auto"
-                >
-                    Mes natural — día 1
-                </Button>
-            </div>
+                <div className="grid grid-cols-7 gap-1.5 sm:gap-2">
+                    {DAYS.map(d => (
+                        <label key={d} className="block">
+                            <input
+                                type="radio"
+                                name={`cycle-start-day-${scope}`}
+                                value={d}
+                                checked={day === d}
+                                onChange={() => setDay(d)}
+                                aria-label={dayLabel(d)}
+                                className="peer sr-only"
+                            />
+                            <span
+                                className={`flex h-11 cursor-pointer items-center justify-center rounded-lg border bg-card/40
+                                    text-sm font-medium tabular-nums text-muted-foreground transition-colors
+                                    hover:bg-accent hover:text-accent-foreground
+                                    peer-checked:border-accent-primary peer-checked:bg-accent-primary peer-checked:font-semibold peer-checked:text-white
+                                    peer-focus-visible:ring-2 peer-focus-visible:ring-accent-primary peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-bg-primary
+                                    ${d >= SHORT_MONTH_THRESHOLD ? "border-dashed border-orange-500/40" : "border-border/60"}`}
+                            >
+                                {d}
+                            </span>
+                        </label>
+                    ))}
+                </div>
+
+                <p className="text-xs text-muted-foreground">
+                    El día 1 es el mes natural. Los días {SHORT_MONTH_THRESHOLD} a {MAX_CYCLE_START_DAY} no
+                    existen en todos los meses.
+                </p>
+            </fieldset>
 
             <div className="rounded-xl border bg-card/50 p-4 space-y-3">
                 <div className="space-y-1">

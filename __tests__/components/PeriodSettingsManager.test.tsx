@@ -30,14 +30,36 @@ describe("PeriodSettingsManager", () => {
         expect(screen.getByTestId("cycle-preview-current")).toHaveTextContent("2026-09-21");
     });
 
-    it("el atajo de mes natural recalcula la vista previa sin guardar", () => {
+    it("elegir un día en la rejilla recalcula la vista previa sin guardar", () => {
         render(<PeriodSettingsManager scope="FINANCIAL" cycleStartDay={22} />);
 
-        fireEvent.click(screen.getByRole("button", { name: /mes natural/i }));
+        fireEvent.click(screen.getByRole("radio", { name: /día 1 .*mes natural/i }));
 
         expect(screen.getByTestId("cycle-preview-current")).toHaveTextContent("2026-09-01");
         expect(screen.getByTestId("cycle-preview-current")).toHaveTextContent("2026-09-30");
         expect(setCycleStartDayAction).not.toHaveBeenCalled();
+    });
+
+    it("la rejilla ofrece los 31 días y marca el guardado", () => {
+        render(<PeriodSettingsManager scope="FINANCIAL" cycleStartDay={22} />);
+
+        expect(screen.getAllByRole("radio")).toHaveLength(31);
+        expect(screen.getByRole("radio", { name: /^día 22$/i })).toBeChecked();
+    });
+
+    it("guarda el día elegido en la rejilla, no el que llegó por props", async () => {
+        jest.useRealTimers();
+
+        render(<PeriodSettingsManager scope="FINANCIAL" cycleStartDay={22} />);
+
+        fireEvent.click(screen.getByRole("radio", { name: /^día 15$/i }));
+        fireEvent.click(screen.getByRole("button", { name: /guardar/i }));
+
+        await waitFor(() => {
+            expect(setCycleStartDayAction).toHaveBeenCalledWith({
+                scope: "FINANCIAL", cycleStartDay: 15,
+            });
+        });
     });
 
     it("no avisa del recorte con días menores que 29", () => {
