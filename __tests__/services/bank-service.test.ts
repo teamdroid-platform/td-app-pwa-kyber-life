@@ -361,3 +361,72 @@ describe("vista de movimientos con pagos atados a la tarjeta", () => {
         expect(detail!.card.debt).toBe(300);
     });
 });
+
+describe("bandeja de pagos por confirmar", () => {
+    async function withCandidate() {
+        const built = buildService();
+        await built.cards.create({
+            id: "card-8361", ownerUserId: USER, cardType: "CREDIT", currency: "USD",
+            lastFour: "8361", status: "ACTIVE", isUnconfirmed: false,
+            createdAt: NOW, updatedAt: NOW, isDeleted: false,
+        } as never);
+        return built;
+    }
+
+    it("agrupa las dos capturas del mismo pago en un solo pendiente", async () => {
+        const { service, transactions } = await withCandidate();
+        const desc = "Pago de tarjeta de crédito XXXX8361";
+        await transactions.create(tx({ amount: 481.61, description: desc }));
+        await transactions.create(tx({
+            amount: 481.61, description: desc, bankSourceAccountId: "acc-1",
+        }));
+
+        const pending = await service.listPendingCardPayments(USER);
+
+        expect(pending).toHaveLength(1);
+        expect(pending[0].cardId).toBe("card-8361");
+        expect(pending[0].twins).toHaveLength(1);
+        expect(pending[0].primary.bankSourceAccountId).toBe("acc-1");
+    });
+
+    it("confirmar ata una sola transacción y marca la gemela como duplicada", async () => {
+        const { service, transactions } = await withCandidate();
+        const desc = "Pago de tarjeta de crédito XXXX8361";
+        const gemela = await transactions.create(tx({ amount: 481.61, description: desc }));
+        const principal = await transactions.create(tx({
+            amount: 481.61, description: desc, bankSourceAccountId: "acc-1",
+        }));
+
+        await service.confirmCardPayment(USER, principal.id, "card-8361");
+
+        expect((await transactions.findById(principal.id))!.bankCardPaymentId).toBe("card-8361");
+        expect((await transactions.findById(gemela.id))!.bankCardPaymentId).toBeFalsy();
+        expect((await transactions.findById(gemela.id))!.possibleDuplicate).toBe(true);
+        expect(await service.listPendingCardPayments(USER)).toEqual([]);
+    });
+
+    it("descartar saca la candidata de la bandeja sin borrarla", async () => {
+        const { service, transactions } = await withCandidate();
+        const t = await transactions.create(tx({
+            amount: 100, description: "Pago de tarjeta de crédito XXXX8361",
+        }));
+
+        await service.dismissCardPayment(USER, t.id);
+
+        expect(await service.listPendingCardPayments(USER)).toEqual([]);
+        const saved = await transactions.findById(t.id);
+        expect(saved!.isDeleted).toBe(false);
+        expect(saved!.cardPaymentDismissedAt).toBeTruthy();
+    });
+
+    it("rechaza confirmar una transacción de otro usuario", async () => {
+        const { service, transactions } = await withCandidate();
+        const ajena = await transactions.create(tx({
+            ownerUserId: "otro", amount: 100,
+            description: "Pago de tarjeta de crédito XXXX8361",
+        }));
+
+        await expect(service.confirmCardPayment(USER, ajena.id, "card-8361"))
+            .rejects.toThrow("Transacción no encontrada");
+    });
+});
