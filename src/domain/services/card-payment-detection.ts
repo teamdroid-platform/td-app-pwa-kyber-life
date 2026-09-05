@@ -71,7 +71,17 @@ export interface PaymentGroup {
 
 const DEAD_STATUSES = new Set(["REJECTED", "DELETED", "DUPLICATE"]);
 
-/** Dos capturas del mismo pago no llegan con la misma hora, pero sí con el mismo día. */
+/**
+ * Dos capturas del mismo pago no llegan con la misma hora, pero sí con el mismo día.
+ *
+ * La ventana se mide contra el **ancla** del grupo —la fecha de la primera
+ * candidata que lo abrió—, no contra la última que se sumó. Medirla contra la
+ * vecina más cercana encadenaría sin tope: tres capturas separadas por 3 días
+ * cada una acabarían en un solo grupo que abarca 9, y eso fundiría pagos que
+ * en realidad son distintos. Con el ancla fija, lo peor que pasa es partir de
+ * más de la cuenta —un clic de más al confirmar—, que es barato comparado con
+ * fundir dos pagos.
+ */
 const TWIN_WINDOW_MS = 3 * 86_400_000;
 
 /**
@@ -121,10 +131,16 @@ export function detectCardPayments(
  * reste la deuda dos veces.
  *
  * Se ata la que trae cuenta de origen, que es la que sabe de dónde salió el
- * dinero; con empate, la más antigua.
+ * dinero; con empate, la más antigua. `PaymentGroup.date` sigue a `primary`
+ * cuando cambia de mano —es la fecha que ve el usuario en pantalla, así que
+ * tiene que corresponder a la transacción que se va a atar— aunque el ancla
+ * que acota la ventana de 3 días (ver `TWIN_WINDOW_MS`) se guarda aparte y
+ * nunca se mueve.
  */
 export function groupTwins(candidates: readonly PaymentCandidate[]): PaymentGroup[] {
     const groups: PaymentGroup[] = [];
+    /** Fecha de la candidata que abrió cada grupo — el ancla de su ventana. */
+    const anchors = new Map<PaymentGroup, number>();
 
     const sorted = [...candidates].sort(
         (a, b) => Date.parse(a.transaction.date) - Date.parse(b.transaction.date),
@@ -135,17 +151,19 @@ export function groupTwins(candidates: readonly PaymentCandidate[]): PaymentGrou
         const group = groups.find(g =>
             g.cardId === candidate.cardId
             && g.amount === Number(transaction.amount)
-            && Math.abs(Date.parse(g.date) - Date.parse(transaction.date)) <= TWIN_WINDOW_MS);
+            && Math.abs(anchors.get(g)! - Date.parse(transaction.date)) <= TWIN_WINDOW_MS);
 
         if (!group) {
-            groups.push({
+            const newGroup: PaymentGroup = {
                 cardId: candidate.cardId,
                 amount: Number(transaction.amount),
                 date: transaction.date,
                 primary: transaction,
                 twins: [],
                 readNumber: candidate.readNumber,
-            });
+            };
+            groups.push(newGroup);
+            anchors.set(newGroup, Date.parse(transaction.date));
             continue;
         }
 
@@ -153,6 +171,7 @@ export function groupTwins(candidates: readonly PaymentCandidate[]): PaymentGrou
         if (!group.primary.bankSourceAccountId && transaction.bankSourceAccountId) {
             group.twins.push(group.primary);
             group.primary = transaction;
+            group.date = transaction.date;
         } else {
             group.twins.push(transaction);
         }

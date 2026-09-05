@@ -138,6 +138,18 @@ describe("groupTwins", () => {
         expect(groups[0].amount).toBe(481.61);
     });
 
+    it("la fecha del grupo sigue a la transacción que se ata", () => {
+        const sinOrigen = tx({ description: desc, amount: 481.61, date: "2026-08-06T13:25:00Z" });
+        const conOrigen = tx({
+            description: desc, amount: 481.61, date: "2026-08-07T09:00:00Z",
+            bankSourceAccountId: "acc-1",
+        });
+        const groups = groupTwins(detectCardPayments([sinOrigen, conOrigen], [mastercard]));
+
+        expect(groups[0].primary.id).toBe(conOrigen.id);
+        expect(groups[0].date).toBe(conOrigen.date);
+    });
+
     it("sin cuenta de origen en ninguna, ata la más antigua", () => {
         const vieja = tx({ description: desc, amount: 36, date: "2026-06-22T07:00:00Z" });
         const nueva = tx({ description: desc, amount: 36, date: "2026-06-22T09:00:00Z" });
@@ -156,6 +168,22 @@ describe("groupTwins", () => {
         const a = tx({ description: desc, amount: 100, date: "2026-08-01T00:00:00Z" });
         const b = tx({ description: desc, amount: 100, date: "2026-08-05T00:00:00Z" });
         expect(groupTwins(detectCardPayments([a, b], [mastercard]))).toHaveLength(2);
+    });
+
+    it("la ventana se mide contra el ancla del grupo, no contra la última vecina sumada", () => {
+        // b entra al grupo de a (3 días exactos). c está a 3 días de b, pero a
+        // 6 del ancla (a): si la ventana se corriera con cada vecino, c se
+        // colaría en el mismo grupo que a — encadenando sin tope.
+        const a = tx({ description: desc, amount: 100, date: "2026-08-01T00:00:00Z" });
+        const b = tx({ description: desc, amount: 100, date: "2026-08-04T00:00:00Z" });
+        const c = tx({ description: desc, amount: 100, date: "2026-08-07T00:00:00Z" });
+        const groups = groupTwins(detectCardPayments([a, b, c], [mastercard]));
+
+        expect(groups).toHaveLength(2);
+        const [first, second] = groups;
+        expect(first.primary.id).toBe(a.id);
+        expect(first.twins.map(t => t.id)).toEqual([b.id]);
+        expect(second.primary.id).toBe(c.id);
     });
 
     it("no junta pagos a tarjetas distintas", () => {
