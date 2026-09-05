@@ -50,8 +50,15 @@ function PendingPaymentCard({ group, cards }: { group: PaymentGroup; cards: Bank
     const [cardId, setCardId] = useState(group.cardId);
     const [busy, setBusy] = useState(false);
     const count = group.twins.length + 1;
+    // Cinturón además del filtro de la raíz (`BankService.listPendingCardPayments`
+    // ya descarta candidatas de tarjetas que no son de crédito): si de todas
+    // formas llega un `cardId` que no está entre las opciones —o no hay
+    // ninguna tarjeta de crédito registrada—, Confirmar no debe poder atar el
+    // pago a algo que el usuario ni siquiera ve en el selector.
+    const canConfirm = cards.some(card => card.id === cardId);
 
     async function confirm() {
+        if (!canConfirm) return;
         setBusy(true);
         const result = await confirmCardPaymentAction({
             transactionId: group.primary.id, cardId,
@@ -86,7 +93,7 @@ function PendingPaymentCard({ group, cards }: { group: PaymentGroup; cards: Bank
                 Número leído: <span className="font-mono">{group.readNumber}</span>
             </p>
 
-            <Select value={cardId} onValueChange={setCardId}>
+            <Select value={cardId} onValueChange={setCardId} disabled={cards.length === 0}>
                 <SelectTrigger aria-label="Tarjeta a la que se pagó">
                     <SelectValue />
                 </SelectTrigger>
@@ -97,8 +104,16 @@ function PendingPaymentCard({ group, cards }: { group: PaymentGroup; cards: Bank
                 </SelectContent>
             </Select>
 
+            {!canConfirm && (
+                <p className="text-xs text-amber-500">
+                    Hace falta registrar una tarjeta de crédito para poder atar este pago.
+                </p>
+            )}
+
             <div className="flex gap-2">
-                <Button onClick={confirm} disabled={busy} className="flex-1">Confirmar</Button>
+                <Button onClick={confirm} disabled={busy || !canConfirm} className="flex-1">
+                    Confirmar
+                </Button>
                 <Button onClick={dismiss} disabled={busy} variant="outline" className="flex-1">
                     Descartar
                 </Button>

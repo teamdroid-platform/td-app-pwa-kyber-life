@@ -389,6 +389,20 @@ describe("bandeja de pagos por confirmar", () => {
         expect(pending[0].primary.bankSourceAccountId).toBe("acc-1");
     });
 
+    it("no propone una tarjeta de débito aunque su número case: a esa no se le paga una deuda", async () => {
+        const { service, transactions, cards } = await withCandidate();
+        await cards.create({
+            id: "card-debito-2780", ownerUserId: USER, cardType: "DEBIT", currency: "USD",
+            lastFour: "2780", status: "ACTIVE", isUnconfirmed: false,
+            createdAt: NOW, updatedAt: NOW, isDeleted: false,
+        } as never);
+        await transactions.create(tx({
+            amount: 120, description: "Pago de tarjeta de crédito XXXX2780",
+        }));
+
+        expect(await service.listPendingCardPayments(USER)).toEqual([]);
+    });
+
     it("confirmar ata una sola transacción y marca la gemela como duplicada", async () => {
         const { service, transactions } = await withCandidate();
         const desc = "Pago de tarjeta de crédito XXXX8361";

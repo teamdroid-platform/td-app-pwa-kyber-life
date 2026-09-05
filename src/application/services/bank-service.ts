@@ -1144,11 +1144,22 @@ export class BankService {
      * sola vez.
      */
     async listPendingCardPayments(userId: UUID): Promise<PaymentGroup[]> {
-        const [transactions, candidates] = await Promise.all([
+        const [transactions, candidates, cards] = await Promise.all([
             this.transactions.findByOwnerId(userId),
             this.identification.identityCandidates(userId),
+            this.cards.findByOwnerId(userId),
         ]);
-        return groupTwins(detectCardPayments(transactions, candidates));
+
+        // `identityCandidates` devuelve toda identidad con número —cuentas y
+        // tarjetas de los dos tipos—, y a una tarjeta de débito no se le paga
+        // una deuda: sin este filtro un número ambiguo podría atar el pago a
+        // la tarjeta con la que se compra.
+        const creditCardIds = new Set(
+            cards.filter(c => c.cardType === "CREDIT").map(c => c.id),
+        );
+        const creditCandidates = candidates.filter(c => creditCardIds.has(c.id));
+
+        return groupTwins(detectCardPayments(transactions, creditCandidates));
     }
 
     /**

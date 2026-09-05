@@ -75,4 +75,18 @@ describe("PendingPaymentsList", () => {
         render(<PendingPaymentsList groups={[]} cards={[CARD]} />);
         expect(screen.getByText(/no hay pagos por confirmar/i)).toBeInTheDocument();
     });
+
+    it("sin tarjetas de crédito, no deja confirmar pero sí descartar", async () => {
+        render(<PendingPaymentsList groups={[GROUP]} cards={[]} />);
+
+        expect(screen.getByRole("button", { name: /confirmar/i })).toBeDisabled();
+        expect(screen.getByText(/hace falta registrar una tarjeta de crédito/i)).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole("button", { name: /descartar/i }));
+
+        await waitFor(() => {
+            expect(dismissCardPaymentAction).toHaveBeenCalledWith({ transactionId: "tx-1" });
+        });
+        expect(confirmCardPaymentAction).not.toHaveBeenCalled();
+    });
 });
