@@ -1176,9 +1176,16 @@ export class BankService {
             ? [group.primary, ...group.twins].filter(t => t.id !== transactionId)
             : [];
 
+        // La gemela no se borra —la segunda fuente a veces trae datos que la
+        // primera no tiene— pero sí queda descartada como candidata (`cardPaymentDismissedAt`):
+        // sin esto, `detectCardPayments` la vuelve a ofrecer en la bandeja tras confirmar.
+        const now = new Date().toISOString();
         for (const twin of twins) {
             await this.transactions.update({
-                ...twin, possibleDuplicate: true, updatedAt: new Date().toISOString(),
+                ...twin,
+                possibleDuplicate: true,
+                cardPaymentDismissedAt: now,
+                updatedAt: now,
             });
         }
 

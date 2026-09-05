@@ -405,6 +405,22 @@ describe("bandeja de pagos por confirmar", () => {
         expect(await service.listPendingCardPayments(USER)).toEqual([]);
     });
 
+    it("la gemela queda descartada como candidata, no atada a ninguna tarjeta", async () => {
+        const { service, transactions } = await withCandidate();
+        const desc = "Pago de tarjeta de crédito XXXX8361";
+        const gemela = await transactions.create(tx({ amount: 481.61, description: desc }));
+        const principal = await transactions.create(tx({
+            amount: 481.61, description: desc, bankSourceAccountId: "acc-1",
+        }));
+
+        await service.confirmCardPayment(USER, principal.id, "card-8361");
+
+        const saved = await transactions.findById(gemela.id);
+        expect(saved!.possibleDuplicate).toBe(true);
+        expect(saved!.cardPaymentDismissedAt).toBeTruthy();
+        expect(saved!.bankCardPaymentId).toBeFalsy();
+    });
+
     it("descartar saca la candidata de la bandeja sin borrarla", async () => {
         const { service, transactions } = await withCandidate();
         const t = await transactions.create(tx({
