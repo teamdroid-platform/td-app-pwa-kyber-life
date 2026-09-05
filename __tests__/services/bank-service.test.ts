@@ -244,3 +244,49 @@ describe("payStatement", () => {
         expect(overview.totalAvailable).toBe(700);
     });
 });
+
+describe("vista de movimientos con pagos atados a la tarjeta", () => {
+    it("un pago con bankCardPaymentId baja la deuda de esa tarjeta", async () => {
+        const { service, cards, transactions } = buildService();
+        const card = await cards.create({
+            id: "card-1", ownerUserId: USER, cardType: "CREDIT", currency: "USD",
+            status: "ACTIVE", isUnconfirmed: false, createdAt: NOW, updatedAt: NOW,
+            isDeleted: false,
+        } as never);
+
+        await transactions.create(tx({
+            amount: 500, bankCardId: card.id, paidWithCredit: true,
+        }));
+        await transactions.create(tx({
+            amount: 200, bankCardPaymentId: card.id, bankSourceAccountId: "acc-1",
+        }));
+
+        const detail = await service.getCardDetail(USER, card.id);
+        expect(detail!.card.debt).toBe(300);
+    });
+
+    it("un pago que trae tarjeta y estado a la vez resta una sola vez", async () => {
+        const { service, cards, statements, transactions } = buildService();
+        const card = await cards.create({
+            id: "card-2", ownerUserId: USER, cardType: "CREDIT", currency: "USD",
+            status: "ACTIVE", isUnconfirmed: false, createdAt: NOW, updatedAt: NOW,
+            isDeleted: false,
+        } as never);
+        const statement = await statements.create({
+            id: "st-1", ownerUserId: USER, cardId: card.id,
+            periodStart: "2026-08-01", periodEnd: "2026-08-31", dueDate: "2026-09-15",
+            computedAmount: 500, totalAmount: null, paidAmount: 0, status: "OPEN",
+            createdAt: NOW, updatedAt: NOW, isDeleted: false,
+        } as never);
+
+        await transactions.create(tx({
+            amount: 500, bankCardId: card.id, paidWithCredit: true,
+        }));
+        await transactions.create(tx({
+            amount: 200, bankCardPaymentId: card.id, bankCardStatementId: statement.id,
+        }));
+
+        const detail = await service.getCardDetail(USER, card.id);
+        expect(detail!.card.debt).toBe(300);
+    });
+});
