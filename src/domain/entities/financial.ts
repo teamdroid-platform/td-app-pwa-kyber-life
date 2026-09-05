@@ -66,6 +66,10 @@ export interface FinancialTransaction extends BaseEntity {
     bankInstitutionId?: UUID | null;
     /** Presente solo en un pago de tarjeta: el estado de cuenta que salda. */
     bankCardStatementId?: UUID | null;
+    /** Tarjeta a la que esta transacción le paga. Opuesto de `bankCardId`. */
+    bankCardPaymentId?: UUID | null;
+    /** Cuándo el usuario descartó esta transacción como candidata a pago de tarjeta. */
+    cardPaymentDismissedAt?: ISODate | null;
     /** Cuenta del otro lado cuando no es del usuario (beneficiario de una transferencia). */
     bankCounterpartyObservationId?: UUID | null;
     tags?: string[] | null;

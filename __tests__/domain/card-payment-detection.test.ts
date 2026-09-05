@@ -52,3 +52,116 @@ describe("extractCardNumber", () => {
         expect(extractCardNumber("Pago de tarjeta por 481.61 el 06/08/2026")).toBeNull();
     });
 });
+
+import { detectCardPayments, groupTwins } from "@/domain/services/card-payment-detection";
+import { parseBankNumber } from "@/lib/bank-number-fingerprint";
+import { mergeFingerprints, type IdentityCandidate } from "@/lib/bank-number-match";
+import type { FinancialTransaction } from "@/domain/entities/financial";
+
+const USER = "11111111-1111-1111-1111-111111111111";
+
+function tx(partial: Partial<FinancialTransaction>): FinancialTransaction {
+    return {
+        id: crypto.randomUUID(), ownerUserId: USER, type: "EXPENSE", status: "CONFIRMED",
+        amount: 100, currency: "USD", date: "2026-08-06T13:25:00Z", description: "test",
+        possibleDuplicate: false, createdAt: "2026-08-06T13:25:00Z",
+        updatedAt: "2026-08-06T13:25:00Z", isDeleted: false,
+        ...partial,
+    } as FinancialTransaction;
+}
+
+/** Una tarjeta candidata con el número que declara. */
+function card(id: string, raw: string): IdentityCandidate {
+    return { id, kind: "CARD", fingerprint: mergeFingerprints([parseBankNumber(raw)]) };
+}
+
+describe("detectCardPayments", () => {
+    const mastercard = card("card-8361", "XXXX8361");
+
+    it("detecta un pago cuyo número resuelve a una sola tarjeta", () => {
+        const t = tx({ description: "Pago de la tarjeta de crédito No. XXXXXXXXXXXX8361" });
+        const found = detectCardPayments([t], [mastercard]);
+
+        expect(found).toHaveLength(1);
+        expect(found[0].cardId).toBe("card-8361");
+        expect(found[0].readNumber).toBe("XXXXXXXXXXXX8361");
+    });
+
+    it("descarta un pago sin número, aunque la descripción sea inequívoca", () => {
+        const t = tx({ description: "Pago de tarjeta de crédito", merchant: "Banco del Pacifico" });
+        expect(detectCardPayments([t], [mastercard])).toEqual([]);
+    });
+
+    it("descarta una compra pagada con tarjeta de débito", () => {
+        const t = tx({ description: "Pago con tarjeta de débito XXXX8361" });
+        expect(detectCardPayments([t], [mastercard])).toEqual([]);
+    });
+
+    it("descarta un número que encaja con dos tarjetas", () => {
+        const t = tx({ description: "Pago de tarjeta XXX361" });
+        const otra = card("card-361", "XXXX0361");
+        expect(detectCardPayments([t], [mastercard, otra])).toEqual([]);
+    });
+
+    it("ignora las transacciones ya atadas o ya descartadas", () => {
+        const atada = tx({
+            description: "Pago de tarjeta XXXX8361", bankCardPaymentId: "card-8361",
+        });
+        const descartada = tx({
+            description: "Pago de tarjeta XXXX8361",
+            cardPaymentDismissedAt: "2026-08-07T00:00:00Z",
+        });
+        expect(detectCardPayments([atada, descartada], [mastercard])).toEqual([]);
+    });
+
+    it("ignora las anuladas", () => {
+        const t = tx({ description: "Pago de tarjeta XXXX8361", status: "DELETED" });
+        expect(detectCardPayments([t], [mastercard])).toEqual([]);
+    });
+});
+
+describe("groupTwins", () => {
+    const mastercard = card("card-8361", "XXXX8361");
+    const desc = "Pago de tarjeta de crédito XXXX8361";
+
+    it("junta dos copias del mismo pago y ata la que tiene cuenta de origen", () => {
+        const sinOrigen = tx({ description: desc, amount: 481.61, date: "2026-08-06T13:25:00Z" });
+        const conOrigen = tx({
+            description: desc, amount: 481.61, date: "2026-08-06T13:25:00Z",
+            bankSourceAccountId: "acc-1",
+        });
+        const groups = groupTwins(detectCardPayments([sinOrigen, conOrigen], [mastercard]));
+
+        expect(groups).toHaveLength(1);
+        expect(groups[0].primary.id).toBe(conOrigen.id);
+        expect(groups[0].twins.map(t => t.id)).toEqual([sinOrigen.id]);
+        expect(groups[0].amount).toBe(481.61);
+    });
+
+    it("sin cuenta de origen en ninguna, ata la más antigua", () => {
+        const vieja = tx({ description: desc, amount: 36, date: "2026-06-22T07:00:00Z" });
+        const nueva = tx({ description: desc, amount: 36, date: "2026-06-22T09:00:00Z" });
+        const groups = groupTwins(detectCardPayments([nueva, vieja], [mastercard]));
+
+        expect(groups[0].primary.id).toBe(vieja.id);
+    });
+
+    it("no junta montos distintos", () => {
+        const a = tx({ description: desc, amount: 100, date: "2026-08-06T13:25:00Z" });
+        const b = tx({ description: desc, amount: 101, date: "2026-08-06T13:25:00Z" });
+        expect(groupTwins(detectCardPayments([a, b], [mastercard]))).toHaveLength(2);
+    });
+
+    it("no junta fechas separadas por más de tres días", () => {
+        const a = tx({ description: desc, amount: 100, date: "2026-08-01T00:00:00Z" });
+        const b = tx({ description: desc, amount: 100, date: "2026-08-05T00:00:00Z" });
+        expect(groupTwins(detectCardPayments([a, b], [mastercard]))).toHaveLength(2);
+    });
+
+    it("no junta pagos a tarjetas distintas", () => {
+        const otra = card("card-9620", "XXXX9620");
+        const a = tx({ description: "Pago de tarjeta XXXX8361", amount: 100 });
+        const b = tx({ description: "Pago de tarjeta XXXX9620", amount: 100 });
+        expect(groupTwins(detectCardPayments([a, b], [mastercard, otra]))).toHaveLength(2);
+    });
+});
