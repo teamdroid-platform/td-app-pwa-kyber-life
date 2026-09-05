@@ -8,6 +8,11 @@
  * dos listas y la de exclusión gana.
  */
 
+import type { UUID, ISODate } from "../core";
+import type { FinancialTransaction } from "../entities/financial";
+import { parseBankNumber } from "@/lib/bank-number-fingerprint";
+import { resolveFingerprint, type IdentityCandidate } from "@/lib/bank-number-match";
+
 /** Frases que significan dinero que entra a una tarjeta. */
 export const PAYMENT_TO_CARD_PATTERNS: readonly RegExp[] = [
     /pago\s+(?:total\s+|minimo\s+)?(?:de\s+)?(?:la\s+)?tarjeta/i,
@@ -40,16 +45,11 @@ export function isPaymentToCard(text: string): boolean {
  * —un monto, una fecha, un número de comprobante— pasaría por número de
  * tarjeta, y un falso positivo aquí ata un pago a la tarjeta equivocada.
  */
-const CARD_NUMBER = /\b(?=[0-9]*[X×x*•·●#])[0-9X×x*•·●#]{4,}\b/;
+const CARD_NUMBER = /(?<![\w•·●])(?=[0-9]*[X×x*•·●#])[0-9X×x*•·●#]{4,}(?![\w•·●])/;
 
 export function extractCardNumber(text: string): string | null {
     return text.match(CARD_NUMBER)?.[0] ?? null;
 }
-
-import type { UUID, ISODate } from "../core";
-import type { FinancialTransaction } from "../entities/financial";
-import { parseBankNumber } from "@/lib/bank-number-fingerprint";
-import { resolveFingerprint, type IdentityCandidate } from "@/lib/bank-number-match";
 
 export interface PaymentCandidate {
     transaction: FinancialTransaction;

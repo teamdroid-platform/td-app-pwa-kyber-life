@@ -1101,6 +1101,7 @@ export class BankService {
     ): Promise<FinancialTransaction> {
         const card = await this.cards.findById(cardId);
         if (!card || card.ownerUserId !== userId) throw new Error("Tarjeta no encontrada");
+        if (card.cardType !== "CREDIT") throw new Error("Solo se puede pagar una tarjeta de crédito");
 
         const openStatement = await this.statements.findOpenForCard(cardId);
         const { toStatement } = allocatePayment(amount, openStatement);
@@ -1153,7 +1154,11 @@ export class BankService {
         // `identityCandidates` devuelve toda identidad con número —cuentas y
         // tarjetas de los dos tipos—, y a una tarjeta de débito no se le paga
         // una deuda: sin este filtro un número ambiguo podría atar el pago a
-        // la tarjeta con la que se compra.
+        // la tarjeta con la que se compra. El filtro tiene un segundo efecto,
+        // también deliberado: al sacar cuentas y débito del universo de
+        // candidatas, un número que sería ambiguo contra el conjunto completo
+        // puede resolver único contra el subconjunto de crédito —reducir el
+        // universo aquí afloja la resolución, no la endurece.
         const creditCardIds = new Set(
             cards.filter(c => c.cardType === "CREDIT").map(c => c.id),
         );
@@ -1178,6 +1183,7 @@ export class BankService {
         }
         const card = await this.cards.findById(cardId);
         if (!card || card.ownerUserId !== userId) throw new Error("Tarjeta no encontrada");
+        if (card.cardType !== "CREDIT") throw new Error("Solo se puede pagar una tarjeta de crédito");
 
         const group = (await this.listPendingCardPayments(userId))
             .find(g => g.primary.id === transactionId
@@ -1208,7 +1214,15 @@ export class BankService {
         });
     }
 
-    /** Saca una candidata de la bandeja sin borrarla ni tocar ningún saldo. */
+    /**
+     * Saca una candidata de la bandeja sin borrarla ni tocar ningún saldo.
+     *
+     * Descarta el grupo completo, no solo la transacción recibida: una
+     * gemela es el mismo pago visto dos veces, así que descartar el pago
+     * las descarta todas — igual que `confirmCardPayment` propaga a las
+     * gemelas al confirmar. Sin esto, la gemela no tocada vuelve sola a la
+     * bandeja en la siguiente carga.
+     */
     async dismissCardPayment(
         userId: UUID, transactionId: UUID,
     ): Promise<FinancialTransaction> {
@@ -1216,10 +1230,21 @@ export class BankService {
         if (!transaction || transaction.ownerUserId !== userId) {
             throw new Error("Transacción no encontrada");
         }
+
+        const group = (await this.listPendingCardPayments(userId))
+            .find(g => g.primary.id === transactionId
+                || g.twins.some(t => t.id === transactionId));
+        const members = group ? [group.primary, ...group.twins] : [transaction];
+
         const now = new Date().toISOString();
-        return this.transactions.update({
-            ...transaction, cardPaymentDismissedAt: now, updatedAt: now,
-        });
+        let dismissed = transaction;
+        for (const member of members) {
+            const updated = await this.transactions.update({
+                ...member, cardPaymentDismissedAt: now, updatedAt: now,
+            });
+            if (member.id === transactionId) dismissed = updated;
+        }
+        return dismissed;
     }
 
     /** Corrige el total de un estado con lo que declara el banco. */
