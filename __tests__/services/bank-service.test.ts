@@ -183,7 +183,7 @@ describe("closeDueStatements", () => {
     });
 });
 
-describe("payStatement", () => {
+describe("payCard (sobre estado de cuenta)", () => {
     async function cardWithOpenStatement() {
         const ctx = buildService();
         const inst = await ctx.service.createInstitution(USER, { name: "Banco del Austro", kind: "BANK" });
@@ -200,12 +200,12 @@ describe("payStatement", () => {
     }
 
     it("crea un gasto real que sale de la cuenta y salda el estado", async () => {
-        const { service, statements, cuenta, statement } = await cardWithOpenStatement();
+        const { service, statements, cuenta, card, statement } = await cardWithOpenStatement();
         const updatedStatement = { ...statement, computedAmount: 611.4 };
         await statements.update(updatedStatement);
 
-        const created = await service.payStatement(
-            USER, statement.id, cuenta.id, 611.4, "2026-08-26T00:00:00Z",
+        const created = await service.payCard(
+            USER, card.id, cuenta.id, 611.4, "2026-08-26T00:00:00Z",
         );
 
         expect(created.bankCardStatementId).toBe(statement.id);
@@ -219,10 +219,10 @@ describe("payStatement", () => {
     });
 
     it("un pago parcial deja el estado abierto", async () => {
-        const { service, statements, cuenta, statement } = await cardWithOpenStatement();
+        const { service, statements, cuenta, card, statement } = await cardWithOpenStatement();
         await statements.update({ ...statement, computedAmount: 611.4 });
 
-        await service.payStatement(USER, statement.id, cuenta.id, 200, "2026-08-26T00:00:00Z");
+        await service.payCard(USER, card.id, cuenta.id, 200, "2026-08-26T00:00:00Z");
 
         const after = await statements.findById(statement.id);
         expect(after!.paidAmount).toBe(200);
@@ -237,11 +237,82 @@ describe("payStatement", () => {
         }));
         await statements.update({ ...statement, computedAmount: 300 });
 
-        await service.payStatement(USER, statement.id, cuenta.id, 300, "2026-08-26T00:00:00Z");
+        await service.payCard(USER, card.id, cuenta.id, 300, "2026-08-26T00:00:00Z");
 
         const overview = await service.getOverview(USER);
         expect(overview.totalDebt).toBe(0);
         expect(overview.totalAvailable).toBe(700);
+    });
+});
+
+describe("payCard", () => {
+    async function creditCard(cards: ReturnType<typeof buildService>["cards"], id: string) {
+        return cards.create({
+            id, ownerUserId: USER, cardType: "CREDIT", currency: "USD",
+            status: "ACTIVE", isUnconfirmed: false, createdAt: NOW, updatedAt: NOW,
+            isDeleted: false,
+        } as never);
+    }
+
+    it("sin estado abierto, el pago entero baja la deuda", async () => {
+        const { service, cards, transactions } = buildService();
+        const card = await creditCard(cards, "card-a");
+        await transactions.create(tx({ amount: 534.56, bankCardId: card.id, paidWithCredit: true }));
+
+        const payment = await service.payCard(USER, card.id, "acc-1", 534.56, NOW);
+
+        expect(payment.type).toBe("PAYMENT");
+        expect(payment.bankCardPaymentId).toBe(card.id);
+        expect(payment.bankCardStatementId).toBeFalsy();
+        expect(payment.bankSourceAccountId).toBe("acc-1");
+        expect((await service.getCardDetail(USER, card.id))!.card.debt).toBe(0);
+    });
+
+    it("con estado abierto, abona el estado y deja el resto en la deuda", async () => {
+        const { service, cards, statements, transactions } = buildService();
+        const card = await creditCard(cards, "card-b");
+        await statements.create({
+            id: "st-b", ownerUserId: USER, cardId: card.id,
+            periodStart: "2026-08-01", periodEnd: "2026-08-31", dueDate: "2026-09-15",
+            computedAmount: 180, totalAmount: null, paidAmount: 0, status: "OPEN",
+            createdAt: NOW, updatedAt: NOW, isDeleted: false,
+        } as never);
+        await transactions.create(tx({ amount: 500, bankCardId: card.id, paidWithCredit: true }));
+
+        const payment = await service.payCard(USER, card.id, "acc-1", 200, NOW);
+
+        expect(payment.bankCardStatementId).toBe("st-b");
+        const saved = await statements.findById("st-b");
+        expect(Number(saved!.paidAmount)).toBe(180);
+        expect(saved!.status).toBe("PAID");
+        expect((await service.getCardDetail(USER, card.id))!.card.debt).toBe(300);
+    });
+
+    it("crea una sola transacción aunque abone el estado", async () => {
+        const { service, cards, statements, transactions } = buildService();
+        const card = await creditCard(cards, "card-c");
+        await statements.create({
+            id: "st-c", ownerUserId: USER, cardId: card.id,
+            periodStart: "2026-08-01", periodEnd: "2026-08-31", dueDate: "2026-09-15",
+            computedAmount: 100, totalAmount: null, paidAmount: 0, status: "OPEN",
+            createdAt: NOW, updatedAt: NOW, isDeleted: false,
+        } as never);
+
+        const before = (await transactions.findByOwnerId(USER)).length;
+        await service.payCard(USER, card.id, "acc-1", 100, NOW);
+        expect((await transactions.findByOwnerId(USER)).length).toBe(before + 1);
+    });
+
+    it("rechaza una tarjeta de otro usuario", async () => {
+        const { service, cards } = buildService();
+        await cards.create({
+            id: "card-ajena", ownerUserId: "otro", cardType: "CREDIT", currency: "USD",
+            status: "ACTIVE", isUnconfirmed: false, createdAt: NOW, updatedAt: NOW,
+            isDeleted: false,
+        } as never);
+
+        await expect(service.payCard(USER, "card-ajena", "acc-1", 10, NOW))
+            .rejects.toThrow("Tarjeta no encontrada");
     });
 });
 
