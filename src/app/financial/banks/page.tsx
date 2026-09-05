@@ -1,12 +1,16 @@
-import { AlertTriangle } from "lucide-react";
-import { getBankOverviewAction } from "@/app/actions/bank";
+import { AlertTriangle, ChevronRight } from "lucide-react";
+import Link from "next/link";
+import { getBankOverviewAction, getPendingCardPaymentsAction } from "@/app/actions/bank";
 import { BankOverviewClient } from "@/presentation/bank/components/BankOverviewClient";
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export default async function BanksPage() {
-    const result = await getBankOverviewAction();
+    const [result, pendingResult] = await Promise.all([
+        getBankOverviewAction(),
+        getPendingCardPaymentsAction(),
+    ]);
 
     if (!result.success) {
         // Un fallo de lectura no debe parecer "no tienes cuentas": dice qué pasó.
@@ -19,11 +23,29 @@ export default async function BanksPage() {
         );
     }
 
+    // Si la bandeja de pagos falla, no tumba el resumen: el enlace simplemente
+    // no aparece, y la pantalla de pagos ya explica su propio error si el
+    // usuario la abre directo.
+    const pendingCount = pendingResult.success ? pendingResult.data.groups.length : 0;
+
     // La cabecera vive dentro del cliente: el botón de añadir abre una hoja con
     // estado, y una banda aparte solo servía para separarlo de lo que abre.
     return (
         <div className="flex min-h-screen w-full flex-col bg-background">
             <div className="mx-auto w-full max-w-3xl flex-1 p-4 md:p-6">
+                {pendingCount > 0 && (
+                    <Link
+                        href="/financial/banks/payments"
+                        className="mb-4 flex items-center justify-between gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200"
+                    >
+                        <span>
+                            {pendingCount === 1
+                                ? "1 pago de tarjeta por confirmar"
+                                : `${pendingCount} pagos de tarjeta por confirmar`}
+                        </span>
+                        <ChevronRight className="h-4 w-4 shrink-0" />
+                    </Link>
+                )}
                 <BankOverviewClient initialData={result.data} />
             </div>
         </div>

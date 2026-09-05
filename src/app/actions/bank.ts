@@ -4,6 +4,7 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import {
     bankService,
+    bankCardRepository,
     financialScannerTransactionRepository,
     financialTransactionRepository,
 } from "@/infrastructure/container";
@@ -97,6 +98,25 @@ export async function getBankCardDetailAction(cardId: string) {
         const data = await bankService.getCardDetail(userId, idSchema.parse(cardId));
         if (!data) throw new Error("Tarjeta no encontrada");
         return data;
+    });
+}
+
+/**
+ * Los pagos que la app detectó entre las transacciones ya capturadas y que
+ * todavía no bajan la deuda de ninguna tarjeta, con las tarjetas de crédito a
+ * las que se pueden atar.
+ *
+ * `BankService` no expone un listado de tarjetas propio: se toma el
+ * repositorio directo del container, como ya hace `getTransactionAccountsAction`
+ * para datos de solo lectura que no pasan por el servicio.
+ */
+export async function getPendingCardPaymentsAction() {
+    return run("getPendingCardPayments", async userId => {
+        const [groups, cards] = await Promise.all([
+            bankService.listPendingCardPayments(userId),
+            bankCardRepository.findByOwnerId(userId),
+        ]);
+        return { groups, cards: cards.filter(card => card.cardType === "CREDIT") };
     });
 }
 
