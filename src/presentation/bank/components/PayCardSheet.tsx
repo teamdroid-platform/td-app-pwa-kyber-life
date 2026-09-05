@@ -16,9 +16,14 @@ import { payCardAction } from "@/app/actions/bank";
 import { money } from "../lib/format-money";
 import type { BankAccountWithBalance, BankCardWithDebt } from "@/application/services/bank-service";
 
-/** `YYYY-MM-DD` de hoy, para el input de fecha. */
+/**
+ * `YYYY-MM-DD` de hoy en la zona del usuario. `toISOString` daría la fecha
+ * UTC, que en Ecuador adelanta un día a partir de las 19:00.
+ */
 function today(): string {
-    return new Date().toISOString().slice(0, 10);
+    const now = new Date();
+    const local = new Date(now.getTime() - now.getTimezoneOffset() * 60_000);
+    return local.toISOString().slice(0, 10);
 }
 
 interface PayCardSheetProps {
@@ -42,7 +47,21 @@ export function PayCardSheet({ card, accounts }: PayCardSheetProps) {
     const [amount, setAmount] = useState(String(card.debt));
     const [date, setDate] = useState(today());
 
+    function handleOpenChange(next: boolean) {
+        if (next) {
+            // El sheet no se desmonta al cerrarse -Radix solo le oculta el
+            // contenido-, así que sin este reseteo el formulario arrastraría
+            // el importe de antes de un pago parcial ya reflejado en
+            // `card.debt`, o algo que el usuario haya escrito y no enviado.
+            setAmount(String(card.debt));
+            setDate(today());
+            setAccountId(preferred?.id ?? "");
+        }
+        setOpen(next);
+    }
+
     async function submit() {
+        if (saving) return; // evita el doble envío de un doble toque rápido
         const parsed = Number(amount.replace(",", "."));
         if (Number.isNaN(parsed) || parsed <= 0) {
             toast.error("Escribe cuánto pagaste");
@@ -72,7 +91,7 @@ export function PayCardSheet({ card, accounts }: PayCardSheetProps) {
     }
 
     return (
-        <Sheet open={open} onOpenChange={setOpen}>
+        <Sheet open={open} onOpenChange={handleOpenChange}>
             <SheetTrigger asChild>
                 <Button size="sm" variant="secondary" className="shrink-0">Pagar</Button>
             </SheetTrigger>

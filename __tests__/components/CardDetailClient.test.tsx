@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { CardDetailClient } from "@/presentation/bank/components/CardDetailClient";
 import type { BankCardDetail } from "@/application/services/bank-service";
 
@@ -45,5 +45,39 @@ describe("CardDetailClient", () => {
     it("no ofrece pagar en una tarjeta de débito", () => {
         render(<CardDetailClient initialData={detail({ cardType: "DEBIT", debt: 100 })} />);
         expect(screen.queryByRole("button", { name: /pagar/i })).toBeNull();
+    });
+});
+
+describe("PayCardSheet — arreglos ronda 1", () => {
+    afterEach(() => {
+        jest.useRealTimers();
+    });
+
+    it("precarga la fecha local del usuario, no la UTC", () => {
+        // A esta hora, en Ecuador (UTC-5) todavía es 5 de septiembre; en UTC
+        // ya es 6. El input de fecha debe mostrar el día local.
+        jest.useFakeTimers().setSystemTime(new Date("2026-09-05T23:30:00-05:00"));
+
+        render(<CardDetailClient initialData={detail()} />);
+        fireEvent.click(screen.getByRole("button", { name: /pagar/i }));
+
+        expect(screen.getByLabelText("Fecha del pago")).toHaveValue("2026-09-05");
+    });
+
+    it("repone el importe a la deuda vigente al reabrir el sheet", () => {
+        render(<CardDetailClient initialData={detail()} />);
+
+        fireEvent.click(screen.getByRole("button", { name: /pagar/i }));
+        const amountInput = screen.getByLabelText("Monto del pago");
+        fireEvent.change(amountInput, { target: { value: "100" } });
+        expect(amountInput).toHaveValue("100");
+
+        // Cerrar sin enviar: Radix solo oculta el contenido del sheet, no
+        // desmonta el componente, así que el importe editado sobreviviría
+        // si no se repusiera explícitamente al reabrir.
+        fireEvent.click(screen.getByRole("button", { name: "Close" }));
+        fireEvent.click(screen.getByRole("button", { name: /pagar/i }));
+
+        expect(screen.getByLabelText("Monto del pago")).toHaveValue("534.56");
     });
 });
