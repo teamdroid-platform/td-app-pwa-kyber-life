@@ -314,6 +314,18 @@ describe("payCard", () => {
         await expect(service.payCard(USER, "card-ajena", "acc-1", 10, NOW))
             .rejects.toThrow("Tarjeta no encontrada");
     });
+
+    it("rechaza pagar una tarjeta de débito propia", async () => {
+        const { service, cards } = buildService();
+        await cards.create({
+            id: "card-debito", ownerUserId: USER, cardType: "DEBIT", currency: "USD",
+            status: "ACTIVE", isUnconfirmed: false, createdAt: NOW, updatedAt: NOW,
+            isDeleted: false,
+        } as never);
+
+        await expect(service.payCard(USER, "card-debito", "acc-1", 10, NOW))
+            .rejects.toThrow("Solo se puede pagar una tarjeta de crédito");
+    });
 });
 
 describe("vista de movimientos con pagos atados a la tarjeta", () => {
@@ -449,6 +461,21 @@ describe("bandeja de pagos por confirmar", () => {
         expect(saved!.cardPaymentDismissedAt).toBeTruthy();
     });
 
+    it("descartar un grupo de gemelas descarta las dos, no solo la que se pidió", async () => {
+        const { service, transactions } = await withCandidate();
+        const desc = "Pago de tarjeta de crédito XXXX8361";
+        const gemela = await transactions.create(tx({ amount: 481.61, description: desc }));
+        await transactions.create(tx({
+            amount: 481.61, description: desc, bankSourceAccountId: "acc-1",
+        }));
+
+        // Se descarta pidiendo la gemela (no la principal): debe arrastrar
+        // al grupo entero igual que si se hubiera pedido la principal.
+        await service.dismissCardPayment(USER, gemela.id);
+
+        expect(await service.listPendingCardPayments(USER)).toEqual([]);
+    });
+
     it("rechaza confirmar una transacción de otro usuario", async () => {
         const { service, transactions } = await withCandidate();
         const ajena = await transactions.create(tx({
@@ -458,5 +485,20 @@ describe("bandeja de pagos por confirmar", () => {
 
         await expect(service.confirmCardPayment(USER, ajena.id, "card-8361"))
             .rejects.toThrow("Transacción no encontrada");
+    });
+
+    it("rechaza confirmar contra una tarjeta de débito propia", async () => {
+        const { service, transactions, cards } = await withCandidate();
+        await cards.create({
+            id: "card-debito-2780", ownerUserId: USER, cardType: "DEBIT", currency: "USD",
+            lastFour: "2780", status: "ACTIVE", isUnconfirmed: false,
+            createdAt: NOW, updatedAt: NOW, isDeleted: false,
+        } as never);
+        const t = await transactions.create(tx({
+            amount: 100, description: "Pago de tarjeta de crédito XXXX8361",
+        }));
+
+        await expect(service.confirmCardPayment(USER, t.id, "card-debito-2780"))
+            .rejects.toThrow("Solo se puede pagar una tarjeta de crédito");
     });
 });

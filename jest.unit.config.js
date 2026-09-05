@@ -14,6 +14,7 @@ const createJestConfig = nextJest({
  * compilador SWC de Next, así que la config vive aquí y no en la raíz.
  */
 const customJestConfig = {
+    globalSetup: '<rootDir>/jest.global-setup.js',
     testEnvironment: 'node',
     // Solo .ts: los .tsx renderizan componentes y necesitan jsdom (jest.config.js).
     testMatch: ['<rootDir>/__tests__/**/*.test.ts'],

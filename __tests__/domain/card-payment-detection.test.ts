@@ -1,4 +1,9 @@
-import { isPaymentToCard, extractCardNumber } from "@/domain/services/card-payment-detection";
+import {
+    isPaymentToCard, extractCardNumber, detectCardPayments, groupTwins,
+} from "@/domain/services/card-payment-detection";
+import { parseBankNumber } from "@/lib/bank-number-fingerprint";
+import { mergeFingerprints, type IdentityCandidate } from "@/lib/bank-number-match";
+import type { FinancialTransaction } from "@/domain/entities/financial";
 
 describe("isPaymentToCard", () => {
     it.each([
@@ -51,12 +56,17 @@ describe("extractCardNumber", () => {
     it("ignora montos y fechas, que no son números de tarjeta", () => {
         expect(extractCardNumber("Pago de tarjeta por 481.61 el 06/08/2026")).toBeNull();
     });
-});
 
-import { detectCardPayments, groupTwins } from "@/domain/services/card-payment-detection";
-import { parseBankNumber } from "@/lib/bank-number-fingerprint";
-import { mergeFingerprints, type IdentityCandidate } from "@/lib/bank-number-match";
-import type { FinancialTransaction } from "@/domain/entities/financial";
+    it("saca el número cuando la máscara de viñetas va al principio", () => {
+        expect(extractCardNumber("Pago a tarjeta ••••8361")).toBe("••••8361");
+    });
+
+    it("saca el número completo, con máscara incluida, cuando la viñeta va al final", () => {
+        // Sin máscara al final se rompería la invariante de que el token
+        // devuelto siempre trae un carácter de máscara.
+        expect(extractCardNumber("Pago tarjeta 1234••••")).toBe("1234••••");
+    });
+});
 
 const USER = "11111111-1111-1111-1111-111111111111";
 
