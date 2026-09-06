@@ -20,6 +20,7 @@ function daysUntil(date: string): number {
 
 export function CardDetailClient({ initialData }: { initialData: BankCardDetail }) {
     const { card, statements, periodMovements, payableAccounts } = initialData;
+    const withoutSource = new Set(initialData.paymentsWithoutSource ?? []);
     const number = formatBankNumber(card);
     const open = card.openStatement;
     const isCredit = card.cardType === "CREDIT";
@@ -122,6 +123,10 @@ export function CardDetailClient({ initialData }: { initialData: BankCardDetail 
                         <MovementRow
                             key={`${movement.transactionId}-${movement.direction}`}
                             movement={movement}
+                            withoutSource={
+                                movement.direction === "PAYMENT"
+                                && withoutSource.has(movement.transactionId)
+                            }
                         />
                     ))
                 )}
