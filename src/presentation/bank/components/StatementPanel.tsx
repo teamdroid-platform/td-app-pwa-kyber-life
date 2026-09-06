@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { computeStatementDue } from "@/domain/services/bank-balance";
-import { payStatementAction, setStatementTotalAction } from "@/app/actions/bank";
+import { payCardAction, setStatementTotalAction } from "@/app/actions/bank";
 import { accountLabel } from "@/lib/bank-identity-label";
 import { money, shortDate } from "../lib/format-money";
 import { cn } from "@/lib/utils";
@@ -15,10 +15,11 @@ import type { BankAccountWithBalance } from "@/application/services/bank-service
 
 interface StatementPanelProps {
     statement: BankCardStatement;
+    cardId: string;
     accounts: BankAccountWithBalance[];
 }
 
-export function StatementPanel({ statement, accounts }: StatementPanelProps) {
+export function StatementPanel({ statement, cardId, accounts }: StatementPanelProps) {
     const router = useRouter();
     const [paying, setPaying] = useState(false);
     const [editingTotal, setEditingTotal] = useState(false);
@@ -40,8 +41,8 @@ export function StatementPanel({ statement, accounts }: StatementPanelProps) {
     async function handlePay() {
         if (!source) return;
         setPaying(true);
-        const result = await payStatementAction({
-            statementId: statement.id,
+        const result = await payCardAction({
+            cardId,
             sourceAccountId: source.id,
             amount: due,
             date: new Date().toISOString(),

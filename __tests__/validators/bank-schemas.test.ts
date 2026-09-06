@@ -1,7 +1,12 @@
-import { createCardSchema, createAccountSchema, payStatementSchema } from "@/lib/validators/bank-schemas";
+import { createCardSchema, createAccountSchema, payCardSchema } from "@/lib/validators/bank-schemas";
 
 const INSTITUTION = "11111111-1111-4111-8111-111111111111";
 const ACCOUNT = "22222222-2222-4222-8222-222222222222";
+// UUID v4 válidos (con nibble de versión y variante correctos): zod 4 valida
+// el formato estricto de RFC4122 y rechaza el "11111111-1111-1111-1111-..."
+// propuesto originalmente porque su grupo de variante no cae en [89ab].
+const UUID_A = "33333333-3333-4333-8333-333333333333";
+const UUID_B = "44444444-4444-4444-8444-444444444444";
 
 describe("createCardSchema", () => {
     const base = { institutionId: INSTITUTION, currency: "USD" };
@@ -70,14 +75,26 @@ describe("createAccountSchema", () => {
     });
 });
 
-describe("payStatementSchema", () => {
-    it("rechaza un monto de cero o negativo", () => {
-        const base = {
-            statementId: INSTITUTION, sourceAccountId: ACCOUNT,
-            date: "2026-08-26T00:00:00.000Z",
-        };
-        expect(payStatementSchema.safeParse({ ...base, amount: 0 }).success).toBe(false);
-        expect(payStatementSchema.safeParse({ ...base, amount: -5 }).success).toBe(false);
-        expect(payStatementSchema.safeParse({ ...base, amount: 611.4 }).success).toBe(true);
+describe("payCardSchema", () => {
+    it("acepta un pago bien formado", () => {
+        const parsed = payCardSchema.parse({
+            cardId: UUID_A, sourceAccountId: UUID_B,
+            amount: 534.56, date: "2026-09-05T12:00:00.000Z",
+        });
+        expect(parsed.amount).toBe(534.56);
+    });
+
+    it("rechaza un monto de cero", () => {
+        expect(() => payCardSchema.parse({
+            cardId: UUID_A, sourceAccountId: UUID_B,
+            amount: 0, date: "2026-09-05T12:00:00.000Z",
+        })).toThrow(/mayor que cero/);
+    });
+
+    it("rechaza un id que no es uuid", () => {
+        expect(() => payCardSchema.parse({
+            cardId: "card-1", sourceAccountId: UUID_B,
+            amount: 10, date: "2026-09-05T12:00:00.000Z",
+        })).toThrow();
     });
 });

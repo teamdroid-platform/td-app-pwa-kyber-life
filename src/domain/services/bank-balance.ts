@@ -125,3 +125,21 @@ export function statementPeriodFor(
 
     return { periodStart, periodEnd, dueDate };
 }
+
+/**
+ * Cómo se reparte un pago entre el estado de cuenta abierto y la deuda
+ * corriente.
+ *
+ * El estado cobra primero porque es lo que tiene fecha de vencimiento; lo que
+ * sobra baja la deuda histórica. Sin estado abierto —una tarjeta sin día de
+ * corte configurado— el pago entero va contra la deuda, que es el caso normal
+ * mientras el usuario no declara el ciclo de su tarjeta.
+ */
+export function allocatePayment(
+    amount: number,
+    openStatement: BankCardStatement | null,
+): { toStatement: number; toDebt: number } {
+    const due = openStatement ? computeStatementDue(openStatement) : 0;
+    const toStatement = round2(Math.max(0, Math.min(amount, due)));
+    return { toStatement, toDebt: round2(amount - toStatement) };
+}

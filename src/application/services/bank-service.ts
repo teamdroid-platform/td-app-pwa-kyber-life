@@ -18,9 +18,12 @@ import type {
 } from "@/domain/repositories/financial";
 import {
     computeAccountBalance, computeCardDebt, computeAvailableCredit,
-    computeStatementDue, runningBalances, statementPeriodFor,
+    runningBalances, statementPeriodFor, allocatePayment,
 } from "@/domain/services/bank-balance";
 import { isIncomeType } from "@/domain/services/financial-balance";
+import {
+    detectCardPayments, groupTwins, type PaymentGroup,
+} from "@/domain/services/card-payment-detection";
 import { ISSUER_NAME, inferInstitutionKind } from "@/lib/bank-institution-kind";
 import { parseBankNumber } from "@/lib/bank-number-fingerprint";
 import { resolveFingerprint, type Resolution } from "@/lib/bank-number-match";
@@ -1084,27 +1087,24 @@ export class BankService {
     }
 
     /**
-     * Paga un estado de cuenta. Crea una transacción de gasto **real** que sale
-     * de la cuenta elegida y queda ligada al estado — es la única forma en que
-     * la deuda de la tarjeta baja.
+     * Registra un pago a una tarjeta.
      *
-     * `paidWithCredit` va en false a propósito: el pago no es un consumo
-     * diferido, es dinero que sale hoy. Eso es lo que evita el doble conteo,
-     * porque los consumos con la tarjeta ya se excluyeron del balance global
-     * mientras estaban diferidos.
+     * Es el único camino de pago: lo llaman tanto el botón del detalle de
+     * tarjeta como el del estado de cuenta. El importe abona primero el estado
+     * abierto —lo que tiene vencimiento— y el resto baja la deuda corriente;
+     * sin estado abierto, todo va a la deuda. Sale **una** transacción, que
+     * lleva la tarjeta siempre y el estado solo cuando abonó algo.
      */
-    async payStatement(
-        userId: UUID, statementId: UUID, sourceAccountId: UUID,
+    async payCard(
+        userId: UUID, cardId: UUID, sourceAccountId: UUID,
         amount: number, date: string,
     ): Promise<FinancialTransaction> {
-        const statement = await this.statements.findById(statementId);
-        if (!statement || statement.ownerUserId !== userId) {
-            throw new Error("Estado de cuenta no encontrado");
-        }
-        const card = await this.cards.findById(statement.cardId);
-        if (!card) throw new Error("Tarjeta no encontrada");
+        const card = await this.cards.findById(cardId);
+        if (!card || card.ownerUserId !== userId) throw new Error("Tarjeta no encontrada");
+        if (card.cardType !== "CREDIT") throw new Error("Solo se puede pagar una tarjeta de crédito");
 
-        const due = computeStatementDue(statement);
+        const openStatement = await this.statements.findOpenForCard(cardId);
+        const { toStatement } = allocatePayment(amount, openStatement);
 
         const transaction = await this.transactions.create({
             id: randomUUID(),
@@ -1119,18 +1119,132 @@ export class BankService {
             paidWithCredit: false,
             possibleDuplicate: false,
             bankSourceAccountId: sourceAccountId,
-            bankCardStatementId: statementId,
+            bankCardPaymentId: cardId,
+            bankCardStatementId: toStatement > 0 ? openStatement!.id : null,
             bankInstitutionId: card.institutionId,
             ...stamps(),
         } as FinancialTransaction);
 
-        await this.statements.update({
-            ...statement,
-            paidAmount: round2(Number(statement.paidAmount) + amount),
-            status: amount >= due ? "PAID" : statement.status,
-        });
+        if (toStatement > 0 && openStatement) {
+            const paidAmount = round2(Number(openStatement.paidAmount) + toStatement);
+            await this.statements.update({
+                ...openStatement,
+                paidAmount,
+                status: paidAmount >= Number(openStatement.totalAmount ?? openStatement.computedAmount)
+                    ? "PAID"
+                    : openStatement.status,
+            });
+        }
 
         return transaction;
+    }
+
+    /**
+     * Los pagos que la app cree haber capturado y todavía no están atados a
+     * ninguna tarjeta, agrupados para que las capturas gemelas se confirmen una
+     * sola vez.
+     */
+    async listPendingCardPayments(userId: UUID): Promise<PaymentGroup[]> {
+        const [transactions, candidates, cards] = await Promise.all([
+            this.transactions.findByOwnerId(userId),
+            this.identification.identityCandidates(userId),
+            this.cards.findByOwnerId(userId),
+        ]);
+
+        // `identityCandidates` devuelve toda identidad con número —cuentas y
+        // tarjetas de los dos tipos—, y a una tarjeta de débito no se le paga
+        // una deuda: sin este filtro un número ambiguo podría atar el pago a
+        // la tarjeta con la que se compra. El filtro tiene un segundo efecto,
+        // también deliberado: al sacar cuentas y débito del universo de
+        // candidatas, un número que sería ambiguo contra el conjunto completo
+        // puede resolver único contra el subconjunto de crédito —reducir el
+        // universo aquí afloja la resolución, no la endurece.
+        const creditCardIds = new Set(
+            cards.filter(c => c.cardType === "CREDIT").map(c => c.id),
+        );
+        const creditCandidates = candidates.filter(c => creditCardIds.has(c.id));
+
+        return groupTwins(detectCardPayments(transactions, creditCandidates));
+    }
+
+    /**
+     * Ata un pago a su tarjeta y marca como duplicadas las capturas gemelas.
+     *
+     * Las gemelas no se borran: la segunda fuente a veces trae datos que la
+     * primera no tiene, y lo que hace falta es que no vuelvan a ofrecerse ni
+     * resten la deuda otra vez.
+     */
+    async confirmCardPayment(
+        userId: UUID, transactionId: UUID, cardId: UUID,
+    ): Promise<FinancialTransaction> {
+        const transaction = await this.transactions.findById(transactionId);
+        if (!transaction || transaction.ownerUserId !== userId) {
+            throw new Error("Transacción no encontrada");
+        }
+        const card = await this.cards.findById(cardId);
+        if (!card || card.ownerUserId !== userId) throw new Error("Tarjeta no encontrada");
+        if (card.cardType !== "CREDIT") throw new Error("Solo se puede pagar una tarjeta de crédito");
+
+        const group = (await this.listPendingCardPayments(userId))
+            .find(g => g.primary.id === transactionId
+                || g.twins.some(t => t.id === transactionId));
+
+        const twins = group
+            ? [group.primary, ...group.twins].filter(t => t.id !== transactionId)
+            : [];
+
+        // La gemela no se borra —la segunda fuente a veces trae datos que la
+        // primera no tiene— pero sí queda descartada como candidata (`cardPaymentDismissedAt`):
+        // sin esto, `detectCardPayments` la vuelve a ofrecer en la bandeja tras confirmar.
+        const now = new Date().toISOString();
+        for (const twin of twins) {
+            await this.transactions.update({
+                ...twin,
+                possibleDuplicate: true,
+                cardPaymentDismissedAt: now,
+                updatedAt: now,
+            });
+        }
+
+        return this.transactions.update({
+            ...transaction,
+            bankCardPaymentId: cardId,
+            paidWithCredit: false,
+            updatedAt: new Date().toISOString(),
+        });
+    }
+
+    /**
+     * Saca una candidata de la bandeja sin borrarla ni tocar ningún saldo.
+     *
+     * Descarta el grupo completo, no solo la transacción recibida: una
+     * gemela es el mismo pago visto dos veces, así que descartar el pago
+     * las descarta todas — igual que `confirmCardPayment` propaga a las
+     * gemelas al confirmar. Sin esto, la gemela no tocada vuelve sola a la
+     * bandeja en la siguiente carga.
+     */
+    async dismissCardPayment(
+        userId: UUID, transactionId: UUID,
+    ): Promise<FinancialTransaction> {
+        const transaction = await this.transactions.findById(transactionId);
+        if (!transaction || transaction.ownerUserId !== userId) {
+            throw new Error("Transacción no encontrada");
+        }
+
+        const group = (await this.listPendingCardPayments(userId))
+            .find(g => g.primary.id === transactionId
+                || g.twins.some(t => t.id === transactionId));
+        const members = group ? [group.primary, ...group.twins] : [transaction];
+
+        const now = new Date().toISOString();
+        let dismissed = transaction;
+        for (const member of members) {
+            const updated = await this.transactions.update({
+                ...member, cardPaymentDismissedAt: now, updatedAt: now,
+            });
+            if (member.id === transactionId) dismissed = updated;
+        }
+        return dismissed;
     }
 
     /** Corrige el total de un estado con lo que declara el banco. */

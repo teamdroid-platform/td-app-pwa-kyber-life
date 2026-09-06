@@ -160,11 +160,15 @@ export class InMemoryBankMovementRepository implements IBankMovementRepository {
             if (t.bankCardId && creditCardIds.has(t.bankCardId) && t.paidWithCredit) {
                 out.push({ ...base, accountId: null, cardId: t.bankCardId, direction: "CHARGE" });
             }
-            if (t.bankCardStatementId) {
-                const statement = await this.statements.findById(t.bankCardStatementId);
-                if (statement) {
-                    out.push({ ...base, accountId: null, cardId: statement.cardId, direction: "PAYMENT" });
-                }
+            // Espejo de la rama PAYMENT de la vista SQL: la tarjeta sale de la
+            // columna propia o del estado, y se emite una sola línea aunque
+            // vengan las dos puestas.
+            const paidCardId = t.bankCardPaymentId
+                ?? (t.bankCardStatementId
+                    ? (await this.statements.findById(t.bankCardStatementId))?.cardId ?? null
+                    : null);
+            if (paidCardId) {
+                out.push({ ...base, accountId: null, cardId: paidCardId, direction: "PAYMENT" });
             }
         }
 
