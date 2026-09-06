@@ -89,7 +89,12 @@ export const statementTotalSchema = z.object({
 
 export const payCardSchema = z.object({
     cardId: uuid,
-    sourceAccountId: uuid,
+    /**
+     * Null cuando el usuario no declara de qué cuenta salió el dinero. Se pide
+     * explícito en vez de opcional: «no lo sé» es una respuesta, y omitir el
+     * campo por error no debería parecerse a haberla dado.
+     */
+    sourceAccountId: uuid.nullable(),
     amount: z.number().positive("El monto debe ser mayor que cero"),
     date: z.string().datetime(),
 });

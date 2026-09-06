@@ -502,3 +502,60 @@ describe("bandeja de pagos por confirmar", () => {
             .rejects.toThrow("Solo se puede pagar una tarjeta de crédito");
     });
 });
+
+describe("payCard sin cuenta de origen", () => {
+    async function creditCardWithDebt(built: ReturnType<typeof buildService>, id: string) {
+        const card = await built.cards.create({
+            id, ownerUserId: USER, cardType: "CREDIT", currency: "USD",
+            status: "ACTIVE", isUnconfirmed: false, createdAt: NOW, updatedAt: NOW,
+            isDeleted: false,
+        } as never);
+        await built.transactions.create(tx({
+            amount: 534.56, bankCardId: card.id, paidWithCredit: true,
+        }));
+        return card;
+    }
+
+    it("baja la deuda sin atar ninguna cuenta", async () => {
+        const built = buildService();
+        const card = await creditCardWithDebt(built, "card-sin-origen");
+
+        const payment = await built.service.payCard(USER, card.id, null, 534.56, NOW);
+
+        expect(payment.bankSourceAccountId).toBeFalsy();
+        expect(payment.bankCardPaymentId).toBe(card.id);
+        expect((await built.service.getCardDetail(USER, card.id))!.card.debt).toBe(0);
+    });
+
+    it("no mueve el saldo de ninguna cuenta", async () => {
+        const built = buildService();
+        const card = await creditCardWithDebt(built, "card-saldo-intacto");
+        const account = await built.accounts.create({
+            id: "acc-intacta", ownerUserId: USER, accountType: "SAVINGS", currency: "USD",
+            status: "ACTIVE", isUnconfirmed: false, createdAt: NOW, updatedAt: NOW,
+            isDeleted: false,
+        } as never);
+        await built.snapshots.create({
+            id: "snap-1", ownerUserId: USER, accountId: account.id, balance: 1000,
+            asOf: "2026-08-01", source: "MANUAL", createdAt: NOW, updatedAt: NOW,
+            isDeleted: false,
+        } as never);
+
+        await built.service.payCard(USER, card.id, null, 534.56, NOW);
+
+        const detail = await built.service.getAccountDetail(USER, account.id);
+        expect(detail!.account.balance).toBe(1000);
+    });
+
+    it("senala el pago sin origen en el detalle de la tarjeta", async () => {
+        const built = buildService();
+        const card = await creditCardWithDebt(built, "card-senalada");
+
+        const payment = await built.service.payCard(USER, card.id, null, 100, NOW);
+        const conCuenta = await built.service.payCard(USER, card.id, "acc-1", 50, NOW);
+
+        const detail = await built.service.getCardDetail(USER, card.id);
+        expect(detail!.paymentsWithoutSource).toContain(payment.id);
+        expect(detail!.paymentsWithoutSource).not.toContain(conCuenta.id);
+    });
+});

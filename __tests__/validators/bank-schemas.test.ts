@@ -84,6 +84,20 @@ describe("payCardSchema", () => {
         expect(parsed.amount).toBe(534.56);
     });
 
+    it("acepta un pago sin cuenta de origen", () => {
+        const parsed = payCardSchema.parse({
+            cardId: UUID_A, sourceAccountId: null,
+            amount: 534.56, date: "2026-09-05T12:00:00.000Z",
+        });
+        expect(parsed.sourceAccountId).toBeNull();
+    });
+
+    it("rechaza que la cuenta de origen falte del todo", () => {
+        expect(() => payCardSchema.parse({
+            cardId: UUID_A, amount: 10, date: "2026-09-05T12:00:00.000Z",
+        })).toThrow();
+    });
+
     it("rechaza un monto de cero", () => {
         expect(() => payCardSchema.parse({
             cardId: UUID_A, sourceAccountId: UUID_B,
