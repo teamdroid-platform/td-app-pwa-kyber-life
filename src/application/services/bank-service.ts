@@ -104,6 +104,15 @@ export interface BankCardDetail {
     periodMovements: BankMovement[];
     /** Cuentas desde las que se puede pagar el estado. */
     payableAccounts: BankAccountWithBalance[];
+    /**
+     * Los pagos que no dicen de qué cuenta salieron, por id de transacción.
+     *
+     * Un movimiento `PAYMENT` nunca nombra cuenta —la salida viaja en su propia
+     * línea `OUT`—, así que desde el movimiento no hay forma de distinguir el
+     * pago que sí tiene origen del que no. Esta lista es lo que permite
+     * marcarlos en la pantalla para volver a ellos.
+     */
+    paymentsWithoutSource: UUID[];
 }
 
 export interface CreateInstitutionInput {
@@ -961,7 +970,16 @@ export class BankService {
                 .map(async a => namedByInstitution(await this.withBalance(a, allMovements), institutions)),
         );
 
-        return { card: withDebt, statements, movements, periodMovements, payableAccounts };
+        const paymentIds = movements.filter(m => m.direction === "PAYMENT").map(m => m.transactionId);
+        const paid = await Promise.all(paymentIds.map(id => this.transactions.findById(id)));
+        const paymentsWithoutSource = paid
+            .filter(t => t && !t.bankSourceAccountId)
+            .map(t => t!.id);
+
+        return {
+            card: withDebt, statements, movements, periodMovements, payableAccounts,
+            paymentsWithoutSource,
+        };
     }
 
     // ─── Cortes de saldo ─────────────────────────────────────
@@ -1094,9 +1112,15 @@ export class BankService {
      * abierto —lo que tiene vencimiento— y el resto baja la deuda corriente;
      * sin estado abierto, todo va a la deuda. Sale **una** transacción, que
      * lleva la tarjeta siempre y el estado solo cuando abonó algo.
+     *
+     * `sourceAccountId` puede venir en null: hay pagos de los que el usuario no
+     * sabe —o no quiere declarar— de qué cuenta salieron. Sin ese campo la
+     * vista no emite la línea `OUT`, así que la deuda de la tarjeta baja y
+     * ningún saldo se mueve. Es una verdad a medias registrada como tal, en
+     * vez de una cuenta inventada que cuadre las cifras.
      */
     async payCard(
-        userId: UUID, cardId: UUID, sourceAccountId: UUID,
+        userId: UUID, cardId: UUID, sourceAccountId: UUID | null,
         amount: number, date: string,
     ): Promise<FinancialTransaction> {
         const card = await this.cards.findById(cardId);
@@ -1118,7 +1142,7 @@ export class BankService {
             date,
             paidWithCredit: false,
             possibleDuplicate: false,
-            bankSourceAccountId: sourceAccountId,
+            bankSourceAccountId: sourceAccountId ?? null,
             bankCardPaymentId: cardId,
             bankCardStatementId: toStatement > 0 ? openStatement!.id : null,
             bankInstitutionId: card.institutionId,

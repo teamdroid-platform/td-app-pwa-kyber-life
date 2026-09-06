@@ -16,9 +16,15 @@ interface MovementRowProps {
     movement: BankMovement;
     /** Saldo que quedó tras este movimiento. Solo aplica a cuentas. */
     runningBalance?: number;
+    /**
+     * Un pago del que no se declaró de qué cuenta salió. Se marca porque desde
+     * el movimiento no hay forma de notarlo: la deuda bajó igual, pero ninguna
+     * cuenta refleja la salida y el dato sigue faltando.
+     */
+    withoutSource?: boolean;
 }
 
-export function MovementRow({ movement, runningBalance }: MovementRowProps) {
+export function MovementRow({ movement, runningBalance, withoutSource }: MovementRowProps) {
     const { Icon, chip, amount, sign } = STYLE[movement.direction];
     const title = movement.merchant || movement.description || "Movimiento";
     const subtitle = movement.merchant && movement.description ? movement.description : null;
@@ -33,6 +39,11 @@ export function MovementRow({ movement, runningBalance }: MovementRowProps) {
                 <span className="block truncate text-sm font-semibold">{title}</span>
                 {subtitle && (
                     <span className="block truncate text-xs text-muted-foreground">{subtitle}</span>
+                )}
+                {withoutSource && (
+                    <span className="mt-0.5 inline-block rounded-full border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-[10px] leading-none text-amber-400">
+                        sin origen
+                    </span>
                 )}
             </span>
 

@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { CardDetailClient } from "@/presentation/bank/components/CardDetailClient";
 import type { BankCardDetail } from "@/application/services/bank-service";
 
@@ -79,5 +79,70 @@ describe("PayCardSheet — arreglos ronda 1", () => {
         fireEvent.click(screen.getByRole("button", { name: /pagar/i }));
 
         expect(screen.getByLabelText("Monto del pago")).toHaveValue("534.56");
+    });
+});
+
+describe("PayCardSheet — origen opcional y banco visible", () => {
+    it("llega con el origen sin definir y avisa de que ningún saldo se mueve", () => {
+        render(<CardDetailClient initialData={detail()} />);
+        fireEvent.click(screen.getByRole("button", { name: /pagar/i }));
+
+        expect(screen.getByRole("combobox", { name: /cuenta de origen/i }))
+            .toHaveTextContent(/sin definir/i);
+        expect(screen.getByTestId("sin-origen-aviso")).toBeInTheDocument();
+    });
+
+    it("cada cuenta del selector dice de qué banco es", () => {
+        render(<CardDetailClient initialData={detail()} />);
+        fireEvent.click(screen.getByRole("button", { name: /pagar/i }));
+        fireEvent.click(screen.getByRole("combobox", { name: /cuenta de origen/i }));
+
+        const opcion = screen.getByRole("option", { name: /ahorros xxxx?\s*8361|ahorros/i });
+        expect(opcion).toHaveTextContent(/Pichincha/);
+    });
+
+    it("registra el pago con la cuenta en null cuando no se define", async () => {
+        const { payCardAction } = jest.requireMock("@/app/actions/bank");
+        payCardAction.mockClear();
+        payCardAction.mockResolvedValue({ success: true, data: null });
+
+        render(<CardDetailClient initialData={detail()} />);
+        fireEvent.click(screen.getByRole("button", { name: /pagar/i }));
+        fireEvent.click(screen.getByRole("button", { name: /registrar pago/i }));
+
+        await waitFor(() => {
+            expect(payCardAction).toHaveBeenCalledWith(
+                expect.objectContaining({ cardId: "card-1", sourceAccountId: null, amount: 534.56 }),
+            );
+        });
+    });
+});
+
+describe("CardDetailClient — pagos sin origen en los movimientos", () => {
+    function conPagos(): BankCardDetail {
+        const base = detail();
+        const movimiento = (transactionId: string) => ({
+            transactionId, ownerUserId: "u1", date: "2026-09-05T12:00:00Z",
+            accountId: null, cardId: "card-1", direction: "PAYMENT",
+            amount: 100, currency: "USD", description: "Pago Mastercard XXXX8361",
+            merchant: "Banco del Pacífico", categoryId: null,
+        });
+        return {
+            ...base,
+            openStatement: null,
+            periodMovements: [movimiento("tx-sin"), movimiento("tx-con")],
+            paymentsWithoutSource: ["tx-sin"],
+        } as unknown as BankCardDetail;
+    }
+
+    it("marca solo el pago que no dice de dónde salió", () => {
+        render(<CardDetailClient initialData={conPagos()} />);
+        expect(screen.getAllByText(/sin origen/i)).toHaveLength(1);
+    });
+
+    it("no marca nada cuando todos los pagos tienen cuenta", () => {
+        const data = { ...conPagos(), paymentsWithoutSource: [] } as unknown as BankCardDetail;
+        render(<CardDetailClient initialData={data} />);
+        expect(screen.queryByText(/sin origen/i)).toBeNull();
     });
 });
