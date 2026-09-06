@@ -4,6 +4,7 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import {
     bankService,
+    bankCardRepository,
     financialScannerTransactionRepository,
     financialTransactionRepository,
 } from "@/infrastructure/container";
@@ -13,7 +14,8 @@ import {
     createAccountSchema, updateAccountSchema,
     createCardSchema, updateCardSchema,
     balanceSnapshotSchema, balanceSnapshotBatchSchema,
-    statementTotalSchema, payStatementSchema,
+    statementTotalSchema,
+    payCardSchema, confirmCardPaymentSchema, dismissCardPaymentSchema,
     mergeInstitutionsSchema, convertToCardSchema,
 } from "@/lib/validators/bank-schemas";
 
@@ -96,6 +98,25 @@ export async function getBankCardDetailAction(cardId: string) {
         const data = await bankService.getCardDetail(userId, idSchema.parse(cardId));
         if (!data) throw new Error("Tarjeta no encontrada");
         return data;
+    });
+}
+
+/**
+ * Los pagos que la app detectó entre las transacciones ya capturadas y que
+ * todavía no bajan la deuda de ninguna tarjeta, con las tarjetas de crédito a
+ * las que se pueden atar.
+ *
+ * `BankService` no expone un listado de tarjetas propio: se toma el
+ * repositorio directo del container, como ya hace `getTransactionAccountsAction`
+ * para datos de solo lectura que no pasan por el servicio.
+ */
+export async function getPendingCardPaymentsAction() {
+    return run("getPendingCardPayments", async userId => {
+        const [groups, cards] = await Promise.all([
+            bankService.listPendingCardPayments(userId),
+            bankCardRepository.findByOwnerId(userId),
+        ]);
+        return { groups, cards: cards.filter(card => card.cardType === "CREDIT") };
     });
 }
 
@@ -260,16 +281,35 @@ export async function setStatementTotalAction(input: unknown) {
     });
 }
 
-export async function payStatementAction(input: unknown) {
-    return run("payStatement", async userId => {
-        const v = payStatementSchema.parse(input);
-        const result = await bankService.payStatement(
-            userId, v.statementId, v.sourceAccountId, v.amount, v.date,
+export async function payCardAction(input: unknown) {
+    return run("payCard", async userId => {
+        const v = payCardSchema.parse(input);
+        const result = await bankService.payCard(
+            userId, v.cardId, v.sourceAccountId, v.amount, v.date,
         );
         revalidateBanks();
         // El pago es un gasto real, así que también mueve el dashboard financiero.
         revalidatePath("/financial");
         revalidatePath("/financial/transactions");
+        return result;
+    });
+}
+
+export async function confirmCardPaymentAction(input: unknown) {
+    return run("confirmCardPayment", async userId => {
+        const v = confirmCardPaymentSchema.parse(input);
+        const result = await bankService.confirmCardPayment(userId, v.transactionId, v.cardId);
+        revalidateBanks();
+        revalidatePath("/financial/banks/payments");
+        return result;
+    });
+}
+
+export async function dismissCardPaymentAction(input: unknown) {
+    return run("dismissCardPayment", async userId => {
+        const v = dismissCardPaymentSchema.parse(input);
+        const result = await bankService.dismissCardPayment(userId, v.transactionId);
+        revalidatePath("/financial/banks/payments");
         return result;
     });
 }

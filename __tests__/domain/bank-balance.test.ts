@@ -1,6 +1,6 @@
 import {
     computeAccountBalance, computeCardDebt, computeAvailableCredit,
-    computeStatementDue, runningBalances, statementPeriodFor,
+    computeStatementDue, runningBalances, statementPeriodFor, allocatePayment,
 } from "@/domain/services/bank-balance";
 import { BankMovement, BankAccountBalanceSnapshot, BankCardStatement } from "@/domain/entities/bank";
 
@@ -155,5 +155,37 @@ describe("el corte manual manda sobre lo anterior", () => {
             mov("2026-08-01T10:00:00Z", "IN", 100),
             mov("2026-08-02T10:00:00Z", "OUT", 40),
         ])).toBe(60);
+    });
+});
+
+/** Un estado de cuenta mínimo con el pendiente que se le pida. */
+function statement(due: number, paid = 0): BankCardStatement {
+    return {
+        id: "s1", ownerUserId: "u1", cardId: "c1",
+        periodStart: "2026-08-01", periodEnd: "2026-08-31", dueDate: "2026-09-15",
+        computedAmount: due + paid, totalAmount: null, paidAmount: paid, status: "OPEN",
+        createdAt: "2026-08-01T00:00:00Z", updatedAt: "2026-08-01T00:00:00Z", isDeleted: false,
+    } as BankCardStatement;
+}
+
+describe("allocatePayment", () => {
+    it("sin estado abierto, todo el pago baja la deuda", () => {
+        expect(allocatePayment(534.56, null)).toEqual({ toStatement: 0, toDebt: 534.56 });
+    });
+
+    it("el estado absorbe lo suyo y el resto baja la deuda", () => {
+        expect(allocatePayment(200, statement(180))).toEqual({ toStatement: 180, toDebt: 20 });
+    });
+
+    it("un pago menor que el pendiente va entero al estado", () => {
+        expect(allocatePayment(50, statement(180))).toEqual({ toStatement: 50, toDebt: 0 });
+    });
+
+    it("un estado ya saldado no absorbe nada", () => {
+        expect(allocatePayment(100, statement(0, 180))).toEqual({ toStatement: 0, toDebt: 100 });
+    });
+
+    it("redondea a centavos en vez de arrastrar ruido de floats", () => {
+        expect(allocatePayment(0.3, statement(0.1))).toEqual({ toStatement: 0.1, toDebt: 0.2 });
     });
 });

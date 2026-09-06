@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ChevronLeft, Inbox } from "lucide-react";
 import { formatBankNumber } from "@/lib/format-bank-number";
 import { StatementPanel } from "./StatementPanel";
+import { PayCardSheet } from "./PayCardSheet";
 import { MovementRow } from "./MovementRow";
 import { money, shortDate } from "../lib/format-money";
 import { computeStatementDue } from "@/domain/services/bank-balance";
@@ -56,9 +57,14 @@ export function CardDetailClient({ initialData }: { initialData: BankCardDetail 
                 />
                 <div className="relative flex flex-col gap-2.5">
                     <p className="text-sm font-medium text-white/85">Deuda total</p>
-                    <h2 className="text-[2rem] font-bold leading-none tracking-tight tabular-nums text-rose-400">
-                        {money(card.debt)}
-                    </h2>
+                    <div className="flex items-center justify-between gap-3">
+                        <h2 className="text-[2rem] font-bold leading-none tracking-tight tabular-nums text-rose-400">
+                            {money(card.debt)}
+                        </h2>
+                        {isCredit && card.debt > 0 && (
+                            <PayCardSheet card={card} accounts={payableAccounts} />
+                        )}
+                    </div>
                     <div className="flex flex-wrap gap-2">
                         {open && remaining !== null && (
                             <span className="rounded-full border border-amber-500/30 bg-amber-500/15 px-2.5 py-0.5 text-[11px] text-amber-200">
@@ -98,7 +104,7 @@ export function CardDetailClient({ initialData }: { initialData: BankCardDetail 
                 </section>
             )}
 
-            {open && <StatementPanel statement={open} accounts={payableAccounts} />}
+            {open && <StatementPanel statement={open} cardId={card.id} accounts={payableAccounts} />}
 
             <section className="flex flex-col gap-2">
                 <h2 className="pt-1 text-[11px] uppercase tracking-wide text-muted-foreground">

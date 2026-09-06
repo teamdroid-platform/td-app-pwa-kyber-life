@@ -87,11 +87,20 @@ export const statementTotalSchema = z.object({
     totalAmount: z.number().nonnegative(),
 });
 
-export const payStatementSchema = z.object({
-    statementId: uuid,
+export const payCardSchema = z.object({
+    cardId: uuid,
     sourceAccountId: uuid,
     amount: z.number().positive("El monto debe ser mayor que cero"),
     date: z.string().datetime(),
+});
+
+export const confirmCardPaymentSchema = z.object({
+    transactionId: uuid,
+    cardId: uuid,
+});
+
+export const dismissCardPaymentSchema = z.object({
+    transactionId: uuid,
 });
 
 // Las de update parten de la base sin refinar: un parcial no puede validar
