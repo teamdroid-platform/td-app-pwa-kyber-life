@@ -7,9 +7,7 @@ import { DEFAULT_CYCLE_START_DAY } from "@/domain/entities/period";
 import { balanceService, periodSettingsService } from "@/infrastructure/container";
 import { requireUserId } from "@/infrastructure/supabase/auth-user";
 import { getCategoriesAction, getInstitutionsAction } from "@/app/actions/financial-settings";
-import { Button } from "@/components/ui/button";
-import { Plus, Inbox as InboxIcon, PieChart } from "lucide-react";
-import Link from "next/link";
+import { Plus } from "lucide-react";
 import { TransactionTabs } from "@/presentation/financial/components/TransactionTabs";
 import { NewTransactionDialog } from "@/presentation/financial/components/ai-capture/NewTransactionDialog";
 import { cycleRangeContaining, toFullDayIsoRange } from "@/lib/date-range";
@@ -132,33 +130,11 @@ export default async function TransactionsPage({
 
     return (
         <div className="flex flex-col gap-6">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                <div>
-                    <h1 className="text-3xl font-bold tracking-tight">Transacciones</h1>
-                    <p className="text-muted-foreground mt-2">
-                        Revisa y gestiona tus transacciones financieras.
-                    </p>
-                </div>
-                <div className="flex w-full sm:w-auto gap-2 mt-4 sm:mt-0">
-                    <Button variant="outline" asChild className="h-10 flex-1 px-2 sm:px-4 sm:flex-none">
-                        <Link href="/financial">
-                            <PieChart className="mr-1.5 h-4 w-4 shrink-0 text-accent-primary" />
-                            <span className="truncate text-xs sm:text-sm">Resumen</span>
-                        </Link>
-                    </Button>
-                    <Button variant="outline" asChild className="h-10 flex-1 px-2 sm:px-4 sm:flex-none">
-                        <Link href="/financial/scans">
-                            <InboxIcon className="mr-1.5 h-4 w-4 shrink-0 text-accent-primary" />
-                            <span className="truncate text-xs sm:text-sm">Escaneos</span>
-                        </Link>
-                    </Button>
-                    <NewTransactionDialog>
-                        <Button className="h-10 flex-1 px-2 sm:px-4 sm:flex-none">
-                            <Plus className="mr-1.5 h-4 w-4 shrink-0" />
-                            <span className="truncate text-xs sm:text-sm">Agregar</span>
-                        </Button>
-                    </NewTransactionDialog>
-                </div>
+            <div>
+                <h1 className="text-3xl font-bold tracking-tight">Transacciones</h1>
+                <p className="text-muted-foreground mt-2">
+                    Revisa y gestiona tus transacciones financieras.
+                </p>
             </div>
 
             <Suspense fallback={<div className="h-10 animate-pulse bg-muted rounded-md" />}>
@@ -183,6 +159,21 @@ export default async function TransactionsPage({
                     </Suspense>
                 </TransactionTabs>
             </Suspense>
+
+            {/* Agregar deja de ocupar una fila entera arriba y pasa a flotar
+                sobre la lista: en esta pantalla se viene a leer, y el alto que
+                comía la botonera vale más como transacciones a la vista.
+                El margen inferior respeta el área segura del teléfono, para que
+                no quede debajo de la barra del navegador. */}
+            <NewTransactionDialog>
+                <button
+                    type="button"
+                    aria-label="Agregar transacción"
+                    className="fixed right-5 bottom-[calc(1.5rem+env(safe-area-inset-bottom))] z-50 grid h-14 w-14 place-items-center rounded-full bg-accent-primary text-white shadow-xl shadow-accent-primary/25 transition-transform hover:scale-105 active:scale-95"
+                >
+                    <Plus className="h-6 w-6" />
+                </button>
+            </NewTransactionDialog>
         </div>
     );
 }
