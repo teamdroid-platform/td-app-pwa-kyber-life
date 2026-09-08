@@ -45,6 +45,30 @@ export async function getDashboardOverviewAction(startDate?: string, endDate?: s
     }
 }
 
+/**
+ * The transactions behind the dashboard's "Sin categoría" counter, so the user
+ * can fix them without hunting for them in the full list — which has no filter
+ * for "has no category".
+ */
+export async function getUncategorizedTransactionsAction(startDate?: string, endDate?: string) {
+    try {
+        const validated = dateFilterSchema.parse({ startDate, endDate });
+        const userId = await getAuthUserId();
+
+        const sDate = validated.startDate ? new Date(validated.startDate) : undefined;
+        const eDate = validated.endDate ? new Date(validated.endDate) : undefined;
+
+        const data = await financialDashboardService.getUncategorizedTransactions(userId, sDate, eDate);
+        return { success: true as const, data };
+    } catch (error) {
+        if (error instanceof z.ZodError) {
+            return { success: false as const, error: `Validation failed: ${formatZodError(error)}` };
+        }
+        console.error("Error fetching uncategorized transactions:", error);
+        return { success: false as const, error: (error as Error).message };
+    }
+}
+
 export async function getFinancialKPIsAction(startDate?: string, endDate?: string) {
     try {
         const validated = dateFilterSchema.parse({ startDate, endDate });

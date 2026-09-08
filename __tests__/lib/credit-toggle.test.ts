@@ -3,12 +3,15 @@ import {
     excludeCreditFromCategoryBreakdown,
     excludeCreditFromInstitutionBreakdown,
     excludeCreditFromDailyBreakdown,
+    excludeCardPaymentsFromCategoryBreakdown,
+    excludeCreditFromMerchantBreakdown,
 } from "@/presentation/financial/lib/credit-toggle";
 import type {
     FinancialKPIs,
     CategoryBreakdown,
     InstitutionBreakdown,
     DailyBreakdown,
+    MerchantBreakdown,
 } from "@/application/services/financial-dashboard-service";
 
 describe("credit-toggle", () => {
@@ -18,6 +21,7 @@ describe("credit-toggle", () => {
                 totalIncome: 1000,
                 totalExpenses: 400,
                 totalExpensesCredit: 300,
+                totalExpensesSettlement: 0,
                 totalTransfers: 50,
                 totalTransfersSavings: 20,
                 totalTransfersFunding: 10,
@@ -26,6 +30,8 @@ describe("credit-toggle", () => {
                 transactionCount: 5,
                 avgTransactionAmount: 100,
                 pendingTransactionsCount: 0,
+                possibleDuplicateCount: 0,
+                uncategorizedCount: 0,
                 currency: "USD",
             };
 
@@ -42,8 +48,8 @@ describe("credit-toggle", () => {
     describe("excludeCreditFromCategoryBreakdown", () => {
         it("subtracts credit totals, drops categories left with nothing, and recomputes percentages", () => {
             const data: CategoryBreakdown[] = [
-                { categoryId: "1", categoryName: "Alimentación", total: 80, creditTotal: 0, count: 2, percentage: 40 },
-                { categoryId: "2", categoryName: "Pago de Tarjetas", total: 120, creditTotal: 120, count: 1, percentage: 60 },
+                { categoryId: "1", categoryName: "Alimentación", total: 80, creditTotal: 0, paymentTotal: 0, count: 2, percentage: 40 },
+                { categoryId: "2", categoryName: "Pago de Tarjetas", total: 120, creditTotal: 120, paymentTotal: 0, count: 1, percentage: 60 },
             ];
 
             const result = excludeCreditFromCategoryBreakdown(data);
@@ -57,8 +63,8 @@ describe("credit-toggle", () => {
 
         it("recomputes percentages proportionally when some categories keep a real remainder", () => {
             const data: CategoryBreakdown[] = [
-                { categoryId: "1", categoryName: "Alimentación", total: 100, creditTotal: 0, count: 1, percentage: 50 },
-                { categoryId: "2", categoryName: "Entretenimiento", total: 100, creditTotal: 50, count: 1, percentage: 50 },
+                { categoryId: "1", categoryName: "Alimentación", total: 100, creditTotal: 0, paymentTotal: 0, count: 1, percentage: 50 },
+                { categoryId: "2", categoryName: "Entretenimiento", total: 100, creditTotal: 50, paymentTotal: 0, count: 1, percentage: 50 },
             ];
 
             const result = excludeCreditFromCategoryBreakdown(data);
@@ -68,6 +74,56 @@ describe("credit-toggle", () => {
             expect(entretenimiento!.total).toBe(50);
             // 100 real + 50 real = 150 total; 50/150 ≈ 33.33%
             expect(entretenimiento!.percentage).toBeCloseTo(33.33, 1);
+        });
+    });
+
+    describe("excludeCardPaymentsFromCategoryBreakdown", () => {
+        it("strips the settled-debt portion and recomputes percentages over what is left", () => {
+            const data: CategoryBreakdown[] = [
+                { categoryId: "1", categoryName: "Vivienda", total: 300, creditTotal: 0, paymentTotal: 0, count: 1, percentage: 30 },
+                { categoryId: "2", categoryName: "Pago de Tarjetas", total: 700, creditTotal: 0, paymentTotal: 700, count: 2, percentage: 70 },
+            ];
+
+            const result = excludeCardPaymentsFromCategoryBreakdown(data);
+
+            expect(result).toHaveLength(1);
+            expect(result[0].categoryName).toBe("Vivienda");
+            expect(result[0].percentage).toBe(100);
+        });
+
+        it("keeps a category that only partly settles debt, minus the settled part", () => {
+            const data: CategoryBreakdown[] = [
+                { categoryId: "1", categoryName: "Otros", total: 500, creditTotal: 0, paymentTotal: 200, count: 3, percentage: 100 },
+            ];
+
+            const result = excludeCardPaymentsFromCategoryBreakdown(data);
+
+            expect(result[0].total).toBe(300);
+            expect(result[0].paymentTotal).toBe(0);
+        });
+
+        it("does not disturb a breakdown with no settlements in it", () => {
+            const data: CategoryBreakdown[] = [
+                { categoryId: "1", categoryName: "Vivienda", total: 300, creditTotal: 100, paymentTotal: 0, count: 1, percentage: 100 },
+            ];
+
+            expect(excludeCardPaymentsFromCategoryBreakdown(data)).toEqual(data);
+        });
+    });
+
+    describe("excludeCreditFromMerchantBreakdown", () => {
+        it("subtracts the credit portion, drops merchants left with nothing, and recomputes shares", () => {
+            const data: MerchantBreakdown[] = [
+                { merchant: "Supermaxi", total: 300, creditTotal: 0, count: 4, percentage: 60 },
+                { merchant: "Uber", total: 100, creditTotal: 100, count: 8, percentage: 20 },
+                { merchant: "Netflix", total: 100, creditTotal: 50, count: 1, percentage: 20 },
+            ];
+
+            const result = excludeCreditFromMerchantBreakdown(data);
+
+            expect(result.map((m) => m.merchant)).toEqual(["Supermaxi", "Netflix"]);
+            expect(result.find((m) => m.merchant === "Netflix")!.total).toBe(50);
+            expect(result.find((m) => m.merchant === "Supermaxi")!.percentage).toBeCloseTo(85.71, 1);
         });
     });
 
@@ -86,7 +142,7 @@ describe("credit-toggle", () => {
     describe("excludeCreditFromDailyBreakdown", () => {
         it("subtracts the credit portion from expenses and adds it back to net", () => {
             const data: DailyBreakdown[] = [
-                { date: "2026-05-15", income: 200, expenses: 150, expensesCredit: 100, withdrawals: 0, other: 0, net: 50 },
+                { date: "2026-05-15", income: 200, expenses: 150, expensesCredit: 100, expensesSettlement: 0, withdrawals: 0, other: 0, net: 50 },
             ];
 
             const result = excludeCreditFromDailyBreakdown(data);

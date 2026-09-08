@@ -3,8 +3,13 @@
 import { useMemo, useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { UnifiedTrendChart } from "./UnifiedTrendChart";
-import { CategoryPieChart } from "./CategoryPieChart";
-import { InstitutionBarChart } from "./InstitutionBarChart";
+import { CashFlowWaterfall } from "./CashFlowWaterfall";
+import { CategoryDeltaBars } from "./CategoryDeltaBars";
+import { MerchantTopList } from "./MerchantTopList";
+import { CyclePaceChart } from "./CyclePaceChart";
+import { IncomeSourceChart } from "./IncomeSourceChart";
+import { DataHealthChips } from "./DataHealthChips";
+import { UncategorizedTransactionsModal } from "./UncategorizedTransactionsModal";
 import { useFinancialDashboard } from "../hooks/useFinancialDashboard";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
@@ -28,7 +33,7 @@ import type { BalanceMode } from "@/domain/entities/balance";
 import {
     excludeCreditFromKpis,
     excludeCreditFromCategoryBreakdown,
-    excludeCreditFromInstitutionBreakdown,
+    excludeCreditFromMerchantBreakdown,
     excludeCreditFromDailyBreakdown,
 } from "../lib/credit-toggle";
 function formatCurrency(value: number): string {
@@ -56,13 +61,19 @@ export function FinancialDashboard() {
     const [customStartDate, setCustomStartDate] = useState<string>(defaultCycle.start);
     const [customEndDate, setCustomEndDate] = useState<string>(defaultCycle.end);
     const [categoryLimit, setCategoryLimit] = useState<number>(5);
-    const [institutionLimit, setInstitutionLimit] = useState<number>(5);
+    const [merchantLimit, setMerchantLimit] = useState<number>(5);
+    // Pagar la tarjeta salda una compra que ya contó como gasto el día que se
+    // hizo: incluirla duplica. Por eso arranca apagado.
+    const [includeCardPayments, setIncludeCardPayments] = useState(false);
     // Mobile-only: filters collapsed by default (accordion), matching the
     // transactions list screen's "Filtros de Búsqueda" pattern.
     const [filtersExpanded, setFiltersExpanded] = useState(false);
     // Tapping a Balance/Ingresos/Gastos tile opens a modal breaking down the
     // values behind that number.
     const [openKpiModal, setOpenKpiModal] = useState<KpiModalKind | null>(null);
+    // La lista de transacciones no filtra por "sin categoría", así que el chip
+    // de la franja de estado abre aquí mismo la lista editable.
+    const [uncategorizedOpen, setUncategorizedOpen] = useState(false);
 
     // Only the hand-typed dates are debounced: a date input emits every partial
     // value while typing (year 0002, 0202, …) and each one would refetch. The
@@ -107,7 +118,7 @@ export function FinancialDashboard() {
         return {};
     }, [filterType, debouncedStartDate, debouncedEndDate, cycleStartDay]);
 
-    const { kpis: rawKpis, monthly, typeBreakdown, categoryBreakdown: rawCategoryBreakdown, institutionBreakdown: rawInstitutionBreakdown, dailyBreakdown: rawDailyBreakdown, loading, refetching, refresh } =
+    const { kpis: rawKpis, categoryBreakdown: rawCategoryBreakdown, dailyBreakdown: rawDailyBreakdown, merchantBreakdown: rawMerchantBreakdown, incomeSourceBreakdown, previous, loading, refetching, refresh } =
         useFinancialDashboard(startDate, endDate);
 
     // Los tres balances, cargados aparte de los KPIs: el selector los necesita
@@ -146,9 +157,9 @@ export function FinancialDashboard() {
         () => excludeCreditFromCategoryBreakdown(rawCategoryBreakdown),
         [rawCategoryBreakdown],
     );
-    const institutionBreakdown = useMemo(
-        () => excludeCreditFromInstitutionBreakdown(rawInstitutionBreakdown),
-        [rawInstitutionBreakdown],
+    const merchantBreakdown = useMemo(
+        () => excludeCreditFromMerchantBreakdown(rawMerchantBreakdown),
+        [rawMerchantBreakdown],
     );
     const dailyBreakdown = useMemo(
         () => excludeCreditFromDailyBreakdown(rawDailyBreakdown),
@@ -186,24 +197,12 @@ export function FinancialDashboard() {
         return rawKpis ? buildKpiModalConfig(openKpiModal, rawKpis) : null;
     }, [openKpiModal, rawKpis, balanceBreakdownInputs, balanceMode]);
 
-    const totalCategoryExpenses = useMemo(() => {
-        if (!categoryBreakdown) return 0;
-        return categoryBreakdown.reduce((sum, item) => sum + item.total, 0);
-    }, [categoryBreakdown]);
-
-    const displayedCategoryBreakdown = useMemo(() => {
-        if (!categoryBreakdown) return [];
-        const filtered = categoryBreakdown.filter(c => c.categoryName && c.categoryName.toLowerCase() !== "sin categoría");
-        return filtered.slice(0, categoryLimit);
-    }, [categoryBreakdown, categoryLimit]);
-
-    const displayedInstitutionBreakdown = useMemo(() => {
-        if (!institutionBreakdown) return [];
-        const filtered = institutionBreakdown.filter(i =>
-            i.institutionName && i.institutionName.toLowerCase() !== "unknown"
-        );
-        return filtered.slice(0, institutionLimit);
-    }, [institutionBreakdown, institutionLimit]);
+    // "Sin categoría" sale del gráfico: no describe un gasto, describe un dato
+    // incompleto. Su cuenta se reporta en la franja de estado de más abajo.
+    const namedCategoryBreakdown = useMemo(
+        () => categoryBreakdown.filter(c => c.categoryName && c.categoryName.toLowerCase() !== "sin categoría"),
+        [categoryBreakdown],
+    );
 
     // ── Realtime: auto-refresh dashboard when transactions change ──
     const subscriptions = useMemo(
@@ -394,11 +393,21 @@ export function FinancialDashboard() {
                     <UnifiedTrendChart data={dailyBreakdown} />
                 </div>
 
+                <Card className="lg:col-span-2 flex flex-col bg-bg-primary">
+                    <CardHeader className="pb-2">
+                        <CardTitle>A dónde se fue el dinero</CardTitle>
+                        <CardDescription>Cómo llegó tu balance a la cifra del periodo</CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex-1">
+                        <CashFlowWaterfall kpis={rawKpis} />
+                    </CardContent>
+                </Card>
+
                 <Card className="flex flex-col bg-bg-primary">
                     <CardHeader className="flex flex-row items-start justify-between pb-2 gap-4">
                         <div>
-                            <CardTitle>Por categoría de gasto</CardTitle>
-                            <CardDescription>Distribución detallada de tus gastos</CardDescription>
+                            <CardTitle>En qué se va</CardTitle>
+                            <CardDescription>Gasto por categoría vs. periodo anterior</CardDescription>
                         </div>
                         <Select value={categoryLimit.toString()} onValueChange={(v) => setCategoryLimit(Number(v))}>
                             <SelectTrigger className="w-[90px] h-8 text-xs bg-muted/40 border-border/40 rounded-lg">
@@ -411,17 +420,23 @@ export function FinancialDashboard() {
                         </Select>
                     </CardHeader>
                     <CardContent className="flex-1">
-                        <CategoryPieChart data={displayedCategoryBreakdown} grandTotal={totalCategoryExpenses} />
+                        <CategoryDeltaBars
+                            data={namedCategoryBreakdown}
+                            previous={previous}
+                            limit={categoryLimit}
+                            includePayments={includeCardPayments}
+                            onIncludePaymentsChange={setIncludeCardPayments}
+                        />
                     </CardContent>
                 </Card>
 
                 <Card className="flex flex-col bg-bg-primary">
                     <CardHeader className="flex flex-row items-start justify-between pb-2 gap-4">
                         <div>
-                            <CardTitle>Por institución</CardTitle>
-                            <CardDescription>Volumen total movido por banco o institución</CardDescription>
+                            <CardTitle>A quién le pagas</CardTitle>
+                            <CardDescription>Comercios con más gasto en el periodo</CardDescription>
                         </div>
-                        <Select value={institutionLimit.toString()} onValueChange={(v) => setInstitutionLimit(Number(v))}>
+                        <Select value={merchantLimit.toString()} onValueChange={(v) => setMerchantLimit(Number(v))}>
                             <SelectTrigger className="w-[90px] h-8 text-xs bg-muted/40 border-border/40 rounded-lg">
                                 <SelectValue placeholder="Top" />
                             </SelectTrigger>
@@ -432,10 +447,60 @@ export function FinancialDashboard() {
                         </Select>
                     </CardHeader>
                     <CardContent className="flex-1">
-                        <InstitutionBarChart data={displayedInstitutionBreakdown} />
+                        <MerchantTopList data={merchantBreakdown} limit={merchantLimit} />
+                    </CardContent>
+                </Card>
+
+                <Card className="flex flex-col bg-bg-primary">
+                    <CardHeader className="pb-2">
+                        <CardTitle>¿Vas bien o te estás pasando?</CardTitle>
+                        <CardDescription>Gasto acumulado del periodo, día a día</CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex-1">
+                        <CyclePaceChart
+                            dailyBreakdown={dailyBreakdown}
+                            previous={previous}
+                            startDate={startDate}
+                            endDate={endDate}
+                        />
+                    </CardContent>
+                </Card>
+
+                <Card className="flex flex-col bg-bg-primary">
+                    <CardHeader className="pb-2">
+                        <CardTitle>De dónde viene</CardTitle>
+                        <CardDescription>Fuentes de ingreso del periodo</CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex-1">
+                        <IncomeSourceChart data={incomeSourceBreakdown} limit={categoryLimit} />
+                    </CardContent>
+                </Card>
+
+                <Card className="lg:col-span-2 flex flex-col bg-bg-primary">
+                    <CardHeader className="pb-2">
+                        <CardTitle>Qué falta revisar</CardTitle>
+                        <CardDescription>Transacciones del periodo que aún necesitan una mano</CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex-1">
+                        <DataHealthChips
+                            kpis={rawKpis}
+                            onFixUncategorized={() => setUncategorizedOpen(true)}
+                        />
                     </CardContent>
                 </Card>
             </div>
+
+            {/* Montado solo mientras está abierto: así cada visita arranca con
+                la lista y las selecciones en limpio, sin resetear estado a mano. */}
+            {uncategorizedOpen && (
+                <UncategorizedTransactionsModal
+                    open
+                    onOpenChange={setUncategorizedOpen}
+                    startDate={startDate}
+                    endDate={endDate}
+                    onCategorized={() => refresh({ silent: false })}
+                />
+            )}
             </>
             )}
         </div>
