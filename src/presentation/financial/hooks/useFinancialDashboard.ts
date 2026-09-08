@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { getDashboardOverviewAction } from "@/app/actions/financial-dashboard";
-import type { FinancialKPIs, MonthlyBreakdown, TypeBreakdown, CategoryBreakdown, InstitutionBreakdown, DailyBreakdown } from "@/application/services/financial-dashboard-service";
+import type { FinancialKPIs, MonthlyBreakdown, TypeBreakdown, CategoryBreakdown, InstitutionBreakdown, DailyBreakdown, MerchantBreakdown, IncomeSourceBreakdown, PreviousPeriodComparison } from "@/application/services/financial-dashboard-service";
 
 interface DashboardState {
     kpis: FinancialKPIs | null;
@@ -11,6 +11,10 @@ interface DashboardState {
     categoryBreakdown: CategoryBreakdown[];
     institutionBreakdown: InstitutionBreakdown[];
     dailyBreakdown: DailyBreakdown[];
+    merchantBreakdown: MerchantBreakdown[];
+    incomeSourceBreakdown: IncomeSourceBreakdown[];
+    /** `null` while loading and whenever the range is open-ended. */
+    previous: PreviousPeriodComparison | null;
     loading: boolean;
     error: string | null;
 }
@@ -22,6 +26,9 @@ const INITIAL_STATE: DashboardState = {
     categoryBreakdown: [],
     institutionBreakdown: [],
     dailyBreakdown: [],
+    merchantBreakdown: [],
+    incomeSourceBreakdown: [],
+    previous: null,
     loading: true,
     error: null,
 };
@@ -61,6 +68,9 @@ export function useFinancialDashboard(startDate?: string, endDate?: string) {
                 categoryBreakdown: result.data.categoryBreakdown,
                 institutionBreakdown: result.data.institutionBreakdown,
                 dailyBreakdown: result.data.dailyBreakdown,
+                merchantBreakdown: result.data.merchantBreakdown,
+                incomeSourceBreakdown: result.data.incomeSourceBreakdown,
+                previous: result.data.previous,
                 loading: false,
                 error: null,
             });

@@ -3,6 +3,7 @@ import type {
     CategoryBreakdown,
     InstitutionBreakdown,
     DailyBreakdown,
+    MerchantBreakdown,
 } from "@/application/services/financial-dashboard-service";
 
 /**
@@ -32,6 +33,45 @@ export function excludeCreditFromCategoryBreakdown(data: CategoryBreakdown[]): C
     return reduced.map((c) => ({
         ...c,
         percentage: grandTotal > 0 ? round2((c.total / grandTotal) * 100) : 0,
+    }));
+}
+
+/**
+ * Drop the portion of each category that settles credit-card debt instead of
+ * buying something.
+ *
+ * Without this, "Pago de Tarjetas" is the biggest slice of the spending chart
+ * while describing no spending at all: the purchase it pays for was already
+ * counted the day it happened. The screen keeps the settlements one toggle
+ * away, for when the user wants total cash out instead of consumption.
+ */
+export function excludeCardPaymentsFromCategoryBreakdown(data: CategoryBreakdown[]): CategoryBreakdown[] {
+    if (data.every((c) => c.paymentTotal === 0)) return data;
+
+    const reduced = data
+        .map((c) => ({ ...c, total: round2(c.total - c.paymentTotal), paymentTotal: 0 }))
+        .filter((c) => c.total > 0);
+    const grandTotal = reduced.reduce((sum, c) => sum + c.total, 0);
+    return reduced.map((c) => ({
+        ...c,
+        percentage: grandTotal > 0 ? round2((c.total / grandTotal) * 100) : 0,
+    }));
+}
+
+/**
+ * Same rule as the category breakdown, applied to merchants: the two cards sit
+ * side by side, so if one showed cash-only totals and the other included
+ * deferred credit spending, the same purchase would appear at two different
+ * amounts on one screen.
+ */
+export function excludeCreditFromMerchantBreakdown(data: MerchantBreakdown[]): MerchantBreakdown[] {
+    const reduced = data
+        .map((m) => ({ ...m, total: round2(m.total - m.creditTotal), creditTotal: 0 }))
+        .filter((m) => m.total > 0);
+    const grandTotal = reduced.reduce((sum, m) => sum + m.total, 0);
+    return reduced.map((m) => ({
+        ...m,
+        percentage: grandTotal > 0 ? round2((m.total / grandTotal) * 100) : 0,
     }));
 }
 

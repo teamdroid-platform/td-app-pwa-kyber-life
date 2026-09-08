@@ -6,6 +6,7 @@ function makeKpis(over: Partial<FinancialKPIs> = {}): FinancialKPIs {
         totalIncome: 4206.13,
         totalExpenses: 2701.70, // 2473.06 real + 228.64 credit
         totalExpensesCredit: 228.64,
+        totalExpensesSettlement: 0,
         totalTransfers: 238.84,
         totalTransfersSavings: 238.84,
         totalTransfersFunding: 0,
@@ -14,6 +15,8 @@ function makeKpis(over: Partial<FinancialKPIs> = {}): FinancialKPIs {
         transactionCount: 10,
         avgTransactionAmount: 100,
         pendingTransactionsCount: 0,
+        possibleDuplicateCount: 0,
+        uncategorizedCount: 0,
         currency: "USD",
         ...over,
     };
