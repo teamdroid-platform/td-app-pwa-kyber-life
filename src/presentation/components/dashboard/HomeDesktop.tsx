@@ -69,7 +69,11 @@ export function HomeDesktop({ metrics, alerts }: HomeDesktopProps) {
     return (
         <div className="grid gap-5 @4xl/home:grid-cols-12">
 
-            <CaptureCard className="@4xl/home:col-span-4 @4xl/home:row-span-2 @4xl/home:row-start-1" />
+            {/* Solo se estira sobre las dos filas cuando el contenedor es ancho.
+                A media anchura los KPIs van en 2×2 y la fila de paneles baja a
+                todo lo ancho, asi que estirarla la dejaba en 325px de ancho por
+                ~620 de alto: una columna de texto flotando en un hueco. */}
+            <CaptureCard className="@4xl/home:col-span-4 @4xl/home:row-start-1 @6xl/home:row-span-2" />
 
             {/* ── Las cuatro cifras del periodo ──
                 En 2×2 hasta que el contenedor da de sí: en cuatro columnas,
@@ -136,8 +140,12 @@ export function HomeDesktop({ metrics, alerts }: HomeDesktopProps) {
                 />
             </div>
 
-            {/* ── Los dos paneles del sistema ── */}
-            <div className="@4xl/home:col-span-8 @4xl/home:col-start-5 @4xl/home:row-start-2 @4xl/home:grid @4xl/home:grid-cols-[5fr_3fr] @4xl/home:gap-3">
+            {/* ── Los dos paneles del sistema ──
+                A media anchura ocupan las doce columnas, debajo del bloque de
+                arriba: en las ocho de la derecha el panel de compras se quedaba
+                con 247px y su leyenda con 35. Solo vuelven a la derecha del
+                CaptureCard cuando hay sitio para las dos cosas. */}
+            <div className="@4xl/home:col-span-12 @4xl/home:col-start-1 @4xl/home:row-start-2 @4xl/home:grid @4xl/home:grid-cols-[5fr_3fr] @4xl/home:gap-3 @6xl/home:col-span-8 @6xl/home:col-start-5">
                 <TrendCard
                     dates={metrics.series.dates}
                     income={metrics.series.income}

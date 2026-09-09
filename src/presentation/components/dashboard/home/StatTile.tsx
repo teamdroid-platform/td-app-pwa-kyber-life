@@ -94,7 +94,11 @@ export function StatTile({
             )}
 
             <div className={cn("relative flex items-start justify-between gap-2", series && "pr-[84px]")}>
-                <span className="min-w-0 truncate text-[12px] text-text-tertiary">{label}</span>
+                {/* Se parte en dos lineas antes que perder palabras: "Cuentas
+                    conectadas" cortado a "Cuen..." no dice nada, y el ancho de
+                    la tarjeta depende de cuantas columnas quepan, que no es algo
+                    que se pueda fijar de antemano. */}
+                <span className="min-w-0 line-clamp-2 text-[12px] leading-tight text-text-tertiary">{label}</span>
                 {icon && <IconTile tint={tint} size="sm">{icon}</IconTile>}
             </div>
 

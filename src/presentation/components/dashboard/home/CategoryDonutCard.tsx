@@ -35,7 +35,7 @@ export function CategoryDonutCard({ slices, total, currency, caption }: Category
     const arcs = donutArcs(slices, radius);
 
     return (
-        <section className={cn(CARD, "flex flex-col gap-4 p-4")}>
+        <section className={cn(CARD, "@container/donut flex flex-col gap-4 p-4")}>
             <CardHeader
                 icon={<ShoppingCart className="h-4 w-4" />}
                 tint="cyan"
@@ -48,7 +48,14 @@ export function CategoryDonutCard({ slices, total, currency, caption }: Category
                     Todavía no hay compras cerradas con las que repartir el gasto.
                 </p>
             ) : (
-                <div className="flex flex-1 flex-col items-center gap-3 sm:flex-row sm:items-center">
+                // Donut y leyenda se ponen en fila solo cuando la tarjeta da de
+                // sí, medida sobre la tarjeta y no sobre la ventana: con un `sm:`
+                // de ventana la fila se forzaba en cualquier pantalla de
+                // escritorio, y en una tarjeta de 247px la leyenda se quedaba con
+                // 35px (247 − 32 de padding − 168 del donut − 12 de gap), con lo
+                // que los nombres de categoría se truncaban enteros y solo
+                // quedaban los porcentajes. A 448px la leyenda recibe ~236px.
+                <div className="flex flex-1 flex-col items-center gap-3 @md/donut:flex-row @md/donut:items-center">
                     <div className="relative shrink-0">
                         {/* El `viewBox` va justo al diámetro del anillo: cualquier
                             margen de más lo encoge dentro del mismo hueco. El tamaño
