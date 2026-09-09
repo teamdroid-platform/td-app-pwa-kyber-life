@@ -70,8 +70,15 @@ export function CaptureCard({ className }: { className?: string }) {
                 {/* Las tres filas se reparten el alto sobrante: la tarjeta llega
                     hasta el pie de los paneles de al lado, y con alto fijo dejaría
                     un hueco muerto al final. Quitar una vía no encoge la tarjeta:
-                    las que quedan crecen para ocupar lo mismo. */}
-                <div className="mt-5 grid flex-1 auto-rows-fr gap-3">
+                    las que quedan crecen para ocupar lo mismo.
+
+                    La columna es `minmax(0,1fr)` y no el `1fr` implícito porque
+                    una pista automática no baja del ancho mínimo de su contenido:
+                    las filas desbordaban la tarjeta y `overflow-hidden` las
+                    cortaba en seco, sin que el `truncate` de dentro llegara a
+                    entrar en juego. Con el mínimo en 0 la pista encoge y el
+                    recorte vuelve a ser de texto, con sus puntos suspensivos. */}
+                <div className="mt-5 grid flex-1 auto-rows-fr grid-cols-[minmax(0,1fr)] gap-3">
                     {WAYS.map(({ id, label, hint, Icon, className: tone, iconClassName }) => (
                         <NewTransactionDialog key={id} startWith={id}>
                             <button type="button" className={cn(ROW, tone)}>
