@@ -67,6 +67,25 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        {/* Pinta el tema antes del primer frame.
+            `next-themes` normalmente inyecta este script solo, pero
+            `ThemeProvider` no lo monta hasta despues de hidratar —a proposito,
+            para esquivar un desajuste de hidratacion en React 19— y con el se
+            perdia lo unico que evita el parpadeo: la app abria en claro y
+            saltaba a oscuro unos dos segundos despues.
+
+            Se lee la misma clave de almacenamiento que usa `next-themes`, con
+            su mismo defecto (`dark`) y su misma resolucion de `system`, para
+            que cuando el provider monte se encuentre la clase ya puesta y no
+            tenga nada que corregir. `<html>` lleva `suppressHydrationWarning`,
+            asi que tocar su `class` aqui no le molesta a React. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var d=document.documentElement,s=localStorage.getItem("theme")||"dark",t=s==="system"?(window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"):s;d.classList.add(t);d.style.colorScheme=t}catch(e){document.documentElement.classList.add("dark");document.documentElement.style.colorScheme="dark"}})();`,
+          }}
+        />
+      </head>
       <body className={`${inter.className} antialiased text-sm font-normal`} suppressHydrationWarning>
         <ThemeProvider>
           {children}
