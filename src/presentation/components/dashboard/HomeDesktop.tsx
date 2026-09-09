@@ -67,12 +67,16 @@ export function HomeDesktop({ metrics, alerts }: HomeDesktopProps) {
     const balanceValueStr = formatMoney(balanceValue(metrics.balances, balanceMode), metrics.currency);
 
     return (
-        <div className="grid gap-5 lg:grid-cols-12">
+        <div className="grid gap-5 @4xl/home:grid-cols-12">
 
-            <CaptureCard className="lg:col-span-4 lg:row-span-2 lg:row-start-1" />
+            <CaptureCard className="@4xl/home:col-span-4 @4xl/home:row-span-2 @4xl/home:row-start-1" />
 
-            {/* ── Las cuatro cifras del periodo ── */}
-            <div className="lg:col-span-8 lg:col-start-5 lg:row-start-1 lg:grid lg:grid-cols-4 lg:gap-3">
+            {/* ── Las cuatro cifras del periodo ──
+                En 2×2 hasta que el contenedor da de sí: en cuatro columnas,
+                un contenedor de 896px deja ~138px por tarjeta y etiquetas como
+                "Cuentas conectadas" se cortan. A 1152px cada una recibe ~181px
+                y entran enteras. */}
+            <div className="@4xl/home:col-span-8 @4xl/home:col-start-5 @4xl/home:row-start-1 @4xl/home:grid @4xl/home:grid-cols-2 @4xl/home:gap-3 @6xl/home:grid-cols-4">
                 {/* No es un `StatTile`: lleva el selector de balance como
                     etiqueta, y ese control ya es interactivo — envolverlo en un
                     `<Link>` como los demás abriría un `<a>` dentro de otro `<a>`
@@ -133,7 +137,7 @@ export function HomeDesktop({ metrics, alerts }: HomeDesktopProps) {
             </div>
 
             {/* ── Los dos paneles del sistema ── */}
-            <div className="lg:col-span-8 lg:col-start-5 lg:row-start-2 lg:grid lg:grid-cols-[5fr_3fr] lg:gap-3">
+            <div className="@4xl/home:col-span-8 @4xl/home:col-start-5 @4xl/home:row-start-2 @4xl/home:grid @4xl/home:grid-cols-[5fr_3fr] @4xl/home:gap-3">
                 <TrendCard
                     dates={metrics.series.dates}
                     income={metrics.series.income}
@@ -151,14 +155,14 @@ export function HomeDesktop({ metrics, alerts }: HomeDesktopProps) {
                 />
             </div>
 
-            <div className="lg:col-span-12 lg:row-start-3">
+            <div className="@4xl/home:col-span-12 @4xl/home:row-start-3">
                 <QuickAccess />
             </div>
 
-            <div className="lg:col-span-7 lg:row-start-4">
+            <div className="@4xl/home:col-span-7 @4xl/home:row-start-4">
                 <RecentActivityCard items={metrics.recent} />
             </div>
-            <div className="lg:col-span-5 lg:row-start-4">
+            <div className="@4xl/home:col-span-5 @4xl/home:row-start-4">
                 <AlertsCard alerts={alerts} />
             </div>
         </div>
