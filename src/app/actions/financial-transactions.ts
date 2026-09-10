@@ -2,6 +2,7 @@
 
 import { financialTransactionService } from "@/infrastructure/container";
 import { requireUserId } from "@/infrastructure/supabase/auth-user";
+import { normalizeTransactionSort } from "@/domain/pagination";
 import {
     createTransactionSchema,
     searchTransactionsSchema,
@@ -99,11 +100,12 @@ export async function searchPaginatedTransactionsAction(params: Record<string, u
         const validated = paginatedSearchSchema.parse(params);
         const userId = await getAuthUserId();
 
-        const { page, pageSize, ...filters } = validated;
+        const { page, pageSize, sortBy, sortDir, ...filters } = validated;
         const result = await financialTransactionService.searchPaginated(
             userId,
             filters,
             { page, pageSize },
+            normalizeTransactionSort(sortBy, sortDir),
         );
 
         return { success: true, data: result };

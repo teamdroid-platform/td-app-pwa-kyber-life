@@ -2,7 +2,7 @@ import { UUID } from "../../domain/core";
 import { FinancialTransaction, FinancialTransactionType, FinancialTransactionStatus } from "../../domain/entities/financial";
 import { IFinancialTransactionRepository, IFinancialTransactionAuditLogRepository } from "../../domain/repositories/financial";
 import { findDuplicates } from "../../domain/services/financial-deduplication";
-import { PaginationParams, PaginatedResult, TransactionSearchFilters } from "../../domain/pagination";
+import { PaginationParams, PaginatedResult, TransactionSearchFilters, TransactionSort } from "../../domain/pagination";
 import { isTransactionPaidWithCredit, creditCardIdSet } from "../../lib/financial-utils";
 
 export interface CreateFinancialTransactionDTO {
@@ -414,13 +414,14 @@ export class FinancialTransactionService {
         userId: UUID,
         filters: TransactionSearchFilters,
         pagination?: Partial<PaginationParams>,
+        sort?: TransactionSort,
     ): Promise<PaginatedResult<FinancialTransaction>> {
         const page = Math.max(1, pagination?.page ?? 1);
         const pageSize = Math.min(100, Math.max(1, pagination?.pageSize ?? 20));
 
         await this.resolveSearchFilters(userId, filters);
 
-        const result = await this.transactionRepo.findPaginated(userId, filters, { page, pageSize });
+        const result = await this.transactionRepo.findPaginated(userId, filters, { page, pageSize }, sort);
         result.data = await this.enrichTransactions(result.data, userId);
         return result;
     }

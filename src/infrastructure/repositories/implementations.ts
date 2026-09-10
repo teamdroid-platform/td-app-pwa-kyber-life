@@ -2,7 +2,7 @@ import { InMemoryRepository } from "./in-memory-repository";
 import { User, Supermarket, Category, Unit, GenericItem, BrandProduct, Template, TemplateItem, Purchase, PurchaseLine, PriceObservation, PasswordResetToken, FinancialTransaction, FinancialTransactionAuditLog, FinancialScanExecution, FinancialScannerTransaction, FinancialInstitution, FinancialInstitutionType, FinancialCategory, Notification, PushSubscription } from "@/domain/entities";
 import { IUserRepository, ISupermarketRepository, ICategoryRepository, IUnitRepository, IGenericItemRepository, IBrandProductRepository, ITemplateRepository, ITemplateItemRepository, IPurchaseRepository, IPurchaseLineRepository, IPriceObservationRepository, IPasswordResetTokenRepository, IFinancialTransactionRepository, IFinancialTransactionAuditLogRepository, IFinancialScanExecutionRepository, IFinancialScannerTransactionRepository, IFinancialInstitutionTypeRepository, IFinancialInstitutionRepository, IFinancialCategoryRepository, INotificationRepository, IPushSubscriptionRepository, NotificationQueryOptions, DashboardRangeFilter } from "@/domain/repositories";
 import { UUID } from "@/domain/core";
-import { PaginationParams, PaginatedResult, TransactionSearchFilters } from "@/domain/pagination";
+import { PaginationParams, PaginatedResult, TransactionSearchFilters, TransactionSort } from "@/domain/pagination";
 import { DASHBOARD_ACTIVE_STATUSES } from "@/domain/services/financial-balance";
 import { IBalanceSettingsRepository } from "@/domain/repositories/balance";
 import { BalanceMode, BalanceScopeRule, BalanceScopeTargetType, BalanceSettings } from "@/domain/entities/balance";
@@ -83,6 +83,31 @@ export class InMemoryFinancialCategoryRepository extends InMemoryRepository<Fina
     }
 }
 
+/**
+ * El equivalente en memoria del `.order()` de la consulta.
+ *
+ * Existe para que los dos backends respondan lo mismo: los modos MOCK y MEMORY
+ * sirven la misma pantalla, y un orden que solo funcionara contra Supabase
+ * convertiría cualquier prueba local en una falsa señal.
+ *
+ * Sin `sort` mantiene el defecto de siempre, fecha descendente.
+ */
+function sortTransactions(
+    transactions: FinancialTransaction[],
+    sort?: TransactionSort,
+): FinancialTransaction[] {
+    const field = sort?.field ?? "date";
+    const factor = (sort?.direction ?? "desc") === "asc" ? 1 : -1;
+
+    return [...transactions].sort((a, b) => {
+        if (field === "amount") return (Number(a.amount) - Number(b.amount)) * factor;
+        if (field === "description") {
+            return (a.description || "").localeCompare(b.description || "", "es") * factor;
+        }
+        return (a.date || "").localeCompare(b.date || "") * factor;
+    });
+}
+
 export class InMemoryFinancialTransactionRepository extends InMemoryRepository<FinancialTransaction> implements IFinancialTransactionRepository {
     async findByOwnerId(userId: UUID): Promise<FinancialTransaction[]> {
         return (await this.findAll()).filter(t => t.ownerUserId === userId).sort((a, b) => b.date.localeCompare(a.date));
@@ -106,8 +131,13 @@ export class InMemoryFinancialTransactionRepository extends InMemoryRepository<F
         userId: UUID,
         filters: TransactionSearchFilters,
         pagination: PaginationParams,
+        sort?: TransactionSort,
     ): Promise<PaginatedResult<FinancialTransaction>> {
-        const all = this.applyFilters(await this.findByOwnerId(userId), filters.query, filters);
+        const filtered = this.applyFilters(await this.findByOwnerId(userId), filters.query, filters);
+        // El orden se aplica antes de cortar la página, igual que lo haría la
+        // consulta: ordenar después daría una página ordenada dentro de un
+        // conjunto que no lo está.
+        const all = sortTransactions(filtered, sort);
         const totalItems = all.length;
         const { page, pageSize } = pagination;
         const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));

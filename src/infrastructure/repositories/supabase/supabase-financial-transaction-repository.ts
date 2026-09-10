@@ -1,9 +1,19 @@
 import type { IFinancialTransactionRepository, DashboardRangeFilter } from "@/domain/repositories/financial";
 import type { FinancialTransaction } from "@/domain/entities/financial";
 import type { UUID } from "@/domain/core";
-import type { PaginationParams, PaginatedResult, TransactionSearchFilters } from "@/domain/pagination";
+import type { PaginationParams, PaginatedResult, TransactionSearchFilters, TransactionSort, TransactionSortField } from "@/domain/pagination";
 import { createClient } from "@/infrastructure/supabase/server";
 import { DASHBOARD_ACTIVE_STATUSES } from "@/domain/services/financial-balance";
+
+/**
+ * Del campo ordenable a su columna. El mapa es la única traducción posible:
+ * el tipo obliga a cubrir los tres campos y nada más entra aquí.
+ */
+const SORT_COLUMNS: Record<TransactionSortField, string> = {
+    date: "date",
+    description: "description",
+    amount: "amount",
+};
 
 export class SupabaseFinancialTransactionRepository implements IFinancialTransactionRepository {
     async create(entity: FinancialTransaction): Promise<FinancialTransaction> {
@@ -254,6 +264,7 @@ export class SupabaseFinancialTransactionRepository implements IFinancialTransac
         userId: UUID,
         filters: TransactionSearchFilters,
         pagination: PaginationParams,
+        sort?: TransactionSort,
     ): Promise<PaginatedResult<FinancialTransaction>> {
         const supabase = await createClient();
         const { page, pageSize } = pagination;
@@ -279,7 +290,17 @@ export class SupabaseFinancialTransactionRepository implements IFinancialTransac
             .select('*')
             .eq('owner_user_id', userId);
         dataQb = this.applyFilters(dataQb, filters.query, filters);
-        dataQb = dataQb.order('date', { ascending: false }).range(from, to);
+        // El campo ya viene de la lista blanca de `normalizeTransactionSort`:
+        // aquí solo se traduce al nombre de columna. Nunca se interpola texto
+        // de la URL en `.order()`, que es donde acabaría construyendo SQL.
+        const sortColumn = SORT_COLUMNS[sort?.field ?? "date"];
+        dataQb = dataQb
+            .order(sortColumn, { ascending: sort?.direction === "asc" })
+            // Segundo criterio estable: sin él, dos importes iguales pueden
+            // cambiar de sitio entre páginas y una fila se repite o se pierde
+            // al hacer scroll.
+            .order('id', { ascending: false })
+            .range(from, to);
 
         const { data, error } = await dataQb;
         if (error) throw new Error(`Pagination data error: ${error.message}`);

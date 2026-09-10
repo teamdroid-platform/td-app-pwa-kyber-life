@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { TRANSACTION_SORT_FIELDS } from "@/domain/pagination";
 
 // ─── Enums as Zod types ──────────────────────────────────────
 
@@ -102,6 +103,10 @@ export const paginatedSearchSchema = z.object({
     tags: z.array(z.string().max(50)).max(20).optional(),
     page: z.number().int().min(1).default(1),
     pageSize: z.number().int().min(1).max(100).default(20),
+    // El campo se valida contra la lista blanca del dominio, no contra una
+    // cadena libre: acaba en un `.order()` que construye SQL.
+    sortBy: z.enum(TRANSACTION_SORT_FIELDS).optional(),
+    sortDir: z.enum(["asc", "desc"]).optional(),
 });
 
 export type PaginatedSearchInput = z.infer<typeof paginatedSearchSchema>;
