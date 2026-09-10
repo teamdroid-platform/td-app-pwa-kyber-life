@@ -82,8 +82,16 @@ export default async function FinancialLayout({
     return (
         <AppLayout user={user}>
             <div className="flex flex-col w-full h-full">
-                <main className="flex-1 w-full flex flex-col items-center">
-                    <div className="w-full max-w-5xl">
+                {/* El techo de lectura sube cuando de verdad hay sitio. Se mide
+                    sobre este contenedor y no sobre la ventana porque la barra
+                    lateral se lleva 256px y se pliega en caliente: a 1600 de
+                    ventana quedan 1280 con ella abierta y 1536 con ella plegada,
+                    y solo el segundo caso justifica ensanchar.
+
+                    El contenedor va en el elemento de fuera a propósito: la
+                    consulta no puede vivir en el mismo nodo cuyo ancho decide. */}
+                <main className="@container/financial flex-1 w-full flex flex-col items-center">
+                    <div className="w-full max-w-5xl @6xl/financial:max-w-[1400px]">
                         <PeriodSettingsProvider cycleStartDay={cycleStartDay}>
                             <FinancialRealtimeProvider>
                                 {children}

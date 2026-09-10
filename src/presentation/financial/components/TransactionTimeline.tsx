@@ -447,13 +447,24 @@ export function TransactionTimeline({ initialTransactions, allFilteredTransactio
                 /* The gaps are deliberately tight: the day headings are short
                    labels, and the air around them was pushing transactions —
                    the thing the user came for — off the screen. */
-                <div className="flex flex-col gap-3 sm:gap-5">
+                <div className="@container/txlist flex flex-col gap-3 sm:gap-5">
                     {Object.entries(grouped).map(([dateLabel, items]) => (
                         <div key={dateLabel} className="flex flex-col gap-1.5">
                             <h3 className="text-sm font-medium text-muted-foreground tracking-tight sticky top-0 bg-background/80 backdrop-blur-sm py-1.5 z-10">
                                 {dateLabel}
                             </h3>
-                            <div className="flex flex-col gap-1.5 sm:gap-2">
+                            {/* Las tarjetas se reparten en columnas dentro de cada día:
+                                la fecha sigue siendo la separación, y agrupar por ella
+                                se pierde si la rejilla la cruza.
+
+                                Los cortes miran el ancho de la lista, no el de la
+                                ventana, porque la barra lateral se lleva 256px y se
+                                pliega en caliente. Y son estos porque la tarjeta es una
+                                fila —icono, texto, importe y menú—: con unos 206px
+                                ocupados por lo que no encoge, por debajo de ~380 el
+                                título se queda sin sitio. A 768 dos columnas dan 380
+                                cada una; a 1152, tres dan 376. */}
+                            <div className="grid grid-cols-1 gap-1.5 @3xl/txlist:grid-cols-2 @3xl/txlist:gap-2 @6xl/txlist:grid-cols-3">
                                 {items.map(t => (
                                     <TransactionCard
                                         key={t.id}
