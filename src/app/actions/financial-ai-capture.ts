@@ -59,10 +59,26 @@ function requireWebhookUrl(variable: "N8N_EXTRACT_TEXT_WEBHOOK_URL" | "N8N_EXTRA
 /** Shared tail of both calls: check the status, parse, validate the shape. */
 async function readExtraction(response: Response): Promise<ExtractionResult> {
     if (!response.ok) {
+        // El flujo explica por qué no pudo, y lo hace con el mismo cuerpo que ya
+        // usa cuando falla dentro de un 200: `{ success: false, error_code,
+        // message }`. Antes se leía como texto plano y se descartaba, así que
+        // "no se pudo entender el audio" llegaba al usuario como "respondió con
+        // un error (400)" — que no dice si conviene repetir la grabación,
+        // escribirlo a mano, o esperar. Solo cuando no hay nada legible dentro
+        // se cae al código de estado.
+        // Un cuerpo solo se puede consumir una vez, así que se lee como texto
+        // —que nunca falla— y se intenta parsear encima: la misma lectura sirve
+        // para el log y para el mensaje.
         const detail = await response.text().catch(() => "");
+        let raw: unknown = null;
+        try { raw = JSON.parse(detail); } catch { /* no era JSON: queda el texto para el log */ }
+        const reported = readReportedFailure(raw);
         const truncated = detail.length > 200 ? `${detail.slice(0, 200)}…` : detail;
         console.error(`AI extraction webhook failed: ${response.status} ${response.statusText}. ${truncated}`);
-        return { success: false, error: `El servicio de interpretación respondió con un error (${response.status}).` };
+        return {
+            success: false,
+            error: reported ?? `El servicio de interpretación respondió con un error (${response.status}).`,
+        };
     }
 
     let payload: unknown;

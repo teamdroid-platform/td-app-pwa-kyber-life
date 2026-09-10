@@ -140,8 +140,13 @@ export function readReportedFailure(raw: unknown): string | null {
     const obj = candidate as Record<string, unknown>;
     if (obj.success !== false && !obj.error) return null;
 
+    // `error_code` es lo último antes de rendirse: es una etiqueta de máquina y
+    // se lee peor que una frase, pero identifica el fallo, y eso deja al usuario
+    // en mejor sitio que una disculpa genérica —tanto para decidir qué hacer
+    // como para reportarlo.
     const message = typeof obj.error === "string" ? obj.error
         : typeof obj.message === "string" ? obj.message
-            : null;
+            : typeof obj.error_code === "string" ? `El servicio de interpretación falló (${obj.error_code}).`
+                : null;
     return message || "El servicio de interpretación no pudo procesar el movimiento.";
 }

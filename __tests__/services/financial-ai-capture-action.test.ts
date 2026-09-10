@@ -108,6 +108,31 @@ describe("extractTransactionFromTextAction", () => {
         expect(result).toEqual({ success: false, error: expect.stringContaining("500") });
     });
 
+    it("prefers the workflow's own explanation over the status code", async () => {
+        fetchMock.mockResolvedValue(jsonResponse(
+            { success: false, error_code: "TEXT_UNINTELLIGIBLE", message: "No se pudo entender la frase." },
+            { ok: false, status: 400 },
+        ));
+
+        const result = await extractTransactionFromTextAction({ text: "asdf" });
+
+        expect(result).toEqual({ success: false, error: "No se pudo entender la frase." });
+    });
+
+    it("falls back to the status when the error body is not JSON", async () => {
+        fetchMock.mockResolvedValue({
+            ok: false,
+            status: 502,
+            statusText: "Bad Gateway",
+            json: async () => { throw new SyntaxError("Unexpected token <"); },
+            text: async () => "<html>502</html>",
+        } as unknown as Response);
+
+        const result = await extractTransactionFromTextAction({ text: "Gasté 12,50" });
+
+        expect(result).toEqual({ success: false, error: expect.stringContaining("502") });
+    });
+
     it("turns an unreachable service into an actionable message", async () => {
         fetchMock.mockRejectedValue(Object.assign(new Error("fetch failed"), { cause: { code: "ECONNREFUSED" } }));
         const result = await extractTransactionFromTextAction({ text: "Gasté 12,50" });
@@ -134,6 +159,34 @@ describe("extractTransactionFromAudioAction", () => {
         if (file) formData.append("audio", file, file.name);
         return formData;
     }
+
+    it("tells the user what the workflow could not do with their recording", async () => {
+        // Lo que n8n devuelve de verdad cuando la transcripción no da nada
+        // aprovechable: un 400 con el motivo dentro. Antes se descartaba y el
+        // usuario solo veía "respondió con un error (400)", que no dice si
+        // conviene repetir la grabación o escribirlo a mano.
+        fetchMock.mockResolvedValue(jsonResponse(
+            { success: false, error_code: "AUDIO_UNINTELLIGIBLE", message: "No se pudo entender el audio." },
+            { ok: false, status: 400 },
+        ));
+        const file = new File([new Uint8Array([1, 2, 3])], "captura.webm", { type: "audio/webm;codecs=opus" });
+
+        const result = await extractTransactionFromAudioAction(audioForm(file));
+
+        expect(result).toEqual({ success: false, error: "No se pudo entender el audio." });
+    });
+
+    it("names the failure code when the workflow sends no message", async () => {
+        fetchMock.mockResolvedValue(jsonResponse(
+            { success: false, error_code: "AUDIO_TOO_SHORT" },
+            { ok: false, status: 400 },
+        ));
+        const file = new File([new Uint8Array([1, 2, 3])], "captura.webm", { type: "audio/webm;codecs=opus" });
+
+        const result = await extractTransactionFromAudioAction(audioForm(file));
+
+        expect(result).toEqual({ success: false, error: expect.stringContaining("AUDIO_TOO_SHORT") });
+    });
 
     it("forwards the recording as multipart with the session's user id", async () => {
         fetchMock.mockResolvedValue(jsonResponse(PAYLOAD));
