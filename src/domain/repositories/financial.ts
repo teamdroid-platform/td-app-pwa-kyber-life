@@ -1,6 +1,6 @@
 import { UUID } from "../core";
 import { IRepository } from "./index";
-import { PaginationParams, PaginatedResult, TransactionSearchFilters } from "../pagination";
+import { PaginationParams, PaginatedResult, TransactionSearchFilters, TransactionSort } from "../pagination";
 import {
     FinancialTransaction,
     FinancialScanExecution,
@@ -28,7 +28,13 @@ export interface IFinancialTransactionRepository extends IRepository<FinancialTr
     findForDashboard(userId: UUID, filter?: DashboardRangeFilter): Promise<FinancialTransaction[]>;
     findRecent(userId: UUID, limit: number): Promise<FinancialTransaction[]>;
     search(userId: UUID, query: string, filters?: TransactionSearchFilters): Promise<FinancialTransaction[]>;
-    findPaginated(userId: UUID, filters: TransactionSearchFilters, pagination: PaginationParams): Promise<PaginatedResult<FinancialTransaction>>;
+    /**
+     * `sort` es opcional y por defecto la lista sigue viniendo por fecha
+     * descendente. Va aparte de los filtros porque no acota el conjunto: lo
+     * ordena, y hacerlo aquí —y no en memoria— es lo que permite que el orden
+     * valga para las 157 filas y no solo para la página cargada.
+     */
+    findPaginated(userId: UUID, filters: TransactionSearchFilters, pagination: PaginationParams, sort?: TransactionSort): Promise<PaginatedResult<FinancialTransaction>>;
     getUniqueTags(userId: UUID): Promise<string[]>;
     /**
      * The user's most used descriptions, most frequent first, grouped by

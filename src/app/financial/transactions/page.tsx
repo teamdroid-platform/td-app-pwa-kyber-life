@@ -11,6 +11,7 @@ import { Plus } from "lucide-react";
 import { TransactionTabs } from "@/presentation/financial/components/TransactionTabs";
 import { NewTransactionDialog } from "@/presentation/financial/components/ai-capture/NewTransactionDialog";
 import { cycleRangeContaining, toFullDayIsoRange } from "@/lib/date-range";
+import { normalizeTransactionSort } from "@/domain/pagination";
 
 // Always render fresh on the server so a type-filter navigation refetches the
 // correctly filtered first page instead of serving a cached route payload.
@@ -59,6 +60,10 @@ export default async function TransactionsPage({
     const institutionId = typeof params.institutionId === 'string' ? params.institutionId : undefined;
 
     const currency = typeof params.currency === 'string' ? params.currency : undefined;
+    // El orden de la tabla. Se valida contra la lista blanca del dominio antes
+    // de viajar: acaba en un `.order()`, que construye SQL con el campo.
+    const sort = normalizeTransactionSort(params.sortBy, params.sortDir);
+
     const range = typeof params.range === 'string' ? params.range : undefined;
     let dateFrom = typeof params.dateFrom === 'string' ? params.dateFrom : undefined;
     let dateTo = typeof params.dateTo === 'string' ? params.dateTo : undefined;
@@ -86,6 +91,8 @@ export default async function TransactionsPage({
             institutionId,
             page: 1,
             pageSize: 20,
+            sortBy: sort?.field,
+            sortDir: sort?.direction,
         }),
         searchAllFilteredTransactionsAction({
             query,
@@ -126,7 +133,9 @@ export default async function TransactionsPage({
         });
 
     // Pass URL filters so the infinite-scroll can re-apply them
-    const searchFilters = { query, status, types, currency, dateFrom, dateTo, range, categoryId, institutionId };
+    // El orden viaja con los filtros para que el scroll infinito siga pidiendo
+    // las páginas siguientes en el mismo orden que la primera.
+    const searchFilters = { query, status, types, currency, dateFrom, dateTo, range, categoryId, institutionId, sortBy: sort?.field, sortDir: sort?.direction };
 
     return (
         <div className="flex flex-col gap-6">

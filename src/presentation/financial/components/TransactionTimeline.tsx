@@ -11,6 +11,8 @@ import { buildFallbackTitle, isTransactionPaidWithCredit } from "@/lib/financial
 import { useFinancialRealtime } from "../hooks/useFinancialRealtime";
 import { WifiOff, Loader2 } from "lucide-react";
 import { TransactionSummary } from "./TransactionSummary";
+import { TransactionKpiRow } from "./TransactionKpiRow";
+import { TransactionTable } from "./TransactionTable";
 import type { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -432,12 +434,23 @@ export function TransactionTimeline({ initialTransactions, allFilteredTransactio
                 </div>
             )}
 
-            {/* Use allFilteredTransactions for the summary if available, otherwise fallback to visible */}
-            <TransactionSummary
-                transactions={allFilteredTransactions || visibleTransactions}
-                balances={balances}
-                rangeLabel={rangeLabel}
-            />
+            {/* Las mismas cifras en dos formas segun el ancho, nunca las dos a la
+                vez: en escritorio la fila de cinco tarjetas siempre visible, y en
+                movil el panel plegable, que ahi si vale la pena porque cinco
+                tarjetas se comerian el alto antes de la primera transaccion.
+                Ambas leen el conjunto filtrado completo, no la pagina cargada. */}
+            <div className="@container/txlist">
+                <div className="hidden @3xl/txlist:block">
+                    <TransactionKpiRow transactions={allFilteredTransactions || visibleTransactions} />
+                </div>
+                <div className="@3xl/txlist:hidden">
+                    <TransactionSummary
+                        transactions={allFilteredTransactions || visibleTransactions}
+                        balances={balances}
+                        rangeLabel={rangeLabel}
+                    />
+                </div>
+            </div>
 
             {visibleTransactions.length === 0 ? (
                 <div className="flex items-center justify-center py-12 text-muted-foreground">
@@ -447,24 +460,40 @@ export function TransactionTimeline({ initialTransactions, allFilteredTransactio
                 /* The gaps are deliberately tight: the day headings are short
                    labels, and the air around them was pushing transactions —
                    the thing the user came for — off the screen. */
-                <div className="flex flex-col gap-3 sm:gap-5">
-                    {Object.entries(grouped).map(([dateLabel, items]) => (
-                        <div key={dateLabel} className="flex flex-col gap-1.5">
-                            <h3 className="text-sm font-medium text-muted-foreground tracking-tight sticky top-0 bg-background/80 backdrop-blur-sm py-1.5 z-10">
-                                {dateLabel}
-                            </h3>
-                            <div className="flex flex-col gap-1.5 sm:gap-2">
-                                {items.map(t => (
-                                    <TransactionCard
-                                        key={t.id}
-                                        transaction={t}
-                                        onStatusChange={(status) => updateLocalTransaction(t.id!, { status })}
-                                        onDeleted={() => setTransactions(prev => prev.filter(x => x.id !== t.id))}
-                                    />
-                                ))}
+                <div className="@container/txlist">
+                    {/* Escritorio: tabla, con la fecha en su columna. Movil: la
+                        lista de tarjetas agrupada por dia, porque seis columnas
+                        en 360px no son una tabla.
+
+                        El corte mira el ancho de la lista y no el de la ventana:
+                        la barra lateral se lleva 256px y se pliega en caliente. */}
+                    <div className="hidden @3xl/txlist:block">
+                        <TransactionTable
+                            transactions={visibleTransactions}
+                            onStatusChange={(id, status) => updateLocalTransaction(id, { status })}
+                            onDeleted={(id) => setTransactions(prev => prev.filter(x => x.id !== id))}
+                        />
+                    </div>
+
+                    <div className="flex flex-col gap-3 @3xl/txlist:hidden">
+                        {Object.entries(grouped).map(([dateLabel, items]) => (
+                            <div key={dateLabel} className="flex flex-col gap-1.5">
+                                <h3 className="text-sm font-medium text-muted-foreground tracking-tight sticky top-0 bg-background/80 backdrop-blur-sm py-1.5 z-10">
+                                    {dateLabel}
+                                </h3>
+                                <div className="flex flex-col gap-1.5">
+                                    {items.map(t => (
+                                        <TransactionCard
+                                            key={t.id}
+                                            transaction={t}
+                                            onStatusChange={(status) => updateLocalTransaction(t.id!, { status })}
+                                            onDeleted={() => setTransactions(prev => prev.filter(x => x.id !== t.id))}
+                                        />
+                                    ))}
+                                </div>
                             </div>
-                        </div>
-                    ))}
+                        ))}
+                    </div>
                 </div>
             )}
 
