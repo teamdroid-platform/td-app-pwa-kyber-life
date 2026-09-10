@@ -43,7 +43,7 @@ export function RecentActivityCard({ items }: { items: readonly ActivityItem[] }
                 Actividad reciente
             </SectionLabel>
 
-            <div className={cn(CARD, "flex-1 divide-y divide-border-base overflow-hidden")}>
+            <div className={cn(CARD, "@container/activity flex-1 divide-y divide-border-base overflow-hidden")}>
                 {items.length === 0 ? (
                     <p className="px-4 py-8 text-center text-[12px] text-text-tertiary">
                         Todavía no hay movimientos registrados.
@@ -63,7 +63,11 @@ export function RecentActivityCard({ items }: { items: readonly ActivityItem[] }
                                 <span className="block truncate text-[13px] font-semibold text-text-primary">{item.title}</span>
                                 <span className="block truncate text-[11px] text-text-tertiary">{item.when}</span>
                             </span>
-                            <span className="hidden shrink-0 rounded-full border border-border-base bg-bg-tertiary/50 px-2.5 py-0.5 text-[11px] font-medium text-text-secondary sm:inline">
+                            {/* La etiqueta del tipo aparece cuando la tarjeta —no
+                                la ventana— tiene sitio: si no, le roba ancho al
+                                título del movimiento, que es lo que se viene a
+                                leer. */}
+                            <span className="hidden shrink-0 rounded-full border border-border-base bg-bg-tertiary/50 px-2.5 py-0.5 text-[11px] font-medium text-text-secondary @sm/activity:inline">
                                 {kind.label}
                             </span>
                             <span className={cn("shrink-0 text-[13px] font-semibold tabular-nums", kind.amountClass)}>
