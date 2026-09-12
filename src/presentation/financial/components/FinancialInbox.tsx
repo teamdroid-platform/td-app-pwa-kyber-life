@@ -29,6 +29,7 @@ import { FinancialScannerTransaction } from "@/domain/entities/financial";
 import { formatAmount, getCategoryVisualConfig, extractSummary, formatTime } from "../lib/scan-display";
 import { ScanAccountBadges } from "./ScanAccountBadges";
 import { ScanTable } from "./ScanTable";
+import { ScanKpiCards } from "./ScanKpiCards";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -101,8 +102,6 @@ export function FinancialInbox() {
     const hasLoadedOnceRef = useRef(false);
     const transactionsRef = useRef<FinancialScannerTransaction[]>([]);
     const pollingNoticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-    const [isHeaderExpanded, setIsHeaderExpanded] = useState(false);
 
     const openDetail = (txId: string) => {
         if (openingId) return;
@@ -404,70 +403,42 @@ export function FinancialInbox() {
     const groupedTransactions = groupTransactionsByDate(filteredTransactions);
 
     return (
-        <div className="space-y-5">
-            {/* Header Summary Info */}
-            <Card className="rounded-2xl border-border/50 bg-bg-secondary/80 py-0 shadow-sm">
-                <CardContent className="flex flex-col sm:flex-row sm:items-center gap-0 sm:gap-4 px-4 py-3 sm:px-5">
-                    <div
-                        className="flex items-center justify-between cursor-pointer sm:cursor-default w-full sm:w-auto flex-1"
-                        onClick={() => setIsHeaderExpanded(!isHeaderExpanded)}
-                    >
-                        <div className="space-y-0.5 flex-1">
-                            {isPollingFallback && showPollingNotice && (
-                                <div className="flex flex-wrap items-center gap-2 mb-1">
-                                    <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-500/20 bg-sky-500/5 px-2 py-0.5 text-[10px] font-medium text-sky-700 dark:text-sky-300">
-                                        <RefreshCw className="h-3 w-3 animate-spin" />
-                                        ACTUALIZANDO
-                                    </span>
-                                </div>
-                            )}
-                            <h3 className="text-base font-semibold tracking-tight">Escaneos por confirmar</h3>
-                            <p className="max-w-md text-xs text-muted-foreground">
-                                Revisa y confirma o ejecuta un nuevo escaneo.
-                            </p>
-                        </div>
-                    </div>
+        <div className="@container/scanlist space-y-5">
+            {/* Las cuatro cifras del monton pendiente. El aviso de
+                actualizacion vive aqui arriba porque es de la bandeja entera,
+                no de ninguna de las cifras. */}
+            {isPollingFallback && showPollingNotice && (
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-500/20 bg-sky-500/5 px-2 py-0.5 text-[10px] font-medium text-sky-700 dark:text-sky-300">
+                    <RefreshCw className="h-3 w-3 animate-spin" />
+                    ACTUALIZANDO
+                </span>
+            )}
 
-                    <div className={cn("flex flex-col gap-2.5 w-full sm:w-auto mt-2.5 sm:mt-0", !isHeaderExpanded && "hidden sm:flex")}>
-                        <div className="grid grid-cols-3 gap-2 w-full sm:w-auto">
-                            <div className="flex flex-col justify-between rounded-xl border border-border/40 bg-bg-primary/70 px-3 py-1.5 text-center sm:text-left">
-                                <div className="text-[9.5px] uppercase tracking-wider text-muted-foreground">Pendientes</div>
-                                <div className="text-base font-bold text-foreground">{filteredTransactions.length}</div>
-                            </div>
-                            <div className="flex flex-col justify-between rounded-xl border border-border/40 bg-bg-primary/70 px-3 py-1.5 text-center sm:text-left">
-                                <div className="text-[9.5px] uppercase tracking-wider text-muted-foreground">Con comercio</div>
-                                <div className="text-base font-bold text-foreground">{filteredTransactions.filter((tx) => tx.merchant).length}</div>
-                            </div>
-                            <div className="flex flex-col justify-between rounded-xl border border-border/40 bg-bg-primary/70 px-3 py-1.5 text-center sm:text-left">
-                                <div className="text-[9.5px] uppercase tracking-wider text-muted-foreground">Con monto</div>
-                                <div className="text-base font-bold text-foreground">{filteredTransactions.filter((tx) => tx.amount != null).length}</div>
-                            </div>
-                        </div>
-                    </div>
+            <ScanKpiCards scans={filteredTransactions} />
 
-                    <div className="grid grid-cols-2 gap-2 w-full sm:hidden mt-2.5">
-                        <Link href="/financial/transactions" className="w-full">
-                            <Button variant="outline" className="w-full rounded-xl gap-2 font-medium h-8 text-xs">
-                                <Receipt className="w-3.5 h-3.5" />
-                                Transacciones
-                            </Button>
-                        </Link>
-                        <Link href="/financial/scanner" className="w-full">
-                            <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl gap-2 font-medium shadow-sm transition-all h-8 text-xs">
-                                <Search className="w-3.5 h-3.5" />
-                                Escanear
-                            </Button>
-                        </Link>
-                    </div>
-                </CardContent>
-            </Card>
+            {/* Los dos accesos, solo en movil: en escritorio ya estan arriba,
+                junto al titulo de la pantalla. */}
+            <div className="grid grid-cols-2 gap-2 @3xl/scanlist:hidden">
+                <Link href="/financial/transactions" className="w-full">
+                    <Button variant="outline" className="h-8 w-full gap-2 rounded-xl text-xs font-medium">
+                        <Receipt className="h-3.5 w-3.5" />
+                        Transacciones
+                    </Button>
+                </Link>
+                <Link href="/financial/scanner" className="w-full">
+                    <Button className="h-8 w-full gap-2 rounded-xl bg-emerald-600 text-xs font-medium text-white shadow-sm transition-all hover:bg-emerald-700">
+                        <Search className="h-3.5 w-3.5" />
+                        Escanear
+                    </Button>
+                </Link>
+            </div>
 
             {/* Escritorio: tabla ordenable y paginada. Móvil: las tarjetas
                 agrupadas por día de siempre — seis columnas en 360px no son una
                 tabla. El corte mira el ancho del contenedor y no el de la
                 ventana, porque la barra lateral se lleva 256px y se pliega en
                 caliente. */}
-            <div className="@container/scanlist">
+            <div>
                 {/* Las dos vistas viven en el DOM y es el CSS quien elige; el
                     `data-testid` deja que un test diga cual de las dos prueba, que
                     en jsdom no hay CSS y ambas se montan. */}
