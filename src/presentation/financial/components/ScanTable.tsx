@@ -20,9 +20,13 @@ interface ScanTableProps {
 
 const COLUMNS: { key: string; label: string; sortField?: ScanSortField; align?: "right" | "center" }[] = [
     { key: "date", label: "Fecha", sortField: "date" },
+    // El comercio va bajo el título, en esta misma columna: es quién cobró, y
+    // leerlo pegado a qué se cobró cuesta menos que cruzar la fila entera.
     { key: "description", label: "Descripción", sortField: "description" },
     { key: "category", label: "Categoría" },
-    { key: "merchant", label: "Comercio / Origen" },
+    // Las cuentas piden su propia columna: son dos líneas de insignias cuando
+    // hay origen y destino, y debajo del título empujaban el resto de la fila.
+    { key: "accounts", label: "Cuentas" },
     { key: "amount", label: "Monto", sortField: "amount", align: "right" },
     { key: "actions", label: "Acciones", align: "center" },
 ];
@@ -143,14 +147,15 @@ export function ScanTable({ scans, processing, onApprove, onReject }: ScanTableP
                                             <span className={cn("grid h-8 w-8 shrink-0 place-items-center rounded-lg", visual.containerClass)}>
                                                 <Icon className="h-4 w-4" />
                                             </span>
-                                            <span className="flex min-w-0 flex-col gap-1 leading-tight">
+                                            <span className="flex min-w-0 flex-col leading-tight">
                                                 <span className="truncate text-[13.5px] font-semibold group-hover:underline">
                                                     {scan.description || scan.summary || "Sin descripción"}
                                                 </span>
-                                                {/* Origen y destino: en una transferencia, de dónde salió y
-                                                    a dónde entró es la mitad de lo que hay que revisar
-                                                    antes de aprobar. */}
-                                                <ScanAccountBadges scan={scan} />
+                                                {scan.merchant && (
+                                                    <span className="mt-0.5 truncate text-[11.5px] text-muted-foreground">
+                                                        {scan.merchant}
+                                                    </span>
+                                                )}
                                             </span>
                                         </Link>
                                     </td>
@@ -166,9 +171,11 @@ export function ScanTable({ scans, processing, onApprove, onReject }: ScanTableP
                                     </td>
 
                                     <td className="px-4 py-3 align-top">
-                                        <span className="block truncate text-[12.5px] text-muted-foreground">
-                                            {scan.merchant || "—"}
-                                        </span>
+                                        {/* Origen y destino: en una transferencia, de dónde salió y a
+                                            dónde entró es la mitad de lo que hay que revisar antes de
+                                            aprobar. Cuando el escáner no identificó ninguna, la celda
+                                            lo dice en vez de quedarse muda. */}
+                                        <ScanAccountBadges scan={scan} emptyLabel="Sin cuenta identificada" />
                                     </td>
 
                                     <td className="px-4 py-3 text-right align-top">

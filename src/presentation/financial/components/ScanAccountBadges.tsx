@@ -8,6 +8,12 @@ import { cn } from "@/lib/utils";
 interface ScanAccountBadgesProps {
     scan: FinancialScannerTransaction;
     className?: string;
+    /**
+     * Qué poner cuando el escáner no identificó ninguna cuenta. En la tarjeta
+     * se omite el bloque entero; en la tabla la celda tiene que decir algo, o
+     * un hueco vacío se lee como un fallo de la pantalla.
+     */
+    emptyLabel?: string;
 }
 
 /**
@@ -22,9 +28,11 @@ interface ScanAccountBadgesProps {
  * rol. Ahora es uno solo con el rol como dato, y lo comparten la tarjeta de
  * móvil y la tabla de escritorio.
  */
-export function ScanAccountBadges({ scan, className }: ScanAccountBadgesProps) {
+export function ScanAccountBadges({ scan, className, emptyLabel }: ScanAccountBadgesProps) {
     const accounts = extractScannedAccounts(scan);
-    if (!accounts.source && !accounts.destination) return null;
+    if (!accounts.source && !accounts.destination) {
+        return emptyLabel ? <span className="text-[11.5px] text-muted-foreground">{emptyLabel}</span> : null;
+    }
 
     return (
         <div className={cn("flex flex-col gap-1.5", className)}>
