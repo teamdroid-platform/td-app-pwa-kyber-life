@@ -40,6 +40,10 @@ import { getInstitutionMatchInfo, INSTITUTION_MATCH_THRESHOLD } from "@/lib/inst
 import { isTransactionPaidWithCredit } from "@/lib/financial-utils";
 import { InstitutionMatchBadge } from "./InstitutionMatchBadge";
 import { FinancialScannerTransaction } from "@/domain/entities/financial";
+import { formatAmount, getCategoryVisualConfig, extractSummary, formatTime } from "../lib/scan-display";
+import { extractScannedAccounts } from "../lib/scan-accounts";
+import { ScanAccountBadges } from "./ScanAccountBadges";
+import { ScanTable } from "./ScanTable";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -66,346 +70,6 @@ function normalizeTransactionType(type?: string | null) {
     const supportedType = TYPE_OPTIONS.find((option) => option.value === normalizedType);
 
     return supportedType?.value ?? DEFAULT_TRANSACTION_TYPE;
-}
-
-function formatAmount(amount?: number | null, currency = "USD") {
-    if (amount == null) {
-        return "--";
-    }
-
-    return new Intl.NumberFormat("es-ES", {
-        style: "currency",
-        currency,
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-    }).format(amount);
-}
-
-interface CategoryVisualConfig {
-    icon: React.ElementType;
-    containerClass: string;
-}
-
-function getCategoryVisualConfig(category?: string | null, txType?: string | null): CategoryVisualConfig {
-    const cat = (category || "").toLowerCase().trim();
-    const type = (txType || "").toUpperCase();
-
-    if (
-        cat.includes("aliment") ||
-        cat.includes("comida") ||
-        cat.includes("restauran") ||
-        cat.includes("food") ||
-        cat.includes("supermerc") ||
-        cat.includes("cafeter")
-    ) {
-        return {
-            icon: Utensils,
-            containerClass: "border-[#FFB020]/50 bg-[#FFB020]/10 text-[#FFB020] shadow-[0_0_14px_rgba(255,176,32,0.25)]",
-        };
-    }
-    if (
-        cat.includes("transpor") ||
-        cat.includes("viaje") ||
-        cat.includes("taxi") ||
-        cat.includes("uber") ||
-        cat.includes("cabify") ||
-        cat.includes("gasolin") ||
-        cat.includes("combust") ||
-        cat.includes("peaje")
-    ) {
-        return {
-            icon: Car,
-            containerClass: "border-cyan-500/50 bg-cyan-500/10 text-cyan-400 shadow-[0_0_14px_rgba(6,182,212,0.25)]",
-        };
-    }
-    if (
-        cat.includes("ropa") ||
-        cat.includes("calzado") ||
-        cat.includes("compra") ||
-        cat.includes("shop") ||
-        cat.includes("tienda") ||
-        cat.includes("mall") ||
-        cat.includes("amazon")
-    ) {
-        return {
-            icon: ShoppingCart,
-            containerClass: "border-emerald-500/50 bg-emerald-500/10 text-emerald-400 shadow-[0_0_14px_rgba(16,185,129,0.25)]",
-        };
-    }
-    if (
-        cat.includes("transfer") ||
-        type === "TRANSFER"
-    ) {
-        return {
-            icon: ArrowRightLeft,
-            containerClass: "border-purple-500/50 bg-purple-500/10 text-purple-400 shadow-[0_0_14px_rgba(168,85,247,0.25)]",
-        };
-    }
-    if (
-        cat.includes("salud") ||
-        cat.includes("farmac") ||
-        cat.includes("medic") ||
-        cat.includes("hospital") ||
-        cat.includes("dentist")
-    ) {
-        return {
-            icon: HeartPulse,
-            containerClass: "border-rose-500/50 bg-rose-500/10 text-rose-400 shadow-[0_0_14px_rgba(244,63,94,0.25)]",
-        };
-    }
-    if (
-        cat.includes("servici") ||
-        cat.includes("luz") ||
-        cat.includes("agua") ||
-        cat.includes("telef") ||
-        cat.includes("internet") ||
-        cat.includes("electric")
-    ) {
-        return {
-            icon: Lightbulb,
-            containerClass: "border-yellow-500/50 bg-yellow-500/10 text-yellow-400 shadow-[0_0_14px_rgba(234,179,8,0.25)]",
-        };
-    }
-    if (
-        cat.includes("entreten") ||
-        cat.includes("cine") ||
-        cat.includes("streaming") ||
-        cat.includes("netflix") ||
-        cat.includes("spotify") ||
-        cat.includes("juego") ||
-        cat.includes("ocio")
-    ) {
-        return {
-            icon: Ticket,
-            containerClass: "border-purple-500/50 bg-purple-500/10 text-purple-400 shadow-[0_0_14px_rgba(168,85,247,0.25)]",
-        };
-    }
-    if (
-        cat.includes("educa") ||
-        cat.includes("curso") ||
-        cat.includes("universid") ||
-        cat.includes("colegio") ||
-        cat.includes("libro")
-    ) {
-        return {
-            icon: GraduationCap,
-            containerClass: "border-blue-500/50 bg-blue-500/10 text-blue-400 shadow-[0_0_14px_rgba(59,130,246,0.25)]",
-        };
-    }
-    if (
-        cat.includes("hogar") ||
-        cat.includes("casa") ||
-        cat.includes("arriendo") ||
-        cat.includes("alquiler") ||
-        cat.includes("mueble")
-    ) {
-        return {
-            icon: Home,
-            containerClass: "border-teal-500/50 bg-teal-500/10 text-teal-400 shadow-[0_0_14px_rgba(20,184,166,0.25)]",
-        };
-    }
-    if (
-        cat.includes("mascot") ||
-        cat.includes("veterin") ||
-        cat.includes("perro") ||
-        cat.includes("gato")
-    ) {
-        return {
-            icon: Dog,
-            containerClass: "border-orange-500/50 bg-orange-500/10 text-orange-400 shadow-[0_0_14px_rgba(249,115,22,0.25)]",
-        };
-    }
-
-    if (type === "INCOME") {
-        return {
-            icon: TrendingUp,
-            containerClass: "border-emerald-500/50 bg-emerald-500/10 text-emerald-400 shadow-[0_0_14px_rgba(16,185,129,0.25)]",
-        };
-    }
-    if (type === "WITHDRAWAL") {
-        return {
-            icon: Wallet,
-            containerClass: "border-sky-500/50 bg-sky-500/10 text-sky-400 shadow-[0_0_14px_rgba(14,165,233,0.25)]",
-        };
-    }
-
-    return {
-        icon: Receipt,
-        containerClass: "border-[#FFB020]/40 bg-[#FFB020]/10 text-[#FFB020] shadow-[0_0_14px_rgba(255,176,32,0.2)]",
-    };
-}
-
-interface ScannedAccountDetails {
-    source?: string | null;
-    destination?: string | null;
-}
-
-/**
- * Extracts origin and destination account numbers from a scanner transaction.
- */
-function extractScannedAccounts(tx: FinancialScannerTransaction): ScannedAccountDetails {
-    let source: string | null = null;
-    let destination: string | null = null;
-
-    // 1. Direct accounts array
-    if (Array.isArray(tx.accounts) && tx.accounts.length > 0) {
-        for (const entry of tx.accounts) {
-            if (!entry || !entry.account) continue;
-            const t = (entry.type || "").toLowerCase().trim();
-            if (t.startsWith("orig") || t.startsWith("sourc") || t.includes("salid") || t.includes("desde")) {
-                if (!source) source = entry.account;
-            } else if (t.startsWith("dest") || t.startsWith("targ") || t.includes("entrad") || t.includes("hacia") || t.includes("para")) {
-                if (!destination) destination = entry.account;
-            } else {
-                if (!source) source = entry.account;
-                else if (!destination) destination = entry.account;
-            }
-        }
-    }
-
-    // 2. Fallback to originStats if missing
-    if (!source || !destination) {
-        const stats = tx.originStats as Record<string, unknown> | null | undefined;
-        if (stats) {
-            if (!source) {
-                const s = stats.sourceAccount || stats.accountSource || stats.originAccount || stats.cuentaOrigen || stats.cuenta_origen;
-                if (typeof s === "string" && s.trim() !== "") source = s.trim();
-            }
-            if (!destination) {
-                const d = stats.destinationAccount || stats.accountDestination || stats.targetAccount || stats.cuentaDestino || stats.cuenta_destino;
-                if (typeof d === "string" && d.trim() !== "") destination = d.trim();
-            }
-            if ((!source || !destination) && Array.isArray(stats.accounts)) {
-                for (const entry of stats.accounts) {
-                    if (!entry || typeof entry !== "object") continue;
-                    const acc = (entry as { account?: string; type?: string }).account;
-                    const typeStr = ((entry as { account?: string; type?: string }).type || "").toLowerCase();
-                    if (!acc) continue;
-                    if (typeStr.startsWith("orig") || typeStr.startsWith("sourc")) {
-                        if (!source) source = acc;
-                    } else if (typeStr.startsWith("dest") || typeStr.startsWith("targ")) {
-                        if (!destination) destination = acc;
-                    }
-                }
-            }
-        }
-    }
-
-    return { source, destination };
-}
-
-function formatMaskedNumber(acc: string): string {
-    const trimmed = acc.trim();
-    const digitsMatch = trimmed.match(/\d{4}$/);
-    if (digitsMatch) {
-        return `**** ${digitsMatch[0]}`;
-    }
-    const lastDigits = trimmed.replace(/\D/g, "").slice(-4);
-    if (lastDigits) {
-        return `**** ${lastDigits}`;
-    }
-    return trimmed.length > 8 ? `**** ${trimmed.slice(-4)}` : trimmed;
-}
-
-interface AccountBadgeInfo {
-    raw: string;
-    formattedNumber: string;
-    typeAcronym: "TCR" | "TDE" | "AHO" | "CTE" | "EFE" | "INV" | "CTA";
-    ownershipAcronym: "MIA" | "TER";
-}
-
-function resolveAccountBadgeInfo(
-    role: "SOURCE" | "DESTINATION",
-    accountNumber: string,
-    tx: FinancialScannerTransaction
-): AccountBadgeInfo {
-    const formatted = formatMaskedNumber(accountNumber);
-    const combinedContext = `${accountNumber} ${tx.merchant || ""} ${tx.description || ""} ${tx.summary || ""}`.toLowerCase();
-
-    // Type detection (TCR, TDE, AHO, CTE, CTA)
-    let typeAcronym: "TCR" | "TDE" | "AHO" | "CTE" | "EFE" | "INV" | "CTA" = "CTA";
-    if (
-        isTransactionPaidWithCredit(tx) ||
-        combinedContext.includes("crédito") ||
-        combinedContext.includes("credito") ||
-        combinedContext.includes("mastercard") ||
-        combinedContext.includes("visa") ||
-        combinedContext.includes("diners") ||
-        combinedContext.includes("amex") ||
-        combinedContext.includes("tcr") ||
-        combinedContext.includes("tc")
-    ) {
-        if (combinedContext.includes("débito") || combinedContext.includes("debito") || combinedContext.includes("tde") || combinedContext.includes("td")) {
-            typeAcronym = "TDE";
-        } else {
-            typeAcronym = "TCR";
-        }
-    } else if (combinedContext.includes("débito") || combinedContext.includes("debito") || combinedContext.includes("tde") || combinedContext.includes("td")) {
-        typeAcronym = "TDE";
-    } else if (combinedContext.includes("ahorro") || combinedContext.includes("aho")) {
-        typeAcronym = "AHO";
-    } else if (combinedContext.includes("corriente") || combinedContext.includes("cte")) {
-        typeAcronym = "CTE";
-    } else if (combinedContext.includes("efectivo") || combinedContext.includes("efe")) {
-        typeAcronym = "EFE";
-    } else if (combinedContext.includes("inversi") || combinedContext.includes("inv")) {
-        typeAcronym = "INV";
-    }
-
-    // Ownership detection:
-    // If source, almost always the user's own account -> MIA
-    // If destination, check if own transfer or third party -> TER
-    let ownershipAcronym: "MIA" | "TER" = role === "SOURCE" ? "MIA" : "TER";
-    if (role === "DESTINATION") {
-        if (
-            combinedContext.includes("entre mis cuentas") ||
-            combinedContext.includes("propia") ||
-            combinedContext.includes("mismo titular") ||
-            combinedContext.includes("ahorro personal") ||
-            combinedContext.includes("mía") ||
-            combinedContext.includes("mia")
-        ) {
-            ownershipAcronym = "MIA";
-        }
-    }
-
-    return {
-        raw: accountNumber,
-        formattedNumber: formatted,
-        typeAcronym,
-        ownershipAcronym,
-    };
-}
-
-/**
- * Extract the best available summary from a scanner transaction.
- * Priority: summary → originStats.emailBody → originStats.snippet
- */
-function extractSummary(tx: FinancialScannerTransaction): string {
-    if (tx.summary && tx.summary.trim() !== "") {
-        return tx.summary;
-    }
-    const stats = tx.originStats as Record<string, unknown> | null | undefined;
-    const emailBody = stats?.emailBody as string | undefined;
-    if (emailBody && emailBody.trim() !== "") {
-        return `[MAIL] ${emailBody}`;
-    }
-    const snippet = stats?.snippet as string | undefined;
-    if (snippet && snippet.trim() !== "") {
-        return `[SNIPPET] ${snippet}`;
-    }
-    return "";
-}
-
-function formatTime(value?: string | null) {
-    if (!value) {
-        return "--:--";
-    }
-
-    return new Intl.DateTimeFormat("es-ES", {
-        hour: "2-digit",
-        minute: "2-digit",
-    }).format(new Date(value));
 }
 
 function formatDateLabel(dateStr: string): string {
@@ -813,8 +477,25 @@ export function FinancialInbox() {
                 </CardContent>
             </Card>
 
-            {/* Transactions Grouped By Date - Compact Fintech Cards without vertical timeline */}
-            <section className="flex flex-col gap-5">
+            {/* Escritorio: tabla ordenable y paginada. Móvil: las tarjetas
+                agrupadas por día de siempre — seis columnas en 360px no son una
+                tabla. El corte mira el ancho del contenedor y no el de la
+                ventana, porque la barra lateral se lleva 256px y se pliega en
+                caliente. */}
+            <div className="@container/scanlist">
+                {/* Las dos vistas viven en el DOM y es el CSS quien elige; el
+                    `data-testid` deja que un test diga cual de las dos prueba, que
+                    en jsdom no hay CSS y ambas se montan. */}
+                <div data-testid="inbox-table" className="hidden @3xl/scanlist:block">
+                    <ScanTable
+                        scans={filteredTransactions}
+                        processing={processing}
+                        onApprove={handleConfirm}
+                        onReject={handleDismiss}
+                    />
+                </div>
+
+            <section data-testid="inbox-cards" className="flex flex-col gap-5 @3xl/scanlist:hidden">
                 {Object.entries(groupedTransactions).map(([dateLabel, items]) => (
                     <div key={dateLabel} className="flex flex-col gap-2.5">
                         {/* Date Header with Purple Calendar Icon */}
@@ -1012,70 +693,8 @@ export function FinancialInbox() {
                                                         )}
                                                     </div>
 
-                                                    {/* Origin and Destination Accounts */}
-                                                    {(accounts.source || accounts.destination) && (
-                                                        <div className="flex flex-col gap-1.5 mt-2">
-                                                            {accounts.source && (() => {
-                                                                const info = resolveAccountBadgeInfo("SOURCE", accounts.source, tx);
-                                                                return (
-                                                                    <div className="flex items-center gap-1.5 flex-wrap min-w-0">
-                                                                        {/* Origin Arrow Icon Badge */}
-                                                                        <span
-                                                                            className="inline-flex items-center justify-center h-5 w-5 rounded-md border border-rose-500/20 bg-rose-50 text-rose-600 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-400 shrink-0 select-none"
-                                                                            title="Origen"
-                                                                        >
-                                                                            <ArrowUpRight className="h-3 w-3 stroke-[2.5]" />
-                                                                        </span>
-
-                                                                        {/* Account Number Badge */}
-                                                                        <span className="inline-flex items-center h-5 px-1.5 rounded-md border border-slate-200 bg-slate-100/90 font-mono text-[11px] text-slate-700 font-medium tracking-wide shrink-0 select-none dark:border-slate-700/60 dark:bg-slate-800/50 dark:text-slate-200">
-                                                                            {info.formattedNumber}
-                                                                        </span>
-
-                                                                        {/* Account Type Acronym Badge (TCR, TDE, AHO, CTE, CTA) */}
-                                                                        <span className="inline-flex items-center h-5 px-1.5 rounded-md border border-indigo-500/20 bg-indigo-50 text-[9.5px] font-bold text-indigo-700 shrink-0 select-none dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-300">
-                                                                            {info.typeAcronym}
-                                                                        </span>
-
-                                                                        {/* Ownership Acronym Badge (MIA for own, TER for third party) */}
-                                                                        <span className="inline-flex items-center h-5 px-1.5 rounded-md border border-slate-200/60 bg-slate-100/60 text-[9px] font-bold text-slate-600 shrink-0 select-none dark:border-slate-600/40 dark:bg-slate-800/40 dark:text-slate-400">
-                                                                            {info.ownershipAcronym}
-                                                                        </span>
-                                                                    </div>
-                                                                );
-                              })()}
-
-                                                            {accounts.destination && (() => {
-                                                                const info = resolveAccountBadgeInfo("DESTINATION", accounts.destination, tx);
-                                                                return (
-                                                                    <div className="flex items-center gap-1.5 flex-wrap min-w-0">
-                                                                        {/* Destination Arrow Icon Badge */}
-                                                                        <span
-                                                                            className="inline-flex items-center justify-center h-5 w-5 rounded-md border border-emerald-500/20 bg-emerald-50 text-emerald-600 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-400 shrink-0 select-none"
-                                                                            title="Destino"
-                                                                        >
-                                                                            <ArrowDownLeft className="h-3 w-3 stroke-[2.5]" />
-                                                                        </span>
-
-                                                                        {/* Account Number Badge */}
-                                                                        <span className="inline-flex items-center h-5 px-1.5 rounded-md border border-slate-200 bg-slate-100/90 font-mono text-[11px] text-slate-700 font-medium tracking-wide shrink-0 select-none dark:border-slate-700/60 dark:bg-slate-800/50 dark:text-slate-200">
-                                                                            {info.formattedNumber}
-                                                                        </span>
-
-                                                                        {/* Account Type Acronym Badge */}
-                                                                        <span className="inline-flex items-center h-5 px-1.5 rounded-md border border-indigo-500/20 bg-indigo-50 text-[9.5px] font-bold text-indigo-700 shrink-0 select-none dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-300">
-                                                                            {info.typeAcronym}
-                                                                        </span>
-
-                                                                        {/* Ownership Acronym Badge */}
-                                                                        <span className="inline-flex items-center h-5 px-1.5 rounded-md border border-slate-200/60 bg-slate-100/60 text-[9px] font-bold text-slate-600 shrink-0 select-none dark:border-slate-600/40 dark:bg-slate-800/40 dark:text-slate-400">
-                                                                            {info.ownershipAcronym}
-                                                                        </span>
-                                                                    </div>
-                                                                );
-                                                            })()}
-                                                        </div>
-                                                    )}
+                                                    {/* Origen y destino, compartido con la tabla de escritorio. */}
+                                                    <ScanAccountBadges scan={tx} className="mt-2" />
                                                 </div>
                                             </div>
 
@@ -1124,6 +743,7 @@ export function FinancialInbox() {
                     </div>
                 ))}
             </section>
+            </div>
         </div>
     );
 }
