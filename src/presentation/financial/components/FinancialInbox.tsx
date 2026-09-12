@@ -414,7 +414,12 @@ export function FinancialInbox() {
                 </span>
             )}
 
-            <ScanKpiCards scans={filteredTransactions} />
+            {/* Solo en escritorio: en movil ocupaban media pantalla antes del
+                primer escaneo, y lo que se viene a hacer aqui es aprobar o
+                rechazar, no leer cuatro cifras. */}
+            <div className="hidden @3xl/scanlist:block">
+                <ScanKpiCards scans={filteredTransactions} />
+            </div>
 
             {/* Los dos accesos, solo en movil: en escritorio ya estan arriba,
                 junto al titulo de la pantalla. */}

@@ -71,7 +71,8 @@ export function ScanKpiCards({ scans }: ScanKpiCardsProps) {
     }, [scans]);
 
     return (
-        <div className="grid grid-cols-2 gap-3 @3xl/scanlist:grid-cols-4">
+        // Cuatro columnas fijas: la bandeja solo monta esto en escritorio.
+        <div className="grid grid-cols-4 gap-3">
             {kpis.map((kpi) => (
                 <div
                     key={kpi.key}
