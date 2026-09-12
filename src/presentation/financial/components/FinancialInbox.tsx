@@ -13,21 +13,7 @@ import {
     Search,
     Receipt,
     Loader2,
-    Utensils,
-    Car,
-    HeartPulse,
-    Lightbulb,
-    Ticket,
-    ShoppingCart,
-    GraduationCap,
-    Home,
-    Dog,
-    TrendingUp,
-    ArrowRightLeft,
-    Wallet,
     CreditCard,
-    ArrowUpRight,
-    ArrowDownLeft,
     Calendar,
 } from "lucide-react";
 import {
@@ -41,7 +27,6 @@ import { isTransactionPaidWithCredit } from "@/lib/financial-utils";
 import { InstitutionMatchBadge } from "./InstitutionMatchBadge";
 import { FinancialScannerTransaction } from "@/domain/entities/financial";
 import { formatAmount, getCategoryVisualConfig, extractSummary, formatTime } from "../lib/scan-display";
-import { extractScannedAccounts } from "../lib/scan-accounts";
 import { ScanAccountBadges } from "./ScanAccountBadges";
 import { ScanTable } from "./ScanTable";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -520,7 +505,6 @@ export function FinancialInbox() {
                                 const categoryVisual = getCategoryVisualConfig(tx.category, tx.type);
                                 const CategoryIcon = categoryVisual.icon;
                                 const isPaidWithCredit = isTransactionPaidWithCredit(tx);
-                                const accounts = extractScannedAccounts(tx);
 
                                 // Institution shown on the card. Mirror the detail form's server-side
                                 // resolution: when the scanned merchant confidently matches a stored

@@ -1,6 +1,6 @@
 import {
     Utensils, Car, HeartPulse, Lightbulb, Ticket, ShoppingCart,
-    GraduationCap, Home, Dog, TrendingUp, ArrowRightLeft, Wallet, CreditCard, Receipt,
+    GraduationCap, Home, Dog, TrendingUp, ArrowRightLeft, Wallet, Receipt,
 } from "lucide-react";
 import type { FinancialScannerTransaction } from "@/domain/entities/financial";
 
