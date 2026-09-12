@@ -7,7 +7,7 @@ import type { FinancialScannerTransaction } from "@/domain/entities/financial";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { ScanAccountBadges } from "./ScanAccountBadges";
-import { formatAmount, formatTime, getCategoryVisualConfig } from "../lib/scan-display";
+import { formatAmount, formatTime, getCategoryVisualConfig, categoryChipClass } from "../lib/scan-display";
 import { sortScans, paginateScans, type ScanSort, type ScanSortField } from "../lib/scan-table";
 
 interface ScanTableProps {
@@ -162,7 +162,7 @@ export function ScanTable({ scans, processing, onApprove, onReject }: ScanTableP
 
                                     <td className="px-4 py-3 align-top">
                                         {scan.category ? (
-                                            <span className={cn("inline-flex max-w-full items-center gap-1.5 truncate rounded-full px-2.5 py-1 text-[11.5px] font-medium", visual.containerClass)}>
+                                            <span className={cn("inline-flex max-w-full items-center gap-1.5 truncate rounded-full border px-2.5 py-1 text-[11.5px] font-medium", categoryChipClass(visual))}>
                                                 {scan.category}
                                             </span>
                                         ) : (

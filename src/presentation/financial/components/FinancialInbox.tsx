@@ -26,7 +26,7 @@ import { getInstitutionMatchInfo, INSTITUTION_MATCH_THRESHOLD } from "@/lib/inst
 import { isTransactionPaidWithCredit } from "@/lib/financial-utils";
 import { InstitutionMatchBadge } from "./InstitutionMatchBadge";
 import { FinancialScannerTransaction } from "@/domain/entities/financial";
-import { formatAmount, getCategoryVisualConfig, extractSummary, formatTime } from "../lib/scan-display";
+import { formatAmount, getCategoryVisualConfig, categoryChipClass, extractSummary, formatTime } from "../lib/scan-display";
 import { ScanAccountBadges } from "./ScanAccountBadges";
 import { ScanTable } from "./ScanTable";
 import { ScanKpiCards } from "./ScanKpiCards";
@@ -564,8 +564,15 @@ export function FinancialInbox() {
                                                     {/* Top Row: Category pill badge (no tag icon) + Amount */}
                                                     <div className="flex items-center justify-between gap-2 w-full min-w-0">
                                                         <div className="flex items-center gap-1.5 min-w-0">
+                                                            {/* El chip toma el color de la categoría, el mismo
+                                                                que el icono. Estaba fijo en ámbar, asi que
+                                                                "Transferencias" salia con icono violeta y
+                                                                etiqueta ambar: dos colores para un solo dato. */}
                                                             <span
-                                                                className="inline-flex h-5 max-w-[150px] sm:max-w-[190px] items-center rounded-md border border-amber-500/20 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold leading-none tracking-wide text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-400"
+                                                                className={cn(
+                                                                    "inline-flex h-5 max-w-[150px] sm:max-w-[190px] items-center rounded-md border px-2 py-0.5 text-[11px] font-semibold leading-none tracking-wide",
+                                                                    categoryChipClass(categoryVisual),
+                                                                )}
                                                                 title={tx.category || "Sin categoría"}
                                                             >
                                                                 <span className="truncate">{tx.category || "Sin categoría"}</span>

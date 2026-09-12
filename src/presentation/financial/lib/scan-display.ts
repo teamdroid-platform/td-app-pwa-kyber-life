@@ -25,6 +25,23 @@ export function formatAmount(amount?: number | null, currency = "USD") {
     }).format(amount);
 }
 
+/**
+ * El mismo color de la categoría, servido para un chip.
+ *
+ * `containerClass` lleva un resplandor que funciona en el círculo del icono —
+ * mide 44px y el halo lo separa del fondo— pero en una etiqueta de 20px de
+ * alto emborrona el texto. Se quita el `shadow-[...]` y se conserva el resto:
+ * borde, fondo y color de letra, que es lo que hace falta para que el chip y
+ * el icono digan lo mismo.
+ *
+ * Se recorta la cadena en vez de declarar un segundo juego de clases porque
+ * asi no hay dos listas de doce colores que mantener sincronizadas, y las
+ * clases resultantes ya existen en el CSS: son las mismas.
+ */
+export function categoryChipClass(config: CategoryVisualConfig): string {
+    return config.containerClass.replace(/\s*shadow-\[[^\]]*\]/g, "");
+}
+
 export interface CategoryVisualConfig {
     icon: React.ElementType;
     containerClass: string;
