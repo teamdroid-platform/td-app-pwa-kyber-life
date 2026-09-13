@@ -45,6 +45,19 @@ export function categoryChipClass(config: CategoryVisualConfig): string {
 export interface CategoryVisualConfig {
     icon: React.ElementType;
     containerClass: string;
+    /**
+     * Un lavado del color de la categoría para el fondo de la tarjeta de móvil.
+     *
+     * Va declarado y no derivado de `containerClass`: recortar la cadena sirve
+     * para quitar una clase que ya existe, pero una opacidad nueva no estaría
+     * en el CSS —Tailwind solo genera lo que ve escrito— y la tarjeta saldría
+     * sin fondo.
+     *
+     * La opacidad es muy baja a propósito: lo que tiñe es la tarjeta entera, y
+     * a poco que suba compite con el chip y el icono, que son los que llevan el
+     * color de verdad.
+     */
+    cardClass: string;
 }
 
 export function getCategoryVisualConfig(category?: string | null, txType?: string | null): CategoryVisualConfig {
@@ -62,6 +75,7 @@ export function getCategoryVisualConfig(category?: string | null, txType?: strin
         return {
             icon: Utensils,
             containerClass: "border-[#FFB020]/50 bg-[#FFB020]/10 text-[#FFB020] shadow-[0_0_14px_rgba(255,176,32,0.25)]",
+            cardClass: "bg-[#FFB020]/[0.10] border-[#FFB020]/35 hover:border-[#FFB020]/55",
         };
     }
     if (
@@ -77,6 +91,7 @@ export function getCategoryVisualConfig(category?: string | null, txType?: strin
         return {
             icon: Car,
             containerClass: "border-cyan-500/50 bg-cyan-500/10 text-cyan-400 shadow-[0_0_14px_rgba(6,182,212,0.25)]",
+            cardClass: "bg-cyan-500/[0.10] border-cyan-500/35 hover:border-cyan-500/55",
         };
     }
     if (
@@ -91,6 +106,7 @@ export function getCategoryVisualConfig(category?: string | null, txType?: strin
         return {
             icon: ShoppingCart,
             containerClass: "border-emerald-500/50 bg-emerald-500/10 text-emerald-400 shadow-[0_0_14px_rgba(16,185,129,0.25)]",
+            cardClass: "bg-emerald-500/[0.10] border-emerald-500/35 hover:border-emerald-500/55",
         };
     }
     if (
@@ -100,6 +116,7 @@ export function getCategoryVisualConfig(category?: string | null, txType?: strin
         return {
             icon: ArrowRightLeft,
             containerClass: "border-purple-500/50 bg-purple-500/10 text-purple-400 shadow-[0_0_14px_rgba(168,85,247,0.25)]",
+            cardClass: "bg-purple-500/[0.10] border-purple-500/35 hover:border-purple-500/55",
         };
     }
     if (
@@ -112,6 +129,7 @@ export function getCategoryVisualConfig(category?: string | null, txType?: strin
         return {
             icon: HeartPulse,
             containerClass: "border-rose-500/50 bg-rose-500/10 text-rose-400 shadow-[0_0_14px_rgba(244,63,94,0.25)]",
+            cardClass: "bg-rose-500/[0.10] border-rose-500/35 hover:border-rose-500/55",
         };
     }
     if (
@@ -125,6 +143,7 @@ export function getCategoryVisualConfig(category?: string | null, txType?: strin
         return {
             icon: Lightbulb,
             containerClass: "border-yellow-500/50 bg-yellow-500/10 text-yellow-400 shadow-[0_0_14px_rgba(234,179,8,0.25)]",
+            cardClass: "bg-yellow-500/[0.10] border-yellow-500/35 hover:border-yellow-500/55",
         };
     }
     if (
@@ -139,6 +158,7 @@ export function getCategoryVisualConfig(category?: string | null, txType?: strin
         return {
             icon: Ticket,
             containerClass: "border-purple-500/50 bg-purple-500/10 text-purple-400 shadow-[0_0_14px_rgba(168,85,247,0.25)]",
+            cardClass: "bg-purple-500/[0.10] border-purple-500/35 hover:border-purple-500/55",
         };
     }
     if (
@@ -151,6 +171,7 @@ export function getCategoryVisualConfig(category?: string | null, txType?: strin
         return {
             icon: GraduationCap,
             containerClass: "border-blue-500/50 bg-blue-500/10 text-blue-400 shadow-[0_0_14px_rgba(59,130,246,0.25)]",
+            cardClass: "bg-blue-500/[0.10] border-blue-500/35 hover:border-blue-500/55",
         };
     }
     if (
@@ -163,6 +184,7 @@ export function getCategoryVisualConfig(category?: string | null, txType?: strin
         return {
             icon: Home,
             containerClass: "border-teal-500/50 bg-teal-500/10 text-teal-400 shadow-[0_0_14px_rgba(20,184,166,0.25)]",
+            cardClass: "bg-teal-500/[0.10] border-teal-500/35 hover:border-teal-500/55",
         };
     }
     if (
@@ -174,6 +196,7 @@ export function getCategoryVisualConfig(category?: string | null, txType?: strin
         return {
             icon: Dog,
             containerClass: "border-orange-500/50 bg-orange-500/10 text-orange-400 shadow-[0_0_14px_rgba(249,115,22,0.25)]",
+            cardClass: "bg-orange-500/[0.10] border-orange-500/35 hover:border-orange-500/55",
         };
     }
 
@@ -181,18 +204,21 @@ export function getCategoryVisualConfig(category?: string | null, txType?: strin
         return {
             icon: TrendingUp,
             containerClass: "border-emerald-500/50 bg-emerald-500/10 text-emerald-400 shadow-[0_0_14px_rgba(16,185,129,0.25)]",
+            cardClass: "bg-emerald-500/[0.10] border-emerald-500/35 hover:border-emerald-500/55",
         };
     }
     if (type === "WITHDRAWAL") {
         return {
             icon: Wallet,
             containerClass: "border-sky-500/50 bg-sky-500/10 text-sky-400 shadow-[0_0_14px_rgba(14,165,233,0.25)]",
+            cardClass: "bg-sky-500/[0.10] border-sky-500/35 hover:border-sky-500/55",
         };
     }
 
     return {
         icon: Receipt,
         containerClass: "border-[#FFB020]/40 bg-[#FFB020]/10 text-[#FFB020] shadow-[0_0_14px_rgba(255,176,32,0.2)]",
+        cardClass: "bg-[#FFB020]/[0.10] border-[#FFB020]/35 hover:border-[#FFB020]/55",
     };
 }
 
