@@ -1,6 +1,7 @@
 import type { FinancialScannerTransaction } from "@/domain/entities/financial";
 import type { ScannedAccountView } from "@/application/services/bank-service";
 import { isTransactionPaidWithCredit } from "@/lib/financial-utils";
+import { beneficiaryIsOwner } from "@/lib/beneficiary-owner";
 
 /**
  * Cómo se leen las cuentas de origen y destino que el escáner extrajo del
@@ -129,12 +130,22 @@ function inferTypeAcronym(accountNumber: string, tx: FinancialScannerTransaction
 }
 
 /** De quién sugiere el texto que es la cuenta. Solo para números sin registrar. */
-function inferOwnership(role: "SOURCE" | "DESTINATION", tx: FinancialScannerTransaction): "MIA" | "TER" {
+function inferOwnership(
+    role: "SOURCE" | "DESTINATION", tx: FinancialScannerTransaction, ownerName?: string | null,
+): "MIA" | "TER" {
     // El origen casi siempre es del usuario: solo se envía dinero desde lo propio.
     if (role === "SOURCE") return "MIA";
 
     const text = `${tx.merchant || ""} ${tx.description || ""} ${tx.summary || ""}`.toLowerCase();
-    return mentions(text, ["entre mis cuentas", "propia", "mismo titular", "ahorro personal", "mía", "mia"])
+    if (mentions(text, ["entre mis cuentas", "propia", "mismo titular", "ahorro personal", "mía", "mia"])) {
+        return "MIA";
+    }
+
+    // Una transferencia a una cuenta propia que aún no está en Bancos: el
+    // comprobante la pone a nombre del usuario. El cuerpo del correo cuenta,
+    // porque es donde el banco escribe la línea de beneficiario.
+    const emailBody = typeof tx.originStats?.emailBody === "string" ? tx.originStats.emailBody : "";
+    return beneficiaryIsOwner(`${tx.description || ""}\n${tx.summary || ""}\n${emailBody}`, ownerName) === true
         ? "MIA"
         : "TER";
 }
@@ -153,6 +164,8 @@ export function resolveAccountBadgeInfo(
     accountNumber: string,
     tx: FinancialScannerTransaction,
     view?: ScannedAccountView | null,
+    /** Nombre del perfil, para reconocer al usuario como beneficiario. */
+    ownerName?: string | null,
 ): AccountBadgeInfo {
     const formattedNumber = formatMaskedNumber(accountNumber);
 
@@ -172,6 +185,6 @@ export function resolveAccountBadgeInfo(
         raw: accountNumber,
         formattedNumber,
         typeAcronym: inferTypeAcronym(accountNumber, tx),
-        ownershipAcronym: declared ?? inferOwnership(role, tx),
+        ownershipAcronym: declared ?? inferOwnership(role, tx, ownerName),
     };
 }

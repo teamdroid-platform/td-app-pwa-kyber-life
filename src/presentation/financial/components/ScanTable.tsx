@@ -19,6 +19,8 @@ interface ScanTableProps {
     onReject: (id: string) => void;
     /** Las cuentas de cada escaneo resueltas contra las del usuario, por id. */
     accountViews?: Record<string, ScannedAccountView[]>;
+    /** Nombre del perfil, para reconocer al usuario como beneficiario. */
+    ownerName?: string | null;
 }
 
 const COLUMNS: { key: string; label: string; sortField?: ScanSortField; align?: "right" | "center" }[] = [
@@ -60,7 +62,7 @@ function dayParts(value?: string | null): { day: string; monthYear: string } {
  * El orden y la paginación se resuelven aquí porque la pantalla ya tiene todos
  * los escaneos pendientes cargados: ordenar lo que tiene es ordenar el total.
  */
-export function ScanTable({ scans, processing, onApprove, onReject, accountViews }: ScanTableProps) {
+export function ScanTable({ scans, processing, onApprove, onReject, accountViews, ownerName }: ScanTableProps) {
     const [sort, setSort] = useState<ScanSort>({ field: "date", direction: "desc" });
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(10);
@@ -181,6 +183,7 @@ export function ScanTable({ scans, processing, onApprove, onReject, accountViews
                                         <ScanAccountBadges
                                             scan={scan}
                                             views={scan.id ? accountViews?.[scan.id] : undefined}
+                                            ownerName={ownerName}
                                             emptyLabel="Sin cuenta identificada"
                                         />
                                     </td>

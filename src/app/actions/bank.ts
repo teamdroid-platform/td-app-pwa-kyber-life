@@ -7,6 +7,7 @@ import {
     bankCardRepository,
     financialScannerTransactionRepository,
     financialTransactionRepository,
+    userRepository,
 } from "@/infrastructure/container";
 import { requireUserId } from "@/infrastructure/supabase/auth-user";
 import {
@@ -91,14 +92,26 @@ export async function getScannedAccountsPreviewAction(scannerTransactionId: stri
  * Sin argumentos por lo mismo que la de arriba: lee los escaneos guardados bajo
  * el dueño, no los que el cliente diga. Una sola lectura de las identidades
  * para toda la bandeja, y ninguna escritura.
+ *
+ * Trae también el nombre del perfil: un destino que aún no está en Bancos pero
+ * va a nombre del usuario es suyo, y solo el nombre permite reconocerlo.
  */
 export async function getInboxScannedAccountsAction() {
     return run("getInboxScannedAccounts", async userId => {
-        const scans = await financialScannerTransactionRepository.findUnprocessedByOwnerId(userId);
-        return bankService.previewScannedAccountsBatch(
+        const [scans, owner] = await Promise.all([
+            financialScannerTransactionRepository.findUnprocessedByOwnerId(userId),
+            userRepository.findById(userId),
+        ]);
+        const views = await bankService.previewScannedAccountsBatch(
             userId,
             scans.flatMap(scan => (scan.id ? [{ id: scan.id, accounts: scan.accounts }] : [])),
         );
+        const ownerName = [owner?.firstName, owner?.lastName]
+            .map(part => part?.trim())
+            .filter(Boolean)
+            .join(" ") || null;
+
+        return { views, ownerName };
     });
 }
 

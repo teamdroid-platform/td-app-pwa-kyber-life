@@ -14,6 +14,8 @@ interface ScanAccountBadgesProps {
      * número que no está registrado— se infiere del texto.
      */
     views?: ScannedAccountView[];
+    /** Nombre del perfil: un destino sin registrar a su nombre es suyo. */
+    ownerName?: string | null;
     className?: string;
     /**
      * Qué poner cuando el escáner no identificó ninguna cuenta. En la tarjeta
@@ -35,7 +37,7 @@ interface ScanAccountBadgesProps {
  * rol. Ahora es uno solo con el rol como dato, y lo comparten la tarjeta de
  * móvil y la tabla de escritorio.
  */
-export function ScanAccountBadges({ scan, views, className, emptyLabel }: ScanAccountBadgesProps) {
+export function ScanAccountBadges({ scan, views, ownerName, className, emptyLabel }: ScanAccountBadgesProps) {
     const accounts = extractScannedAccounts(scan);
     if (!accounts.source && !accounts.destination) {
         return emptyLabel ? <span className="text-[11.5px] text-muted-foreground">{emptyLabel}</span> : null;
@@ -44,10 +46,10 @@ export function ScanAccountBadges({ scan, views, className, emptyLabel }: ScanAc
     return (
         <div className={cn("flex flex-col gap-1.5", className)}>
             {accounts.source && (
-                <AccountRow role="SOURCE" account={accounts.source} scan={scan} view={viewFor(views, "SOURCE", accounts.source)} />
+                <AccountRow role="SOURCE" account={accounts.source} scan={scan} view={viewFor(views, "SOURCE", accounts.source)} ownerName={ownerName} />
             )}
             {accounts.destination && (
-                <AccountRow role="DESTINATION" account={accounts.destination} scan={scan} view={viewFor(views, "DESTINATION", accounts.destination)} />
+                <AccountRow role="DESTINATION" account={accounts.destination} scan={scan} view={viewFor(views, "DESTINATION", accounts.destination)} ownerName={ownerName} />
             )}
         </div>
     );
@@ -70,13 +72,15 @@ function AccountRow({
     account,
     scan,
     view,
+    ownerName,
 }: {
     role: "SOURCE" | "DESTINATION";
     account: string;
     scan: FinancialScannerTransaction;
     view: ScannedAccountView | null;
+    ownerName?: string | null;
 }) {
-    const info = resolveAccountBadgeInfo(role, account, scan, view);
+    const info = resolveAccountBadgeInfo(role, account, scan, view, ownerName);
     const isSource = role === "SOURCE";
     const Arrow = isSource ? ArrowUpRight : ArrowDownLeft;
 

@@ -95,3 +95,35 @@ describe("resolveAccountBadgeInfo — inferencia, solo sin registro", () => {
         expect(resolveAccountBadgeInfo("DESTINATION", "22XXXXXX58", TRANSFER).ownershipAcronym).toBe("TER");
     });
 });
+
+describe("resolveAccountBadgeInfo — el beneficiario es el propio usuario", () => {
+    const OWNER = "Fernando Xavier Garnica Bautista";
+
+    it("un destino sin registrar a nombre del usuario es suyo", () => {
+        expect(resolveAccountBadgeInfo("DESTINATION", "22XXXXXX58", TRANSFER, null, OWNER).ownershipAcronym).toBe("MIA");
+    });
+
+    it("lee el beneficiario también del cuerpo del correo", () => {
+        const scan = {
+            ...TRANSFER,
+            description: "Transferencia",
+            summary: "",
+            originStats: { emailBody: "Cuenta destino: 22XXXXXX58 Beneficiario cta. destino: XAVIER GARNICA Dispositivo: pixel" },
+        };
+        expect(resolveAccountBadgeInfo("DESTINATION", "22XXXXXX58", scan, null, OWNER).ownershipAcronym).toBe("MIA");
+    });
+
+    it("una transferencia del usuario a otra persona sigue siendo de un tercero", () => {
+        const scan = {
+            ...TRANSFER,
+            description: "Transferencia a MARCOS ISRAEL SOLIS JARA",
+            summary: "Se realizó una transferencia de $30.00 desde la cuenta de Fernando Xavier Garnica Bautista a Marcos Israel Solis Jara.",
+        };
+        expect(resolveAccountBadgeInfo("DESTINATION", "40XXXXXXXX00", scan, null, OWNER).ownershipAcronym).toBe("TER");
+    });
+
+    it("lo que el usuario declaró manda sobre el nombre", () => {
+        const declared = view({ ownership: "EXTERNAL" });
+        expect(resolveAccountBadgeInfo("DESTINATION", "22XXXXXX58", TRANSFER, declared, OWNER).ownershipAcronym).toBe("TER");
+    });
+});

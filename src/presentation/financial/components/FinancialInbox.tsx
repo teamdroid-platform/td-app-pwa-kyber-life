@@ -145,6 +145,7 @@ export function FinancialInbox() {
     // Se piden de nuevo cuando cambia el conjunto de escaneos: uno recién
     // llegado por realtime también tiene que salir con su tipo real.
     const [accountViews, setAccountViews] = useState<Record<string, ScannedAccountView[]>>({});
+    const [ownerName, setOwnerName] = useState<string | null>(null);
     const scanIdsKey = transactions.map((tx) => tx.id).join(",");
 
     useEffect(() => {
@@ -152,7 +153,10 @@ export function FinancialInbox() {
         let mounted = true;
         getInboxScannedAccountsAction()
             .then((result) => {
-                if (mounted && result.success) setAccountViews(result.data);
+                if (mounted && result.success) {
+                    setAccountViews(result.data.views);
+                    setOwnerName(result.data.ownerName);
+                }
             })
             // Sin la lectura, las insignias caen a la inferencia: la bandeja sigue siendo usable.
             .catch(() => {});
@@ -476,6 +480,7 @@ export function FinancialInbox() {
                         onApprove={handleConfirm}
                         onReject={handleDismiss}
                         accountViews={accountViews}
+                        ownerName={ownerName}
                     />
                 </div>
 
@@ -692,6 +697,7 @@ export function FinancialInbox() {
                                                     <ScanAccountBadges
                                                         scan={tx}
                                                         views={tx.id ? accountViews[tx.id] : undefined}
+                                                        ownerName={ownerName}
                                                         className="mt-2"
                                                     />
                                                 </div>
