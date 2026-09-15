@@ -2,11 +2,20 @@
 
 import { ArrowUpRight, ArrowDownLeft } from "lucide-react";
 import type { FinancialScannerTransaction } from "@/domain/entities/financial";
+import type { ScannedAccountView } from "@/application/services/bank-service";
 import { extractScannedAccounts, resolveAccountBadgeInfo } from "../lib/scan-accounts";
 import { cn } from "@/lib/utils";
 
 interface ScanAccountBadgesProps {
     scan: FinancialScannerTransaction;
+    /**
+     * Los números del escaneo resueltos contra las cuentas del usuario. Con
+     * ellos, una cuenta registrada muestra su tipo real; sin ellos —o para un
+     * número que no está registrado— se infiere del texto.
+     */
+    views?: ScannedAccountView[];
+    /** Nombre del perfil: un destino sin registrar a su nombre es suyo. */
+    ownerName?: string | null;
     className?: string;
     /**
      * Qué poner cuando el escáner no identificó ninguna cuenta. En la tarjeta
@@ -28,7 +37,7 @@ interface ScanAccountBadgesProps {
  * rol. Ahora es uno solo con el rol como dato, y lo comparten la tarjeta de
  * móvil y la tabla de escritorio.
  */
-export function ScanAccountBadges({ scan, className, emptyLabel }: ScanAccountBadgesProps) {
+export function ScanAccountBadges({ scan, views, ownerName, className, emptyLabel }: ScanAccountBadgesProps) {
     const accounts = extractScannedAccounts(scan);
     if (!accounts.source && !accounts.destination) {
         return emptyLabel ? <span className="text-[11.5px] text-muted-foreground">{emptyLabel}</span> : null;
@@ -36,22 +45,42 @@ export function ScanAccountBadges({ scan, className, emptyLabel }: ScanAccountBa
 
     return (
         <div className={cn("flex flex-col gap-1.5", className)}>
-            {accounts.source && <AccountRow role="SOURCE" account={accounts.source} scan={scan} />}
-            {accounts.destination && <AccountRow role="DESTINATION" account={accounts.destination} scan={scan} />}
+            {accounts.source && (
+                <AccountRow role="SOURCE" account={accounts.source} scan={scan} view={viewFor(views, "SOURCE", accounts.source)} ownerName={ownerName} />
+            )}
+            {accounts.destination && (
+                <AccountRow role="DESTINATION" account={accounts.destination} scan={scan} view={viewFor(views, "DESTINATION", accounts.destination)} ownerName={ownerName} />
+            )}
         </div>
     );
+}
+
+/**
+ * La lectura del servidor para un número. Se busca por la cadena del banco y,
+ * si el mismo número sale en los dos lados, por el lado también.
+ */
+function viewFor(
+    views: ScannedAccountView[] | undefined, role: "SOURCE" | "DESTINATION", account: string,
+): ScannedAccountView | null {
+    const raw = account.trim();
+    const same = views?.filter(v => v.raw === raw) ?? [];
+    return same.find(v => v.role === role) ?? same[0] ?? null;
 }
 
 function AccountRow({
     role,
     account,
     scan,
+    view,
+    ownerName,
 }: {
     role: "SOURCE" | "DESTINATION";
     account: string;
     scan: FinancialScannerTransaction;
+    view: ScannedAccountView | null;
+    ownerName?: string | null;
 }) {
-    const info = resolveAccountBadgeInfo(role, account, scan);
+    const info = resolveAccountBadgeInfo(role, account, scan, view, ownerName);
     const isSource = role === "SOURCE";
     const Arrow = isSource ? ArrowUpRight : ArrowDownLeft;
 

@@ -22,6 +22,8 @@ import {
     dismissInboxTransactionAction,
 } from "@/app/actions/financial-inbox";
 import { getInstitutionsAction } from "@/app/actions/financial-settings";
+import { getInboxScannedAccountsAction } from "@/app/actions/bank";
+import type { ScannedAccountView } from "@/application/services/bank-service";
 import { getInstitutionMatchInfo, INSTITUTION_MATCH_THRESHOLD } from "@/lib/institution-match";
 import { isTransactionPaidWithCredit } from "@/lib/financial-utils";
 import { InstitutionMatchBadge } from "./InstitutionMatchBadge";
@@ -138,6 +140,30 @@ export function FinancialInbox() {
             mounted = false;
         };
     }, []);
+
+    // Las cuentas de cada escaneo contra las que el usuario ya tiene en Bancos.
+    // Se piden de nuevo cuando cambia el conjunto de escaneos: uno recién
+    // llegado por realtime también tiene que salir con su tipo real.
+    const [accountViews, setAccountViews] = useState<Record<string, ScannedAccountView[]>>({});
+    const [ownerName, setOwnerName] = useState<string | null>(null);
+    const scanIdsKey = transactions.map((tx) => tx.id).join(",");
+
+    useEffect(() => {
+        if (!scanIdsKey) return;
+        let mounted = true;
+        getInboxScannedAccountsAction()
+            .then((result) => {
+                if (mounted && result.success) {
+                    setAccountViews(result.data.views);
+                    setOwnerName(result.data.ownerName);
+                }
+            })
+            // Sin la lectura, las insignias caen a la inferencia: la bandeja sigue siendo usable.
+            .catch(() => {});
+        return () => {
+            mounted = false;
+        };
+    }, [scanIdsKey]);
 
     const loadInbox = useCallback(async (options?: { silent?: boolean; mergeNewOnly?: boolean }) => {
         const { silent = false, mergeNewOnly = false } = options ?? {};
@@ -453,6 +479,8 @@ export function FinancialInbox() {
                         processing={processing}
                         onApprove={handleConfirm}
                         onReject={handleDismiss}
+                        accountViews={accountViews}
+                        ownerName={ownerName}
                     />
                 </div>
 
@@ -666,7 +694,12 @@ export function FinancialInbox() {
                                                     </div>
 
                                                     {/* Origen y destino, compartido con la tabla de escritorio. */}
-                                                    <ScanAccountBadges scan={tx} className="mt-2" />
+                                                    <ScanAccountBadges
+                                                        scan={tx}
+                                                        views={tx.id ? accountViews[tx.id] : undefined}
+                                                        ownerName={ownerName}
+                                                        className="mt-2"
+                                                    />
                                                 </div>
                                             </div>
 

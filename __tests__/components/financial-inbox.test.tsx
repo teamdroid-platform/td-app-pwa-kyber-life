@@ -8,6 +8,7 @@ import {
     dismissInboxTransactionAction,
 } from "@/app/actions/financial-inbox";
 import { getInstitutionsAction } from "@/app/actions/financial-settings";
+import { getInboxScannedAccountsAction } from "@/app/actions/bank";
 import type { FinancialScannerTransaction } from "@/domain/entities/financial";
 
 jest.mock("next/navigation", () => ({
@@ -23,6 +24,10 @@ jest.mock("@/app/actions/financial-inbox", () => ({
 
 jest.mock("@/app/actions/financial-settings", () => ({
     getInstitutionsAction: jest.fn(),
+}));
+
+jest.mock("@/app/actions/bank", () => ({
+    getInboxScannedAccountsAction: jest.fn(),
 }));
 
 jest.mock("@/presentation/financial/hooks/useFinancialRealtime", () => ({
@@ -80,6 +85,7 @@ describe("FinancialInbox", () => {
             get: jest.fn().mockReturnValue(null),
         });
         (getInstitutionsAction as jest.Mock).mockResolvedValue([]);
+        (getInboxScannedAccountsAction as jest.Mock).mockResolvedValue({ success: true, data: { views: {}, ownerName: null } });
     });
 
     it("displays the RobotLoader with 'Cargando datos...' while fetching transactions", () => {
@@ -151,6 +157,72 @@ describe("FinancialInbox", () => {
         const table = within(screen.getByTestId("inbox-table"));
         expect(table.getByTitle("Origen")).toBeInTheDocument();
         expect(table.getByTitle("Destino")).toBeInTheDocument();
+    });
+
+    it("labels scanned accounts with the user's registered accounts before guessing from text", async () => {
+        // El caso real: dos cuentas de ahorros del usuario salían como TDE —«Ltda.»
+        // contiene «td»— y el destino, que también es suyo, como TER.
+        const transfer: FinancialScannerTransaction = {
+            ...SCAN_ITEM_WITH_ACCOUNTS,
+            id: "scan-coop",
+            merchant: "Cooperativa de Ahorro y Crédito Jardín Azuayo Ltda.",
+            description: "Transferencia a la cuenta de Xavier Garnica",
+            summary: "Se realizó una transferencia de 53.00 USD a la cuenta de Xavier Garnica.",
+            accounts: [
+                { type: "origen", account: "25XXX10" },
+                { type: "destino", account: "22XXXXXX58" },
+            ],
+        };
+        const registered = (role: "SOURCE" | "DESTINATION", raw: string, id: string) => ({
+            role, raw, display: raw, kind: "ACCOUNT", resolution: "INFERRED",
+            match: { id, typeLabel: "Ahorros", typeAcronym: "AHO", institutionName: null },
+            institutionHint: null, ownership: null, decision: null,
+        });
+
+        (getUnprocessedInboxTransactionsAction as jest.Mock).mockResolvedValue({ success: true, data: [transfer] });
+        (getInboxScannedAccountsAction as jest.Mock).mockResolvedValue({
+            success: true,
+            data: { ownerName: null, views: {
+                "scan-coop": [
+                    registered("SOURCE", "25XXX10", "acc-coop"),
+                    registered("DESTINATION", "22XXXXXX58", "acc-pichincha"),
+                ],
+            } },
+        });
+
+        render(<FinancialInbox />);
+
+        const cards = within(await screen.findByTestId("inbox-cards"));
+        await waitFor(() => expect(cards.getAllByText("AHO")).toHaveLength(2));
+        expect(cards.getAllByText("MIA")).toHaveLength(2);
+        expect(cards.queryByText("TDE")).not.toBeInTheDocument();
+        expect(cards.queryByText("TER")).not.toBeInTheDocument();
+
+        const table = within(screen.getByTestId("inbox-table"));
+        expect(table.getAllByText("AHO")).toHaveLength(2);
+    });
+
+    it("marks an unregistered destination as the user's own when it goes to their name", async () => {
+        const transfer: FinancialScannerTransaction = {
+            ...SCAN_ITEM_WITH_ACCOUNTS,
+            id: "scan-own",
+            merchant: "Cooperativa de Ahorro y Crédito Jardín Azuayo Ltda.",
+            description: "Transferencia a la cuenta de Xavier Garnica",
+            summary: "Se realizó una transferencia desde la cuenta de Fernando Xavier Garnica Bautista a la cuenta de Xavier Garnica.",
+            accounts: [{ type: "destino", account: "22XXXXXX58" }],
+        };
+
+        (getUnprocessedInboxTransactionsAction as jest.Mock).mockResolvedValue({ success: true, data: [transfer] });
+        (getInboxScannedAccountsAction as jest.Mock).mockResolvedValue({
+            success: true,
+            data: { views: {}, ownerName: "Fernando Xavier Garnica Bautista" },
+        });
+
+        render(<FinancialInbox />);
+
+        const cards = within(await screen.findByTestId("inbox-cards"));
+        expect(await cards.findByText("MIA")).toBeInTheDocument();
+        expect(cards.queryByText("TER")).not.toBeInTheDocument();
     });
 
     it("opens the detail form via Enter key", async () => {

@@ -1,5 +1,7 @@
 import type { FinancialScannerTransaction } from "@/domain/entities/financial";
+import type { ScannedAccountView } from "@/application/services/bank-service";
 import { isTransactionPaidWithCredit } from "@/lib/financial-utils";
+import { beneficiaryIsOwner } from "@/lib/beneficiary-owner";
 
 /**
  * Cómo se leen las cuentas de origen y destino que el escáner extrajo del
@@ -85,69 +87,104 @@ function formatMaskedNumber(acc: string): string {
 export interface AccountBadgeInfo {
     raw: string;
     formattedNumber: string;
-    typeAcronym: "TCR" | "TDE" | "AHO" | "CTE" | "EFE" | "INV" | "CTA";
+    /** TCR, TDE, AHO, CTE, EFE, INV — o CTA cuando no se sabe. */
+    typeAcronym: string;
     ownershipAcronym: "MIA" | "TER";
 }
 
+/**
+ * Si el texto nombra alguna de las palabras, completa.
+ *
+ * Contra la subcadena: «ltda» contiene «td» y «Cooperativa de Ahorro y Crédito»
+ * contiene «crédito», y así dos cuentas de ahorros salían como tarjetas de
+ * débito.
+ */
+function mentions(text: string, words: readonly string[]): boolean {
+    return words.some(word => new RegExp(String.raw`(^|[^\p{L}\p{N}])${word}(?=$|[^\p{L}\p{N}])`, "u").test(text));
+}
+
+/**
+ * «Ahorro y crédito» es el apellido de las cooperativas, no el tipo de la
+ * cuenta: se quita antes de buscar tipos en el texto.
+ */
+const COOPERATIVE_NAME = /ahorros?\s+y\s+cr[eé]dito/gu;
+
+/** El tipo que el texto del escaneo sugiere. Solo para números sin registrar. */
+function inferTypeAcronym(accountNumber: string, tx: FinancialScannerTransaction): string {
+    const text = `${accountNumber} ${tx.merchant || ""} ${tx.description || ""} ${tx.summary || ""}`
+        .toLowerCase()
+        .replace(COOPERATIVE_NAME, " ");
+
+    const debit = mentions(text, ["débito", "debito", "tde", "td"]);
+    if (debit) return "TDE";
+
+    const credit = isTransactionPaidWithCredit(tx)
+        || mentions(text, ["crédito", "credito", "mastercard", "visa", "diners", "amex", "tcr", "tc"]);
+    if (credit) return "TCR";
+
+    if (mentions(text, ["ahorros?", "aho"])) return "AHO";
+    if (mentions(text, ["corriente", "cte"])) return "CTE";
+    if (mentions(text, ["efectivo", "efe"])) return "EFE";
+    if (mentions(text, ["inversión", "inversion", "inv"])) return "INV";
+    return "CTA";
+}
+
+/** De quién sugiere el texto que es la cuenta. Solo para números sin registrar. */
+function inferOwnership(
+    role: "SOURCE" | "DESTINATION", tx: FinancialScannerTransaction, ownerName?: string | null,
+): "MIA" | "TER" {
+    // El origen casi siempre es del usuario: solo se envía dinero desde lo propio.
+    if (role === "SOURCE") return "MIA";
+
+    const text = `${tx.merchant || ""} ${tx.description || ""} ${tx.summary || ""}`.toLowerCase();
+    if (mentions(text, ["entre mis cuentas", "propia", "mismo titular", "ahorro personal", "mía", "mia"])) {
+        return "MIA";
+    }
+
+    // Una transferencia a una cuenta propia que aún no está en Bancos: el
+    // comprobante la pone a nombre del usuario. El cuerpo del correo cuenta,
+    // porque es donde el banco escribe la línea de beneficiario.
+    const emailBody = typeof tx.originStats?.emailBody === "string" ? tx.originStats.emailBody : "";
+    return beneficiaryIsOwner(`${tx.description || ""}\n${tx.summary || ""}\n${emailBody}`, ownerName) === true
+        ? "MIA"
+        : "TER";
+}
+
+/**
+ * Qué es una cuenta del escaneo y de quién, para sus insignias.
+ *
+ * Primero la base: si el número corresponde a una cuenta o tarjeta que el
+ * usuario ya tiene —`view.match`, resuelto contra sus identidades—, su tipo es
+ * el registrado y la cuenta es suya. Solo cuando no hay registro se infiere
+ * del texto, que es una suposición y se equivoca: el nombre del banco, el
+ * resumen del escáner y el número comparten un mismo texto.
+ */
 export function resolveAccountBadgeInfo(
     role: "SOURCE" | "DESTINATION",
     accountNumber: string,
-    tx: FinancialScannerTransaction
+    tx: FinancialScannerTransaction,
+    view?: ScannedAccountView | null,
+    /** Nombre del perfil, para reconocer al usuario como beneficiario. */
+    ownerName?: string | null,
 ): AccountBadgeInfo {
-    const formatted = formatMaskedNumber(accountNumber);
-    const combinedContext = `${accountNumber} ${tx.merchant || ""} ${tx.description || ""} ${tx.summary || ""}`.toLowerCase();
+    const formattedNumber = formatMaskedNumber(accountNumber);
 
-    // Type detection (TCR, TDE, AHO, CTE, CTA)
-    let typeAcronym: "TCR" | "TDE" | "AHO" | "CTE" | "EFE" | "INV" | "CTA" = "CTA";
-    if (
-        isTransactionPaidWithCredit(tx) ||
-        combinedContext.includes("crédito") ||
-        combinedContext.includes("credito") ||
-        combinedContext.includes("mastercard") ||
-        combinedContext.includes("visa") ||
-        combinedContext.includes("diners") ||
-        combinedContext.includes("amex") ||
-        combinedContext.includes("tcr") ||
-        combinedContext.includes("tc")
-    ) {
-        if (combinedContext.includes("débito") || combinedContext.includes("debito") || combinedContext.includes("tde") || combinedContext.includes("td")) {
-            typeAcronym = "TDE";
-        } else {
-            typeAcronym = "TCR";
-        }
-    } else if (combinedContext.includes("débito") || combinedContext.includes("debito") || combinedContext.includes("tde") || combinedContext.includes("td")) {
-        typeAcronym = "TDE";
-    } else if (combinedContext.includes("ahorro") || combinedContext.includes("aho")) {
-        typeAcronym = "AHO";
-    } else if (combinedContext.includes("corriente") || combinedContext.includes("cte")) {
-        typeAcronym = "CTE";
-    } else if (combinedContext.includes("efectivo") || combinedContext.includes("efe")) {
-        typeAcronym = "EFE";
-    } else if (combinedContext.includes("inversi") || combinedContext.includes("inv")) {
-        typeAcronym = "INV";
+    if (view?.match) {
+        return {
+            raw: accountNumber,
+            formattedNumber,
+            typeAcronym: view.match.typeAcronym,
+            ownershipAcronym: "MIA",
+        };
     }
 
-    // Ownership detection:
-    // If source, almost always the user's own account -> MIA
-    // If destination, check if own transfer or third party -> TER
-    let ownershipAcronym: "MIA" | "TER" = role === "SOURCE" ? "MIA" : "TER";
-    if (role === "DESTINATION") {
-        if (
-            combinedContext.includes("entre mis cuentas") ||
-            combinedContext.includes("propia") ||
-            combinedContext.includes("mismo titular") ||
-            combinedContext.includes("ahorro personal") ||
-            combinedContext.includes("mía") ||
-            combinedContext.includes("mia")
-        ) {
-            ownershipAcronym = "MIA";
-        }
-    }
+    // Lo que el usuario ya dijo del número manda sobre lo que sugiera el texto.
+    const declared = view?.ownership ? (view.ownership === "MINE" ? "MIA" : "TER") : null;
 
     return {
         raw: accountNumber,
-        formattedNumber: formatted,
-        typeAcronym,
-        ownershipAcronym,
+        formattedNumber,
+        typeAcronym: inferTypeAcronym(accountNumber, tx),
+        ownershipAcronym: declared ?? inferOwnership(role, tx, ownerName),
     };
 }

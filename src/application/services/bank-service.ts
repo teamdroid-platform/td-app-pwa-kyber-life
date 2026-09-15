@@ -26,7 +26,7 @@ import {
 } from "@/domain/services/card-payment-detection";
 import { ISSUER_NAME, inferInstitutionKind } from "@/lib/bank-institution-kind";
 import { parseBankNumber } from "@/lib/bank-number-fingerprint";
-import { resolveFingerprint, type Resolution } from "@/lib/bank-number-match";
+import { resolveFingerprint, type IdentityCandidate, type Resolution } from "@/lib/bank-number-match";
 import { formatBankNumber } from "@/lib/format-bank-number";
 import { cardLabel, identityAcronym, identityTypeLabel } from "@/lib/bank-identity-label";
 import { BankIdentificationService } from "./bank-identification-service";
@@ -318,6 +318,14 @@ export interface ScannedAccountView {
     decision: ScannedAccountDecision | null;
 }
 
+/** Las identidades del usuario, leídas una vez para resolver varios números. */
+interface PreviewContext {
+    candidates: IdentityCandidate[];
+    accounts: BankAccount[];
+    cards: BankCard[];
+    institutions: BankInstitution[];
+}
+
 /** Sufijo mínimo para fundar una identidad sin preguntar. */
 const AUTOCREATE_MIN_SUFFIX = 4;
 
@@ -439,15 +447,51 @@ export class BankService {
         userId: UUID, entries: readonly ScannedAccountEntry[],
         ownership?: OwnershipByRaw | null,
     ): Promise<ScannedAccountView[]> {
-        const usable = entries.filter(e => e.account?.trim());
-        if (usable.length === 0) return [];
+        if (!entries.some(e => e.account?.trim())) return [];
+        return this.scannedAccountViews(entries, await this.previewContext(userId), ownership);
+    }
 
+    /**
+     * Lo mismo para muchos escaneos a la vez, indexado por el id de cada uno.
+     *
+     * La bandeja pinta decenas de escaneos: pedir las identidades del usuario
+     * una vez por escaneo multiplicaba las lecturas por fila. Se leen una sola
+     * vez y cada escaneo se resuelve contra ellas. Tampoco escribe nada.
+     */
+    async previewScannedAccountsBatch(
+        userId: UUID,
+        scans: readonly { id: string; accounts?: readonly ScannedAccountEntry[] | null }[],
+    ): Promise<Record<string, ScannedAccountView[]>> {
+        const result: Record<string, ScannedAccountView[]> = {};
+        for (const scan of scans) result[scan.id] = [];
+
+        const withAccounts = scans.filter(s => s.accounts?.some(e => e.account?.trim()));
+        if (withAccounts.length === 0) return result;
+
+        const context = await this.previewContext(userId);
+        for (const scan of withAccounts) {
+            result[scan.id] = this.scannedAccountViews(scan.accounts ?? [], context);
+        }
+        return result;
+    }
+
+    /** Lo que hace falta leer para resolver números sin escribir nada. */
+    private async previewContext(userId: UUID): Promise<PreviewContext> {
         const [candidates, accounts, cards, institutions] = await Promise.all([
             this.identification.identityCandidates(userId),
             this.accounts.findByOwnerId(userId),
             this.cards.findByOwnerId(userId),
             this.institutions.findByOwnerId(userId),
         ]);
+        return { candidates, accounts, cards, institutions };
+    }
+
+    private scannedAccountViews(
+        entries: readonly ScannedAccountEntry[],
+        { candidates, accounts, cards, institutions }: PreviewContext,
+        ownership?: OwnershipByRaw | null,
+    ): ScannedAccountView[] {
+        const usable = entries.filter(e => e.account?.trim());
 
         const institutionName = (id: UUID | null | undefined) =>
             institutions.find(i => i.id === id)?.name ?? null;
