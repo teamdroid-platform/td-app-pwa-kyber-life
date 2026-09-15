@@ -85,6 +85,23 @@ export async function getScannedAccountsPreviewAction(scannerTransactionId: stri
     });
 }
 
+/**
+ * Las cuentas de todos los escaneos pendientes de la bandeja, por id de escaneo.
+ *
+ * Sin argumentos por lo mismo que la de arriba: lee los escaneos guardados bajo
+ * el dueño, no los que el cliente diga. Una sola lectura de las identidades
+ * para toda la bandeja, y ninguna escritura.
+ */
+export async function getInboxScannedAccountsAction() {
+    return run("getInboxScannedAccounts", async userId => {
+        const scans = await financialScannerTransactionRepository.findUnprocessedByOwnerId(userId);
+        return bankService.previewScannedAccountsBatch(
+            userId,
+            scans.flatMap(scan => (scan.id ? [{ id: scan.id, accounts: scan.accounts }] : [])),
+        );
+    });
+}
+
 export async function getBankAccountDetailAction(accountId: string) {
     return run("getBankAccountDetail", async userId => {
         const data = await bankService.getAccountDetail(userId, idSchema.parse(accountId));

@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowDown, ArrowUp, ChevronsUpDown, ChevronLeft, ChevronRight, Check, X, Loader2 } from "lucide-react";
 import type { FinancialScannerTransaction } from "@/domain/entities/financial";
+import type { ScannedAccountView } from "@/application/services/bank-service";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { ScanAccountBadges } from "./ScanAccountBadges";
@@ -16,6 +17,8 @@ interface ScanTableProps {
     processing: { id: string; action: "confirm" | "dismiss" } | null;
     onApprove: (scan: FinancialScannerTransaction) => void;
     onReject: (id: string) => void;
+    /** Las cuentas de cada escaneo resueltas contra las del usuario, por id. */
+    accountViews?: Record<string, ScannedAccountView[]>;
 }
 
 const COLUMNS: { key: string; label: string; sortField?: ScanSortField; align?: "right" | "center" }[] = [
@@ -57,7 +60,7 @@ function dayParts(value?: string | null): { day: string; monthYear: string } {
  * El orden y la paginación se resuelven aquí porque la pantalla ya tiene todos
  * los escaneos pendientes cargados: ordenar lo que tiene es ordenar el total.
  */
-export function ScanTable({ scans, processing, onApprove, onReject }: ScanTableProps) {
+export function ScanTable({ scans, processing, onApprove, onReject, accountViews }: ScanTableProps) {
     const [sort, setSort] = useState<ScanSort>({ field: "date", direction: "desc" });
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(10);
@@ -175,7 +178,11 @@ export function ScanTable({ scans, processing, onApprove, onReject }: ScanTableP
                                             dónde entró es la mitad de lo que hay que revisar antes de
                                             aprobar. Cuando el escáner no identificó ninguna, la celda
                                             lo dice en vez de quedarse muda. */}
-                                        <ScanAccountBadges scan={scan} emptyLabel="Sin cuenta identificada" />
+                                        <ScanAccountBadges
+                                            scan={scan}
+                                            views={scan.id ? accountViews?.[scan.id] : undefined}
+                                            emptyLabel="Sin cuenta identificada"
+                                        />
                                     </td>
 
                                     <td className="px-4 py-3 text-right align-top">

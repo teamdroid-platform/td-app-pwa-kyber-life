@@ -301,3 +301,44 @@ describe("previewScannedAccounts — bordes", () => {
         expect(vista.match).toBeNull();
     });
 });
+
+describe("previewScannedAccountsBatch — la bandeja entera de una vez", () => {
+    it("devuelve las cuentas de cada escaneo bajo su id", async () => {
+        const { service, cuenta } = await withIdentities();
+
+        const vistas = await service.previewScannedAccountsBatch(USER, [
+            { id: "scan-a", accounts: [{ type: "origen", account: "AHO - XXXXXX0814" }] },
+            { id: "scan-b", accounts: [{ type: "destino", account: "XXXXXX1582" }] },
+        ]);
+
+        expect(vistas["scan-a"][0].match?.id).toBe(cuenta.id);
+        expect(vistas["scan-b"][0].match).toBeNull();
+    });
+
+    it("un escaneo sin cuentas queda con la lista vacía, no ausente", async () => {
+        const { service } = await withIdentities();
+
+        const vistas = await service.previewScannedAccountsBatch(USER, [
+            { id: "scan-a", accounts: null },
+        ]);
+
+        expect(vistas).toEqual({ "scan-a": [] });
+    });
+
+    it("reconoce un número por lo que la cuenta aprendió de escaneos anteriores", async () => {
+        // El caso real: la cuenta se registró con sus cuatro últimos, y un
+        // escaneo ya la ligó con el número completo. Uno nuevo enmascarado con
+        // otro formato tiene que caer en la misma cuenta.
+        const { service, identification, banco } = await withIdentities();
+        const pichincha = await service.createAccount(USER, {
+            institutionId: banco.id, accountType: "SAVINGS", lastFour: "9558",
+        });
+        await identification.observe(USER, "2204339558");
+
+        const vistas = await service.previewScannedAccountsBatch(USER, [
+            { id: "scan-a", accounts: [{ type: "destino", account: "22XXXXXX58" }] },
+        ]);
+
+        expect(vistas["scan-a"][0].match).toMatchObject({ id: pichincha.id, typeAcronym: "AHO" });
+    });
+});
