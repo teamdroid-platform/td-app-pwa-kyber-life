@@ -8,7 +8,7 @@ import { Toaster } from "@/components/ui/sonner";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "KYBERLIFE",
+  title: "KyberLife",
   description: "Personal Web Platform",
   manifest: "/manifest.json",
   icons: {
