@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"C:/Users/XAVIER GARNICA/.local/bin/graphify.EXE\" hook-guard search"
+            "command": "sh \"${CLAUDE_PROJECT_DIR}/.claude/hooks/graphify-guard.sh\" search"
           }
         ]
       },
@@ -15,10 +15,21 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"C:/Users/XAVIER GARNICA/.local/bin/graphify.EXE\" hook-guard read"
+            "command": "sh \"${CLAUDE_PROJECT_DIR}/.claude/hooks/graphify-guard.sh\" read"
           }
         ]
       }
     ]
+  },
+  "extraKnownMarketplaces": {
+    "claude-plugins-official": {
+      "source": {
+        "source": "github",
+        "repo": "anthropics/claude-plugins-official"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "superpowers@claude-plugins-official": true
   }
 }
