@@ -94,6 +94,31 @@ describe("TransactionCard", () => {
         expect(screen.queryByText("TC")).not.toBeInTheDocument();
     });
 
+    describe("saldo corriente", () => {
+        it("no lo dibuja cuando la pantalla no lo trae", () => {
+            render(<TransactionCard transaction={TRANSACTION} />);
+
+            expect(screen.queryByText(/Saldo acumulado/)).not.toBeInTheDocument();
+        });
+
+        it("muestra la cifra sin la palabra 'saldo' a la vista", () => {
+            render(<TransactionCard transaction={TRANSACTION} running={{ balance: -2978.09, moved: true }} />);
+
+            // La cifra se ve; la palabra que la nombra solo la oye un lector de
+            // pantalla, que es justo lo que se pidió.
+            expect(screen.getByText("-2.978,09")).toBeInTheDocument();
+            expect(screen.getByTitle("Saldo acumulado")).toBeInTheDocument();
+        });
+
+        it("atenúa y explica el saldo de un movimiento que no lo cambió", () => {
+            render(<TransactionCard transaction={TRANSACTION} running={{ balance: -2965.86, moved: false }} />);
+
+            const saldo = screen.getByTitle(/este movimiento no lo cambió/);
+            expect(saldo).toHaveTextContent("-2.965,86");
+            expect(saldo.className).toContain("text-muted-foreground/55");
+        });
+    });
+
     it("does not render the TC badge for regular debit transactions", () => {
         render(<TransactionCard transaction={{
             ...TRANSACTION,

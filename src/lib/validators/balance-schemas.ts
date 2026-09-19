@@ -11,6 +11,13 @@ export const balanceRangeSchema = z.object({
     endDate: z.string().datetime().optional(),
 });
 
+/**
+ * El interruptor del saldo corriente. Un booleano suelto igual pasa por el
+ * borde de la action: lo que llega del cliente se valida, sin excepciones por
+ * ser un solo dato.
+ */
+export const showRunningBalanceSchema = z.boolean();
+
 export const balanceScopeRuleSchema = z.object({
     targetType: z.enum(['INSTITUTION', 'ACCOUNT', 'CARD']),
     targetId: z.string().uuid(),

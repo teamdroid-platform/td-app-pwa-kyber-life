@@ -55,12 +55,21 @@ function formatCurrency(amount: number, currency: string): string {
 interface TransactionSummaryProps {
     transactions: FinancialTransaction[];
     balances?: BalanceSet | null;
+    /**
+     * El modo del selector, que ahora manda quien envuelve: la lista pinta el
+     * saldo corriente de cada fila con este mismo modo, así que el estado no
+     * puede vivir dentro del chip.
+     */
+    balanceMode?: BalanceMode;
+    onBalanceModeChange?: (mode: BalanceMode) => void;
     rangeLabel?: string;
 }
 
 type ViewMode = 'day' | 'week' | 'month';
 
-export function TransactionSummary({ transactions, balances, rangeLabel }: TransactionSummaryProps) {
+export function TransactionSummary({
+    transactions, balances, balanceMode: controlledMode, onBalanceModeChange, rangeLabel,
+}: TransactionSummaryProps) {
     const [viewMode, setViewMode] = useState<ViewMode>('day');
     const [isExpanded, setIsExpanded] = useState(false);
     const [isDesktopExpanded, setIsDesktopExpanded] = useState(false);
@@ -71,7 +80,12 @@ export function TransactionSummary({ transactions, balances, rangeLabel }: Trans
     // El modo del selector de balance: arranca en el de ajustes y no se
     // recuerda entre cargas. Solo importa cuando `balances` viene — sin él,
     // el chip sigue el cálculo local de siempre.
-    const [balanceMode, setBalanceMode] = useState<BalanceMode>(() => balances?.defaultMode ?? DEFAULT_BALANCE_MODE);
+    //
+    // Se queda como estado propio para quien monte este componente suelto; si
+    // le llega desde fuera, manda el de fuera y este no se usa.
+    const [ownMode, setOwnMode] = useState<BalanceMode>(() => balances?.defaultMode ?? DEFAULT_BALANCE_MODE);
+    const balanceMode = controlledMode ?? ownMode;
+    const setBalanceMode = onBalanceModeChange ?? setOwnMode;
     // On touch there is no "mouse leave" to close the tooltip, so make it dismissable.
     const { containerRef, tooltipActive, handlePointerDown } = useChartTooltipDismiss();
 

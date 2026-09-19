@@ -7,8 +7,10 @@ import { BALANCE_MODES } from "@/domain/entities/balance";
 import { resolveScope } from "@/domain/services/balance-scope";
 import {
     setBalanceDefaultModeAction, setBalanceScopeRuleAction, clearBalanceScopeAction,
+    setShowRunningBalanceAction,
 } from "@/app/actions/balance";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -32,6 +34,8 @@ interface ScopeItem {
 
 interface BalanceScopeManagerProps {
     defaultMode: BalanceMode;
+    /** Si la lista de transacciones muestra el saldo acumulado bajo cada monto. */
+    showRunningBalance: boolean;
     initialRules: BalanceScopeRule[];
     institutions: { id: string; name: string }[];
     accounts: ScopeItem[];
@@ -45,9 +49,10 @@ interface BalanceScopeManagerProps {
  * heredan, así que una cuenta que el escáner cree mañana entra sola.
  */
 export function BalanceScopeManager({
-    defaultMode, initialRules, institutions, accounts, cards,
+    defaultMode, showRunningBalance, initialRules, institutions, accounts, cards,
 }: BalanceScopeManagerProps) {
     const [mode, setMode] = useState<BalanceMode>(defaultMode);
+    const [showRunning, setShowRunning] = useState(showRunningBalance);
     const [rules, setRules] = useState<BalanceScopeRule[]>(initialRules);
     const [expanded, setExpanded] = useState<string | null>(null);
 
@@ -94,6 +99,13 @@ export function BalanceScopeManager({
         if (!result.success) setMode(previous);
     }
 
+    async function changeShowRunning(next: boolean) {
+        const previous = showRunning;
+        setShowRunning(next);
+        const result = await setShowRunningBalanceAction(next);
+        if (!result.success) setShowRunning(previous);
+    }
+
     async function reset() {
         const previous = rules;
         setRules([]);
@@ -134,6 +146,27 @@ export function BalanceScopeManager({
                         </label>
                     ))}
                 </div>
+            </section>
+
+            <section className="space-y-3">
+                <h3 className="text-sm font-semibold text-text-primary">Saldo corriente en la lista</h3>
+                <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-border/40 bg-bg-secondary/40 p-3">
+                    <span className="flex flex-1 flex-col gap-0.5">
+                        <span className="text-sm font-medium text-text-primary">
+                            Mostrar el saldo bajo cada monto
+                        </span>
+                        <span className="text-xs leading-snug text-text-secondary">
+                            La lista se lee como un libro diario: cada fila trae el saldo acumulado
+                            del rango. Sigue al balance elegido arriba, así que con «Del periodo»
+                            los consumos con tarjeta no mueven el saldo y con «Con tarjetas» sí.
+                        </span>
+                    </span>
+                    <Switch
+                        checked={showRunning}
+                        onChange={changeShowRunning}
+                        label="Mostrar el saldo bajo cada monto"
+                    />
+                </label>
             </section>
 
             <section className="space-y-3">

@@ -6,12 +6,14 @@ import { ArrowDown, ArrowUp, ChevronsUpDown, CreditCard, AlertCircle } from "luc
 import type { FinancialTransaction } from "@/domain/entities/financial";
 import { TRANSACTION_SORT_FIELDS, type TransactionSortField } from "@/domain/pagination";
 import { isTransactionPaidWithCredit } from "@/lib/financial-utils";
+import type { RunningBalanceEntry } from "@/domain/services/financial-balance";
 import { cn } from "@/lib/utils";
 import { TransactionRowMenu } from "./TransactionRowMenu";
 import {
     typeStyleOf,
     amountSignOf,
     formatAmount,
+    formatRunningBalance,
     formatTime,
     formatDayParts,
     getFallbackDescription,
@@ -19,12 +21,25 @@ import {
 
 interface TransactionTableProps {
     transactions: FinancialTransaction[];
+    /**
+     * El saldo acumulado por id, cuando el usuario encendió el saldo
+     * corriente. Sin él la tabla no dibuja su columna: aquí sí cabe el
+     * encabezado, así que la palabra "Saldo" la pone la columna y no cada fila.
+     */
+    running?: Record<string, RunningBalanceEntry>;
     onStatusChange: (id: string, status: FinancialTransaction["status"]) => void;
     onDeleted: (id: string) => void;
 }
 
+interface Column {
+    key: string;
+    label: string;
+    sortField?: TransactionSortField;
+    align?: "right";
+}
+
 /** Las columnas, y cuáles se pueden ordenar. */
-const COLUMNS: { key: string; label: string; sortField?: TransactionSortField; align?: "right" }[] = [
+const COLUMNS: Column[] = [
     { key: "date", label: "Fecha", sortField: "date" },
     { key: "description", label: "Descripción", sortField: "description" },
     { key: "category", label: "Categoría" },
@@ -32,6 +47,9 @@ const COLUMNS: { key: string; label: string; sortField?: TransactionSortField; a
     { key: "amount", label: "Monto", sortField: "amount", align: "right" },
     { key: "actions", label: "" },
 ];
+
+/** La columna del saldo va antes de las acciones, pegada al monto que la mueve. */
+const RUNNING_COLUMN: Column = { key: "running", label: "Saldo", align: "right" };
 
 /**
  * La lista de transacciones como tabla, para pantallas anchas.
@@ -43,7 +61,7 @@ const COLUMNS: { key: string; label: string; sortField?: TransactionSortField; a
  * tiene scroll infinito, así que ordenar en el cliente ordenaría las veinte
  * filas cargadas y parecería que ordenó las ciento cincuenta y siete.
  */
-export function TransactionTable({ transactions, onStatusChange, onDeleted }: TransactionTableProps) {
+export function TransactionTable({ transactions, running, onStatusChange, onDeleted }: TransactionTableProps) {
     const router = useRouter();
     const pathname = usePathname();
     const searchParams = useSearchParams();
@@ -54,6 +72,10 @@ export function TransactionTable({ transactions, onStatusChange, onDeleted }: Tr
         ? (rawSortBy as TransactionSortField)
         : "date";
     const activeDir = searchParams.get("sortDir") === "asc" ? "asc" : "desc";
+
+    const columns: Column[] = running
+        ? [...COLUMNS.slice(0, -1), RUNNING_COLUMN, COLUMNS[COLUMNS.length - 1]]
+        : COLUMNS;
 
     const toggleSort = useCallback((field: TransactionSortField) => {
         const params = new URLSearchParams(searchParams.toString());
@@ -73,7 +95,7 @@ export function TransactionTable({ transactions, onStatusChange, onDeleted }: Tr
             <table className="w-full border-collapse text-left">
                 <thead>
                     <tr className="border-b border-border/50">
-                        {COLUMNS.map((col) => (
+                        {columns.map((col) => (
                             <th
                                 key={col.key}
                                 scope="col"
@@ -119,6 +141,7 @@ export function TransactionTable({ transactions, onStatusChange, onDeleted }: Tr
                         const { day, monthYear } = formatDayParts(t.date);
                         const sign = amountSignOf(t.type);
                         const onCredit = isTransactionPaidWithCredit(t);
+                        const runningEntry = t.id ? running?.[t.id] : undefined;
 
                         return (
                             <tr
@@ -190,6 +213,26 @@ export function TransactionTable({ transactions, onStatusChange, onDeleted }: Tr
                                         {sign}{formatAmount(Number(t.amount), t.currency)}
                                     </span>
                                 </td>
+
+                                {running && (
+                                    <td className="px-4 py-3 text-right align-middle">
+                                        {runningEntry ? (
+                                            <span
+                                                className={cn(
+                                                    "whitespace-nowrap text-[12.5px] tabular-nums",
+                                                    runningEntry.moved ? "text-muted-foreground" : "text-muted-foreground/55",
+                                                )}
+                                                title={runningEntry.moved
+                                                    ? "Saldo acumulado"
+                                                    : "Saldo acumulado — este movimiento no lo cambió"}
+                                            >
+                                                {formatRunningBalance(runningEntry.balance)}
+                                            </span>
+                                        ) : (
+                                            <span className="text-[12.5px] text-muted-foreground/40">—</span>
+                                        )}
+                                    </td>
+                                )}
 
                                 <td className="px-2 py-3 text-right align-middle">
                                     <TransactionRowMenu

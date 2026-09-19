@@ -5,7 +5,7 @@ import { UUID } from "@/domain/core";
 import { PaginationParams, PaginatedResult, TransactionSearchFilters, TransactionSort } from "@/domain/pagination";
 import { DASHBOARD_ACTIVE_STATUSES } from "@/domain/services/financial-balance";
 import { IBalanceSettingsRepository } from "@/domain/repositories/balance";
-import { BalanceMode, BalanceScopeRule, BalanceScopeTargetType, BalanceSettings } from "@/domain/entities/balance";
+import { BalanceMode, BalanceScopeRule, BalanceScopeTargetType, BalanceSettings, DEFAULT_BALANCE_MODE, DEFAULT_SHOW_RUNNING_BALANCE } from "@/domain/entities/balance";
 import { IPeriodSettingsRepository } from "@/domain/repositories/period";
 import { PeriodScope, PeriodSettings } from "@/domain/entities/period";
 
@@ -517,9 +517,24 @@ export class InMemoryBalanceSettingsRepository implements IBalanceSettingsReposi
     }
 
     async setDefaultMode(userId: UUID, mode: BalanceMode): Promise<BalanceSettings> {
-        const saved: BalanceSettings = { ownerUserId: userId, defaultMode: mode };
+        const saved: BalanceSettings = { ...this.current(userId), defaultMode: mode };
         this.settings.set(userId, saved);
         return saved;
+    }
+
+    async setShowRunningBalance(userId: UUID, show: boolean): Promise<BalanceSettings> {
+        const saved: BalanceSettings = { ...this.current(userId), showRunningBalance: show };
+        this.settings.set(userId, saved);
+        return saved;
+    }
+
+    /** Lo guardado, o los valores de fábrica: guardar una cosa no borra la otra. */
+    private current(userId: UUID): BalanceSettings {
+        return this.settings.get(userId) ?? {
+            ownerUserId: userId,
+            defaultMode: DEFAULT_BALANCE_MODE,
+            showRunningBalance: DEFAULT_SHOW_RUNNING_BALANCE,
+        };
     }
 
     async getRules(userId: UUID): Promise<BalanceScopeRule[]> {

@@ -31,6 +31,8 @@ import {
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import type { RunningBalanceEntry } from "@/domain/services/financial-balance";
+import { formatRunningBalance } from "../lib/transaction-display";
 import { isTransactionPaidWithCredit } from "@/lib/financial-utils";
 import { toast } from "sonner";
 import {
@@ -43,6 +45,13 @@ import {
 
 interface TransactionCardProps {
     transaction: FinancialTransaction;
+    /**
+     * El saldo acumulado tras este movimiento, cuando el usuario encendió el
+     * saldo corriente. Llega calculado del servidor: las reglas de alcance
+     * —qué cuentas entran al balance— viven ahí, y calcularlo aquí pintaría un
+     * saldo distinto del que dice la cabecera.
+     */
+    running?: RunningBalanceEntry | null;
     onStatusChange?: (status: FinancialTransaction["status"]) => void;
     onDeleted?: () => void;
 }
@@ -111,6 +120,7 @@ function getFallbackDescription(tx: FinancialTransaction, typeLabel: string): st
 
 export function TransactionCard({
     transaction,
+    running,
     onStatusChange,
     onDeleted,
 }: TransactionCardProps) {
@@ -283,6 +293,28 @@ export function TransactionCard({
                     >
                         {amountSign}{formatAmount(transaction.amount, transaction.currency)}
                     </span>
+
+                    {/* El saldo del libro diario: va sin la palabra "saldo" y
+                        sin moneda —el importe de arriba ya la lleva—, así que
+                        lo que lo nombra es su sitio. Para quien no ve la
+                        pantalla, el nombre va igual, solo que oculto.
+                        Atenuado cuando el movimiento no cambió el saldo: si no,
+                        tres filas seguidas con la misma cifra parecen un error
+                        en vez de la regla del crédito diferido. */}
+                    {running && (
+                        <span
+                            className={cn(
+                                "text-[10.5px] leading-none tabular-nums whitespace-nowrap",
+                                running.moved ? "text-muted-foreground" : "text-muted-foreground/55",
+                            )}
+                            title={running.moved
+                                ? "Saldo acumulado"
+                                : "Saldo acumulado — este movimiento no lo cambió"}
+                        >
+                            <span className="sr-only">Saldo acumulado: </span>
+                            {formatRunningBalance(running.balance)}
+                        </span>
+                    )}
 
                     <div className="flex items-center gap-2 text-[11px] text-muted-foreground mt-1">
 

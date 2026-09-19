@@ -17,6 +17,7 @@ import type { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import type { BalanceSet } from "@/application/services/balance-service";
+import { type BalanceMode, DEFAULT_BALANCE_MODE } from "@/domain/entities/balance";
 
 // ─── Props ───────────────────────────────────────────────────
 
@@ -163,6 +164,10 @@ function withFallbackDescription(draft: unknown): Record<string, unknown> {
 
 export function TransactionTimeline({ initialTransactions, allFilteredTransactions, searchFilters, balances, rangeLabel }: TransactionTimelineProps) {
     const [transactions, setTransactions] = useState<FinancialTransaction[]>(initialTransactions);
+    // El modo del balance vive aquí y no dentro del resumen porque ya no lo usa
+    // solo el chip: el saldo corriente de cada fila lo sigue, y las dos cosas
+    // tienen que decir lo mismo.
+    const [balanceMode, setBalanceMode] = useState<BalanceMode>(() => balances?.defaultMode ?? DEFAULT_BALANCE_MODE);
     const [isFromCache, setIsFromCache] = useState(false);
     const [page, setPage] = useState(1);
     const [hasMore, setHasMore] = useState(true);
@@ -422,6 +427,29 @@ export function TransactionTimeline({ initialTransactions, allFilteredTransactio
         return transactions.filter(t => t.type && activeTypes.includes(t.type));
     }, [transactions, typeFilter]);
 
+    /**
+     * El saldo acumulado de cada fila, o `undefined` cuando esta pantalla no
+     * lo lleva. Se apaga en tres casos, y los tres por el mismo motivo —un
+     * acumulado que no se puede verificar contra la cabecera engaña más que
+     * informa:
+     *
+     * - El usuario no lo encendió, así que el servidor no lo calculó.
+     * - El balance elegido es el total: ese sale de los saldos declarados de
+     *   las cuentas, no del flujo de esta lista, y no hay nada que acumular.
+     * - La lista está ordenada por algo que no es la fecha. Fuera del orden
+     *   cronológico las cifras seguirían siendo correctas una por una, pero
+     *   en pantalla irían dando saltos hacia atrás y hacia adelante.
+     */
+    const sortField = searchParams.get("sortBy");
+    const running = useMemo(() => {
+        if (!balances?.running) return undefined;
+        if (balanceMode === "TOTAL") return undefined;
+        if (sortField && sortField !== "date") return undefined;
+        return balanceMode === "PERIOD_WITH_CREDIT"
+            ? balances.running.withCredit
+            : balances.running.period;
+    }, [balances, balanceMode, sortField]);
+
     // ── Render ───────────────────────────────────────────────
     const grouped = groupTransactionsByDate(visibleTransactions);
 
@@ -447,6 +475,8 @@ export function TransactionTimeline({ initialTransactions, allFilteredTransactio
                     <TransactionSummary
                         transactions={allFilteredTransactions || visibleTransactions}
                         balances={balances}
+                        balanceMode={balanceMode}
+                        onBalanceModeChange={setBalanceMode}
                         rangeLabel={rangeLabel}
                     />
                 </div>
@@ -470,6 +500,7 @@ export function TransactionTimeline({ initialTransactions, allFilteredTransactio
                     <div className="hidden @3xl/txlist:block">
                         <TransactionTable
                             transactions={visibleTransactions}
+                            running={running}
                             onStatusChange={(id, status) => updateLocalTransaction(id, { status })}
                             onDeleted={(id) => setTransactions(prev => prev.filter(x => x.id !== id))}
                         />
@@ -486,6 +517,7 @@ export function TransactionTimeline({ initialTransactions, allFilteredTransactio
                                         <TransactionCard
                                             key={t.id}
                                             transaction={t}
+                                            running={running?.[t.id!] ?? null}
                                             onStatusChange={(status) => updateLocalTransaction(t.id!, { status })}
                                             onDeleted={() => setTransactions(prev => prev.filter(x => x.id !== t.id))}
                                         />
