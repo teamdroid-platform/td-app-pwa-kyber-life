@@ -28,7 +28,7 @@ import { getInstitutionMatchInfo, INSTITUTION_MATCH_THRESHOLD } from "@/lib/inst
 import { isTransactionPaidWithCredit } from "@/lib/financial-utils";
 import { InstitutionMatchBadge } from "./InstitutionMatchBadge";
 import { FinancialScannerTransaction } from "@/domain/entities/financial";
-import { formatAmount, getCategoryVisualConfig, categoryChipClass, extractSummary, formatTime } from "../lib/scan-display";
+import { formatAmount, getCategoryVisualConfig, getTypeVisualConfig, categoryChipClass, extractSummary, formatTime } from "../lib/scan-display";
 import { ScanAccountBadges } from "./ScanAccountBadges";
 import { ScanTable } from "./ScanTable";
 import { ScanKpiCards } from "./ScanKpiCards";
@@ -507,7 +507,11 @@ export function FinancialInbox() {
                                 const isWithdrawal = txType === "WITHDRAWAL";
 
                                 const categoryVisual = getCategoryVisualConfig(tx.category, tx.type);
-                                const CategoryIcon = categoryVisual.icon;
+                                // El círculo dice de qué TIPO es el movimiento, no de qué
+                                // categoría: un escaneo es la transacción antes de
+                                // confirmarse y tiene que leerse igual que en el listado.
+                                const typeVisual = getTypeVisualConfig(tx.type);
+                                const TypeIcon = typeVisual.icon;
                                 const isPaidWithCredit = isTransactionPaidWithCredit(tx);
 
                                 // Institution shown on the card. Mirror the detail form's server-side
@@ -566,10 +570,10 @@ export function FinancialInbox() {
                                                         <div
                                                             className={cn(
                                                                 "flex items-center justify-center rounded-full w-11 h-11 border transition-transform duration-200 group-hover:scale-105",
-                                                                categoryVisual.containerClass
+                                                                typeVisual.containerClass
                                                             )}
                                                         >
-                                                            <CategoryIcon className="w-5 h-5" strokeWidth={2.2} />
+                                                            <TypeIcon className="w-5 h-5" strokeWidth={2.2} />
                                                         </div>
                                                         {/* Top badge on avatar (TC if credit) */}
                                                         {isPaidWithCredit && (

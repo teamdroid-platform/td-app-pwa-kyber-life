@@ -3,6 +3,7 @@ import {
     GraduationCap, Home, Dog, TrendingUp, ArrowRightLeft, Wallet, Receipt,
 } from "lucide-react";
 import type { FinancialScannerTransaction } from "@/domain/entities/financial";
+import { resolveTransactionTypeOption } from "@/presentation/financial/components/TransactionTypeChips";
 
 /**
  * Cómo se presenta un escaneo: su icono y color según la categoría que el
@@ -41,6 +42,53 @@ export function formatAmount(amount?: number | null, currency = "USD") {
 export function categoryChipClass(config: CategoryVisualConfig): string {
     return config.containerClass.replace(/\s*shadow-\[[^\]]*\]/g, "");
 }
+
+/**
+ * El icono y el color del TIPO de movimiento: ingreso, gasto, transferencia,
+ * retiro.
+ *
+ * El icono sale de `resolveTransactionTypeOption`, el mismo mapa que pintan
+ * los chips del formulario, las pestañas del listado y la tarjeta de una
+ * transacción confirmada. Un escaneo es esa transacción antes de confirmarse,
+ * así que tiene que leerse igual: si el listado usa la flecha hacia abajo para
+ * un gasto, la bandeja no puede usar un tenedor porque el escáner adivinó
+ * «Alimentación».
+ *
+ * El color acompaña al icono y no a la categoría. El círculo dice de qué tipo
+ * es el movimiento; el chip de al lado sigue diciendo de qué categoría, con el
+ * color de la categoría. Cada elemento, un dato y un color.
+ */
+export function getTypeVisualConfig(txType?: string | null): CategoryVisualConfig {
+    const type = (txType || "").toUpperCase();
+    const { Icon } = resolveTransactionTypeOption(type);
+
+    return {
+        icon: Icon,
+        containerClass: TYPE_CONTAINER_CLASS[type] ?? TYPE_CONTAINER_CLASS.OTHER,
+        // El lavado de la tarjeta se queda en manos de la categoría: teñir el
+        // fondo entero por tipo pondría media bandeja del mismo color.
+        cardClass: "",
+    };
+}
+
+/**
+ * Borde, fondo y color de letra por tipo, en la paleta que ya usan la tarjeta
+ * de transacción y los chips: verde ingreso, rojo gasto, ámbar transferencia,
+ * índigo retiro. Escritas enteras porque Tailwind solo genera las clases que
+ * ve literales en el código.
+ */
+const TYPE_CONTAINER_CLASS: Record<string, string> = {
+    INCOME: "border-emerald-500/50 bg-emerald-500/10 text-emerald-500 dark:text-emerald-400",
+    DEPOSIT: "border-emerald-500/50 bg-emerald-500/10 text-emerald-500 dark:text-emerald-400",
+    REFUND: "border-emerald-500/50 bg-emerald-500/10 text-emerald-500 dark:text-emerald-400",
+    EXPENSE: "border-rose-500/50 bg-rose-500/10 text-rose-500 dark:text-rose-400",
+    PAYMENT: "border-rose-500/50 bg-rose-500/10 text-rose-500 dark:text-rose-400",
+    TRANSFER: "border-yellow-500/50 bg-yellow-500/10 text-yellow-500 dark:text-yellow-400",
+    WITHDRAWAL: "border-indigo-500/50 bg-indigo-500/10 text-indigo-500 dark:text-indigo-400",
+    FEE: "border-amber-500/50 bg-amber-500/10 text-amber-500 dark:text-amber-400",
+    TAX: "border-amber-500/50 bg-amber-500/10 text-amber-500 dark:text-amber-400",
+    OTHER: "border-zinc-500/40 bg-zinc-500/10 text-zinc-600 dark:text-zinc-300",
+};
 
 export interface CategoryVisualConfig {
     icon: React.ElementType;

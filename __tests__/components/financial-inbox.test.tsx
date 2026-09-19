@@ -135,6 +135,41 @@ describe("FinancialInbox", () => {
         expect(mockPush).toHaveBeenCalledWith("/financial/scans/scan-item-1");
     });
 
+    // El icono del círculo dice de qué TIPO es el movimiento. Antes salía el de
+    // la categoría que adivinó el escáner, así que un gasto en "Alimentación"
+    // se anunciaba con un tenedor y no se parecía en nada a la misma
+    // transacción ya confirmada en el listado.
+    it("pinta el icono del tipo, no el de la categoría", async () => {
+        (getUnprocessedInboxTransactionsAction as jest.Mock).mockResolvedValue({
+            success: true,
+            data: [SCAN_ITEM],
+        });
+
+        render(<FinancialInbox />);
+
+        const cardsEl = await screen.findByTestId("inbox-cards");
+        const cards = within(cardsEl);
+
+        // Gasto: flecha hacia abajo, la misma de las pestañas y los chips.
+        expect(cardsEl.querySelector(".lucide-trending-down")).toBeInTheDocument();
+        expect(cardsEl.querySelector(".lucide-utensils")).toBeNull();
+        // La categoría sigue nombrada en su chip: lo que se va es su icono.
+        expect(cards.getByText("Alimentación")).toBeInTheDocument();
+    });
+
+    it("una transferencia usa el icono de transferencia", async () => {
+        (getUnprocessedInboxTransactionsAction as jest.Mock).mockResolvedValue({
+            success: true,
+            data: [SCAN_ITEM_WITH_ACCOUNTS],
+        });
+
+        render(<FinancialInbox />);
+
+        const cardsEl = await screen.findByTestId("inbox-cards");
+
+        expect(cardsEl.querySelector(".lucide-arrow-right-left")).toBeInTheDocument();
+    });
+
     it("renders origin and destination accounts and brand badges when present", async () => {
         (getUnprocessedInboxTransactionsAction as jest.Mock).mockResolvedValue({
             success: true,
