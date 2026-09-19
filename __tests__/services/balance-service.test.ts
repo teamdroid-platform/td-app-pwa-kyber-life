@@ -227,9 +227,78 @@ describe("BalanceService", () => {
     it("respeta el modo por defecto guardado", async () => {
         const service = buildService();
         (service as any).settingsRepo.getSettings.mockResolvedValue({
-            ownerUserId: userId, defaultMode: "TOTAL",
+            ownerUserId: userId, defaultMode: "TOTAL", showRunningBalance: false,
         });
 
         expect((await service.getBalanceSet(userId, {})).defaultMode).toBe("TOTAL");
+    });
+
+    describe("saldo corriente", () => {
+        /** El mismo servicio, con el interruptor del libro diario encendido. */
+        function withRunningOn(rules: unknown[] = [], txs?: FinancialTransaction[]) {
+            const service = buildService(rules, txs);
+            (service as any).settingsRepo.getSettings.mockResolvedValue({
+                ownerUserId: userId, defaultMode: "PERIOD", showRunningBalance: true,
+            });
+            return service;
+        }
+
+        it("no viene si el usuario no lo encendió", async () => {
+            const set = await buildService().getBalanceSet(userId, { transactions });
+
+            expect(set.showRunningBalance).toBe(false);
+            expect(set.running).toBeUndefined();
+        });
+
+        it("tampoco viene sin una lista que recorrer", async () => {
+            const set = await withRunningOn().getBalanceSet(userId, {});
+
+            expect(set.showRunningBalance).toBe(true);
+            expect(set.running).toBeUndefined();
+        });
+
+        it("el saldo de la última fila es el balance que muestra la cabecera", async () => {
+            const set = await withRunningOn().getBalanceSet(userId, { transactions });
+
+            // transactions viene ordenada de la más antigua a la más reciente y
+            // todas comparten fecha, así que desempata el id: la última es "4".
+            expect(set.running!.period["4"].balance).toBe(set.period.value);
+            expect(set.running!.withCredit["4"].balance).toBe(set.withCredit.value);
+        });
+
+        it("el consumo con tarjeta solo mueve el saldo en el modo con tarjetas", async () => {
+            const set = await withRunningOn().getBalanceSet(userId, { transactions });
+
+            expect(set.running!.period["4"].moved).toBe(false);
+            expect(set.running!.withCredit["4"].moved).toBe(true);
+        });
+
+        it("una fila fuera de la configuración no mueve el saldo", async () => {
+            const rules = [{
+                id: "r1", ownerUserId: userId, targetType: "INSTITUTION", targetId: "inst-out",
+                included: false, createdAt: "", updatedAt: "", isDeleted: false,
+            }];
+
+            const set = await withRunningOn(rules).getBalanceSet(userId, { transactions });
+
+            // "3" es el gasto de la cuenta del banco excluido.
+            expect(set.running!.period["3"].moved).toBe(false);
+            expect(set.running!.period["3"].balance).toBe(set.running!.period["2"].balance);
+        });
+
+        it("las filas que no son dinero real aparecen igual, repitiendo el saldo", async () => {
+            const pending: FinancialTransaction = {
+                ...baseTx, id: "pending", amount: 900, status: "DETECTED",
+                date: "2026-08-23T23:00:00Z",
+            };
+
+            const set = await withRunningOn().getBalanceSet(userId, {
+                transactions: [...transactions, pending],
+            });
+
+            expect(set.running!.period["pending"]).toEqual({
+                balance: set.period.value, moved: false,
+            });
+        });
     });
 });

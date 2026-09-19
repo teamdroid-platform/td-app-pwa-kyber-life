@@ -8,7 +8,7 @@ import type { ScannedAccountView } from "@/application/services/bank-service";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { ScanAccountBadges } from "./ScanAccountBadges";
-import { formatAmount, formatTime, getCategoryVisualConfig, categoryChipClass } from "../lib/scan-display";
+import { formatAmount, formatTime, getCategoryVisualConfig, getTypeVisualConfig, categoryChipClass } from "../lib/scan-display";
 import { sortScans, paginateScans, type ScanSort, type ScanSortField } from "../lib/scan-table";
 
 interface ScanTableProps {
@@ -128,7 +128,9 @@ export function ScanTable({ scans, processing, onApprove, onReject, accountViews
                     <tbody>
                         {view.items.map((scan) => {
                             const visual = getCategoryVisualConfig(scan.category, scan.type);
-                            const Icon = visual.icon;
+                            // El icono es el del tipo, como en la bandeja y en el listado.
+                            const typeVisual = getTypeVisualConfig(scan.type);
+                            const Icon = typeVisual.icon;
                             const { day, monthYear } = dayParts(scan.date);
                             const busy = processing?.id === scan.id;
 
@@ -149,7 +151,7 @@ export function ScanTable({ scans, processing, onApprove, onReject, accountViews
                                             href={`/financial/scans/${scan.id}`}
                                             className="flex items-start gap-3 group"
                                         >
-                                            <span className={cn("grid h-8 w-8 shrink-0 place-items-center rounded-lg", visual.containerClass)}>
+                                            <span className={cn("grid h-8 w-8 shrink-0 place-items-center rounded-lg border", typeVisual.containerClass)}>
                                                 <Icon className="h-4 w-4" />
                                             </span>
                                             <span className="flex min-w-0 flex-col leading-tight">

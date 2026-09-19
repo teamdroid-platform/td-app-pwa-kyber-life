@@ -18,6 +18,7 @@ interface SettingsDashboardProps {
     institutionTypes: FinancialInstitutionType[];
     initialCategories: FinancialCategory[];
     balanceDefaultMode: BalanceMode;
+    balanceShowRunningBalance: boolean;
     balanceRules: BalanceScopeRule[];
     bankInstitutions: BankInstitution[];
     bankAccounts: BankAccountWithBalance[];
@@ -35,6 +36,7 @@ export function SettingsDashboard({
     institutionTypes,
     initialCategories,
     balanceDefaultMode,
+    balanceShowRunningBalance,
     balanceRules,
     bankInstitutions,
     bankAccounts,
@@ -85,6 +87,7 @@ export function SettingsDashboard({
             <TabsContent value="balances" className="mt-0">
                 <BalanceScopeManager
                     defaultMode={balanceDefaultMode}
+                    showRunningBalance={balanceShowRunningBalance}
                     initialRules={balanceRules}
                     institutions={scopeInstitutions}
                     accounts={scopeAccounts}

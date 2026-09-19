@@ -1,4 +1,4 @@
-import { computeNetBalance, sumCreditExpenses, transactionTypeBucket } from "@/domain/services/financial-balance";
+import { computeNetBalance, computeRunningBalances, sumCreditExpenses, transactionTypeBucket } from "@/domain/services/financial-balance";
 import type { BalanceScope } from "@/domain/services/balance-scope";
 import type { FinancialTransaction } from "@/domain/entities/financial";
 
@@ -112,5 +112,99 @@ describe("financial-balance", () => {
             };
             expect(computeNetBalance([ahorro], undefined, scope)).toBe(-200);
         });
+    });
+});
+
+describe("computeRunningBalances", () => {
+    type LedgerTx = Tx & { id: string; date: string; createdAt?: string; status?: string };
+
+    const tx = (id: string, date: string, over: Partial<LedgerTx>): LedgerTx => ({
+        id,
+        date,
+        type: "EXPENSE",
+        amount: 0,
+        paidWithCredit: false,
+        ...over,
+    });
+
+    it("acumula en orden cronológico, aunque lleguen del revés", () => {
+        // Como llegan de la pantalla: lo más nuevo primero.
+        const ledger = [
+            tx("3", "2026-09-19T07:04:00Z", { amount: 80.24 }),
+            tx("2", "2026-09-19T04:13:00Z", { amount: 12.23 }),
+            tx("1", "2026-09-18T09:41:00Z", { amount: 200 }),
+        ];
+
+        const running = computeRunningBalances(ledger);
+
+        expect(running["1"].balance).toBe(-200);
+        expect(running["2"].balance).toBe(-212.23);
+        expect(running["3"].balance).toBe(-292.47);
+    });
+
+    it("el saldo de la última transacción es el balance del periodo", () => {
+        const ledger = [
+            tx("1", "2026-09-01T10:00:00Z", { type: "INCOME", amount: 1000 }),
+            tx("2", "2026-09-02T10:00:00Z", { amount: 250.55 }),
+            tx("3", "2026-09-03T10:00:00Z", { amount: 40.1 }),
+        ];
+
+        const running = computeRunningBalances(ledger);
+
+        expect(running["3"].balance).toBe(computeNetBalance(ledger));
+    });
+
+    it("un consumo con tarjeta no mueve el saldo hasta que se activa el modo con tarjetas", () => {
+        const ledger = [
+            tx("1", "2026-09-01T10:00:00Z", { type: "INCOME", amount: 500 }),
+            tx("2", "2026-09-02T10:00:00Z", { amount: 19.99, paidWithCredit: true }),
+            tx("3", "2026-09-03T10:00:00Z", { amount: 10 }),
+        ];
+
+        const period = computeRunningBalances(ledger);
+        expect(period["2"]).toEqual({ balance: 500, moved: false });
+        expect(period["3"].balance).toBe(490);
+
+        const withCredit = computeRunningBalances(ledger, { includeCredit: true });
+        expect(withCredit["2"]).toEqual({ balance: 480.01, moved: true });
+        expect(withCredit["3"].balance).toBe(470.01);
+    });
+
+    it("retiros y transferencias neutras repiten el saldo anterior", () => {
+        const ledger = [
+            tx("1", "2026-09-01T10:00:00Z", { type: "INCOME", amount: 300 }),
+            tx("2", "2026-09-02T10:00:00Z", { type: "WITHDRAWAL", amount: 100 }),
+            tx("3", "2026-09-03T10:00:00Z", { type: "TRANSFER", amount: 20.22 }),
+        ];
+
+        const running = computeRunningBalances(ledger);
+
+        expect(running["2"]).toEqual({ balance: 300, moved: false });
+        expect(running["3"]).toEqual({ balance: 300, moved: false });
+    });
+
+    it("una fila que no es dinero real se lista pero no suma", () => {
+        const ledger = [
+            tx("1", "2026-09-01T10:00:00Z", { type: "INCOME", amount: 100, status: "CONFIRMED" }),
+            tx("2", "2026-09-02T10:00:00Z", { amount: 60, status: "DETECTED" }),
+            tx("3", "2026-09-03T10:00:00Z", { amount: 25, status: "MANUAL" }),
+        ];
+
+        const running = computeRunningBalances(ledger);
+
+        expect(running["2"]).toEqual({ balance: 100, moved: false });
+        expect(running["3"].balance).toBe(75);
+    });
+
+    it("desempata por hora de registro cuando dos movimientos comparten fecha", () => {
+        const ledger = [
+            tx("b", "2026-09-01T10:00:00Z", { amount: 10, createdAt: "2026-09-01T12:00:00Z" }),
+            tx("a", "2026-09-01T10:00:00Z", { type: "INCOME", amount: 100, createdAt: "2026-09-01T11:00:00Z" }),
+        ];
+
+        const running = computeRunningBalances(ledger);
+
+        expect(running["a"].balance).toBe(100);
+        expect(running["b"].balance).toBe(90);
     });
 });

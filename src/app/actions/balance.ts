@@ -5,6 +5,7 @@ import { balanceService, balanceSettingsRepository } from "@/infrastructure/cont
 import { requireUserId } from "@/infrastructure/supabase/auth-user";
 import {
     balanceModeSchema, balanceRangeSchema, balanceScopeRuleSchema,
+    showRunningBalanceSchema,
 } from "@/lib/validators/balance-schemas";
 
 function formatZodError(error: z.ZodError): string {
@@ -82,6 +83,19 @@ export async function setBalanceScopeRuleAction(input: unknown) {
         return { success: true as const, data };
     } catch (error) {
         console.error("Error saving balance scope rule:", error);
+        return fail(error);
+    }
+}
+
+/** Enciende o apaga el saldo corriente de la lista de transacciones. */
+export async function setShowRunningBalanceAction(show: unknown) {
+    try {
+        const validated = showRunningBalanceSchema.parse(show);
+        const userId = await requireUserId();
+        const data = await balanceSettingsRepository.setShowRunningBalance(userId, validated);
+        return { success: true as const, data };
+    } catch (error) {
+        console.error("Error saving running balance preference:", error);
         return fail(error);
     }
 }

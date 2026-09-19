@@ -71,6 +71,7 @@ describe("TransactionSummary", () => {
     describe("con balances", () => {
         const balances: BalanceSet = {
             defaultMode: "PERIOD",
+            showRunningBalance: false,
             currency: "USD",
             total: { value: 5000, accountsCounted: 2, accountsWithoutSnapshot: [], creditDebt: 0 },
             period: { value: 900, income: 1000, expenses: 100, savings: 0, funding: 0, crossScope: 0, excludedCount: 0 },

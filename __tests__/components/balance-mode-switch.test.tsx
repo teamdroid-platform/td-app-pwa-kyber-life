@@ -6,6 +6,7 @@ import type { BalanceMode } from "@/domain/entities/balance";
 
 const balances: BalanceSet = {
     defaultMode: "PERIOD",
+    showRunningBalance: false,
     currency: "USD",
     total: { value: 4812.3, accountsCounted: 6, accountsWithoutSnapshot: [{ id: "a", name: "Austro" }], creditDebt: 371.26 },
     period: { value: 4709.46, income: 5000, expenses: 290.54, savings: 0, funding: 0, crossScope: 0, excludedCount: 0 },

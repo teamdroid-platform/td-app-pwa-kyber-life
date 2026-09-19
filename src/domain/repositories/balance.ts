@@ -9,6 +9,8 @@ export interface IBalanceSettingsRepository {
     /** Null cuando el usuario nunca configuró nada. */
     getSettings(userId: UUID): Promise<BalanceSettings | null>;
     setDefaultMode(userId: UUID, mode: BalanceMode): Promise<BalanceSettings>;
+    /** Enciende o apaga el saldo corriente de la lista de transacciones. */
+    setShowRunningBalance(userId: UUID, show: boolean): Promise<BalanceSettings>;
     getRules(userId: UUID): Promise<BalanceScopeRule[]>;
     /** Crea o actualiza la regla de ese objetivo. */
     setRule(userId: UUID, targetType: BalanceScopeTargetType, targetId: UUID, included: boolean): Promise<BalanceScopeRule>;

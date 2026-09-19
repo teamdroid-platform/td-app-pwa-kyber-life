@@ -23,6 +23,7 @@ describe("BalanceScopeManager", () => {
         render(
             <BalanceScopeManager
                 defaultMode="PERIOD"
+                showRunningBalance={false}
                 initialRules={[]}
                 institutions={institutions}
                 accounts={accounts}
@@ -38,6 +39,7 @@ describe("BalanceScopeManager", () => {
         render(
             <BalanceScopeManager
                 defaultMode="PERIOD"
+                showRunningBalance={false}
                 initialRules={[{
                     id: "r1", ownerUserId: "u", targetType: "ACCOUNT", targetId: "acc-2",
                     included: false, createdAt: "", updatedAt: "", isDeleted: false,
@@ -55,6 +57,7 @@ describe("BalanceScopeManager", () => {
         render(
             <BalanceScopeManager
                 defaultMode="PERIOD"
+                showRunningBalance={false}
                 initialRules={[{
                     id: "r1", ownerUserId: "u", targetType: "ACCOUNT", targetId: "acc-2",
                     included: false, createdAt: "", updatedAt: "", isDeleted: false,
@@ -81,6 +84,7 @@ describe("BalanceScopeManager", () => {
         render(
             <BalanceScopeManager
                 defaultMode="PERIOD"
+                showRunningBalance={false}
                 initialRules={[]}
                 institutions={institutions}
                 accounts={accounts}
@@ -103,6 +107,7 @@ describe("BalanceScopeManager", () => {
         render(
             <BalanceScopeManager
                 defaultMode="PERIOD"
+                showRunningBalance={false}
                 initialRules={[{
                     id: "r1", ownerUserId: "u", targetType: "INSTITUTION", targetId: "inst-1",
                     included: false, createdAt: "", updatedAt: "", isDeleted: false,
@@ -135,6 +140,7 @@ describe("BalanceScopeManager", () => {
             render(
                 <BalanceScopeManager
                     defaultMode="PERIOD"
+                    showRunningBalance={false}
                     initialRules={[]}
                     institutions={emptyInstitutions}
                     accounts={[]}
@@ -150,6 +156,7 @@ describe("BalanceScopeManager", () => {
             const { rerender } = render(
                 <BalanceScopeManager
                     defaultMode="PERIOD"
+                    showRunningBalance={false}
                     initialRules={[]}
                     institutions={emptyInstitutions}
                     accounts={[]}
@@ -174,6 +181,7 @@ describe("BalanceScopeManager", () => {
             rerender(
                 <BalanceScopeManager
                     defaultMode="PERIOD"
+                    showRunningBalance={false}
                     initialRules={[{
                         id: "r1", ownerUserId: "u", targetType: "INSTITUTION", targetId: "inst-empty",
                         included: false, createdAt: "", updatedAt: "", isDeleted: false,
@@ -191,6 +199,7 @@ describe("BalanceScopeManager", () => {
         render(
             <BalanceScopeManager
                 defaultMode="PERIOD"
+                showRunningBalance={false}
                 initialRules={[{
                     id: "r1", ownerUserId: "u", targetType: "ACCOUNT", targetId: "acc-2",
                     included: false, createdAt: "", updatedAt: "", isDeleted: false,

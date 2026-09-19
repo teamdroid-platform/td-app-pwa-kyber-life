@@ -63,6 +63,26 @@ export function formatAmount(amount: number, currency = "USD"): string {
 }
 
 /**
+ * El saldo corriente, sin símbolo de moneda.
+ *
+ * El importe de la fila, justo encima, ya la lleva; repetirla en un número que
+ * vive debajo y en cuerpo pequeño solo le quita ancho al título. El signo sí
+ * va siempre: es lo único que distingue un saldo a favor de uno en contra.
+ *
+ * La configuración regional es la de los balances (`es-EC`), no la de los
+ * importes de la fila (`es-ES`), y la diferencia se ve: en español europeo los
+ * millares no se separan hasta cinco cifras, así que el saldo de la última
+ * transacción saldría «3058,33» bajo una cabecera que dice «3.058,33». Son el
+ * mismo número y tienen que escribirse igual.
+ */
+export function formatRunningBalance(value: number): string {
+    return new Intl.NumberFormat("es-EC", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    }).format(value);
+}
+
+/**
  * La hora se formatea en UTC a propósito: el `date` guardado es un valor de
  * reloj de pared etiquetado como UTC, así que convertirlo a la zona del
  * dispositivo lo movería de sitio.

@@ -25,4 +25,13 @@ export interface BalanceScopeRule extends BaseEntity {
 export interface BalanceSettings {
     ownerUserId: UUID;
     defaultMode: BalanceMode;
+    /**
+     * Si la lista de transacciones muestra el saldo acumulado bajo cada monto.
+     * Apagado de fábrica: es un dato de más en cada fila y quien no lleve la
+     * lista como un libro diario no lo necesita.
+     */
+    showRunningBalance: boolean;
 }
+
+/** El valor de {@link BalanceSettings.showRunningBalance} sin configuración. */
+export const DEFAULT_SHOW_RUNNING_BALANCE = false;

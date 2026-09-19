@@ -6,7 +6,7 @@ import {
 import { getBalanceScopeAction } from "@/app/actions/balance";
 import { getBankOverviewAction } from "@/app/actions/bank";
 import { getAllCycleStartDaysAction } from "@/app/actions/period-settings";
-import { DEFAULT_BALANCE_MODE } from "@/domain/entities/balance";
+import { DEFAULT_BALANCE_MODE, DEFAULT_SHOW_RUNNING_BALANCE } from "@/domain/entities/balance";
 import { DEFAULT_CYCLE_START_DAY } from "@/domain/entities/period";
 import { SettingsDashboard } from "@/presentation/financial/components/settings/SettingsDashboard";
 
@@ -30,6 +30,9 @@ export default async function FinancialSettingsPage() {
     const balanceDefaultMode = scopeResult.success
         ? (scopeResult.data.settings?.defaultMode ?? DEFAULT_BALANCE_MODE)
         : DEFAULT_BALANCE_MODE;
+    const balanceShowRunningBalance = scopeResult.success
+        ? (scopeResult.data.settings?.showRunningBalance ?? DEFAULT_SHOW_RUNNING_BALANCE)
+        : DEFAULT_SHOW_RUNNING_BALANCE;
     const balanceRules = scopeResult.success ? scopeResult.data.rules : [];
     const bankInstitutions = bankOverviewResult.success ? bankOverviewResult.data.institutions : [];
     const bankAccounts = bankOverviewResult.success ? bankOverviewResult.data.accounts : [];
@@ -50,6 +53,7 @@ export default async function FinancialSettingsPage() {
                     institutionTypes={institutionTypes}
                     initialCategories={categories}
                     balanceDefaultMode={balanceDefaultMode}
+                    balanceShowRunningBalance={balanceShowRunningBalance}
                     balanceRules={balanceRules}
                     bankInstitutions={bankInstitutions}
                     bankAccounts={bankAccounts}

@@ -25,6 +25,7 @@ function money(amount: number): string {
 // notaría si el selector mostrara el número equivocado.
 const BALANCES: BalanceSet = {
     defaultMode: "PERIOD",
+    showRunningBalance: false,
     currency: "USD",
     total: { value: 24560, accountsCounted: 6, accountsWithoutSnapshot: [], creditDebt: 0 },
     period: { value: 5100.75, income: 8450, expenses: 3240.8, savings: 0, funding: 0, crossScope: 0, excludedCount: 0 },

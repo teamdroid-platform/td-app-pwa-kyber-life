@@ -1,6 +1,6 @@
 import { UUID } from "../../domain/core";
 import { FinancialTransaction } from "../../domain/entities/financial";
-import { BalanceMode, DEFAULT_BALANCE_MODE } from "../../domain/entities/balance";
+import { BalanceMode, DEFAULT_BALANCE_MODE, DEFAULT_SHOW_RUNNING_BALANCE } from "../../domain/entities/balance";
 import {
     IFinancialTransactionRepository, IFinancialCategoryRepository,
 } from "../../domain/repositories/financial";
@@ -9,7 +9,7 @@ import {
     IBankAccountBalanceSnapshotRepository,
 } from "../../domain/repositories/bank";
 import { IBalanceSettingsRepository } from "../../domain/repositories/balance";
-import { computeNetBalance, crossScopeTransfer, sumCreditExpenses, isIncomeType, isWithdrawalType, isSavingsTransfer, isFundingTransfer, DASHBOARD_ACTIVE_STATUSES } from "../../domain/services/financial-balance";
+import { computeNetBalance, computeRunningBalances, type RunningBalanceEntry, crossScopeTransfer, sumCreditExpenses, isIncomeType, isWithdrawalType, isSavingsTransfer, isFundingTransfer, DASHBOARD_ACTIVE_STATUSES } from "../../domain/services/financial-balance";
 import { computeTotalBalance, TotalBalanceAccount } from "../../domain/services/balance-modes";
 import { computeAccountBalance, computeCardDebt } from "../../domain/services/bank-balance";
 import { resolveScope, BalanceScope } from "../../domain/services/balance-scope";
@@ -18,6 +18,8 @@ import { accountLabel } from "../../lib/bank-identity-label";
 
 export interface BalanceSet {
     defaultMode: BalanceMode;
+    /** Si la lista debe pintar el saldo acumulado bajo cada monto. */
+    showRunningBalance: boolean;
     currency: string;
     total: {
         value: number;
@@ -56,6 +58,19 @@ export interface BalanceSet {
     withCredit: {
         value: number;
         creditDeferred: number;
+    };
+    /**
+     * El saldo acumulado tras cada transacción, por id, en los dos modos de
+     * periodo. Solo viene cuando quien llama pasó su lista y el usuario
+     * encendió el saldo corriente.
+     *
+     * Vienen los dos modos de una vez por lo mismo que vienen los tres
+     * balances: el selector de la cabecera cambia de modo sin volver al
+     * servidor, y la columna de saldos tiene que cambiar con él.
+     */
+    running?: {
+        period: Record<string, RunningBalanceEntry>;
+        withCredit: Record<string, RunningBalanceEntry>;
     };
 }
 
@@ -132,13 +147,44 @@ export class BalanceService {
 
         const scope = resolveScope(rules, { accounts, cards });
         const categoryNameById = new Map(categories.map(c => [c.id!, c.name]));
+        const showRunningBalance = settings?.showRunningBalance ?? DEFAULT_SHOW_RUNNING_BALANCE;
 
         return {
             defaultMode: settings?.defaultMode ?? DEFAULT_BALANCE_MODE,
+            showRunningBalance,
             currency: "USD",
             total: await this.buildTotal(accounts, cards, movements),
             period: this.buildPeriod(transactions, categoryNameById, scope),
             withCredit: this.buildWithCredit(transactions, categoryNameById, scope),
+            running: showRunningBalance && given
+                ? this.buildRunning(given, creditCardIds, categoryNameById, scope)
+                : undefined,
+        };
+    }
+
+    /**
+     * El libro diario de la lista que quien llama está mostrando.
+     *
+     * Se construye sobre la lista entera, no sobre la ya estrechada a lo
+     * contable: una detección sin revisar se ve en la pantalla y también
+     * necesita su renglón de saldo —el suyo es el anterior, porque no suma.
+     * De descartarlas se encarga el propio cálculo, por su estado.
+     */
+    private buildRunning(
+        given: readonly FinancialTransaction[],
+        creditCardIds: ReadonlySet<string>,
+        categoryNameById: ReadonlyMap<string, string>,
+        scope: BalanceScope,
+    ): NonNullable<BalanceSet["running"]> {
+        const ledger = given.map(t => ({
+            ...t,
+            paidWithCredit: isTransactionPaidWithCredit(t, creditCardIds),
+        }));
+        const common = { categoryNameById, scope };
+
+        return {
+            period: computeRunningBalances(ledger, common),
+            withCredit: computeRunningBalances(ledger, { ...common, includeCredit: true }),
         };
     }
 

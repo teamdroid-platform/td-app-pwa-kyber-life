@@ -2,6 +2,7 @@ import type { IBalanceSettingsRepository } from "@/domain/repositories/balance";
 import type {
     BalanceMode, BalanceScopeRule, BalanceScopeTargetType, BalanceSettings,
 } from "@/domain/entities/balance";
+import { DEFAULT_SHOW_RUNNING_BALANCE } from "@/domain/entities/balance";
 import type { UUID } from "@/domain/core";
 import { createClient } from "@/infrastructure/supabase/server";
 
@@ -13,6 +14,24 @@ interface ScopeRuleRow {
     included: boolean;
     created_at: string;
     updated_at: string;
+}
+
+interface SettingsRow {
+    owner_user_id: string;
+    default_mode: string;
+    show_running_balance?: boolean | null;
+}
+
+/**
+ * `show_running_balance` se lee con `??`: la columna llegó después que la
+ * tabla, y una fila guardada antes de la migración no la trae.
+ */
+function mapSettings(row: SettingsRow): BalanceSettings {
+    return {
+        ownerUserId: row.owner_user_id,
+        defaultMode: row.default_mode as BalanceMode,
+        showRunningBalance: row.show_running_balance ?? DEFAULT_SHOW_RUNNING_BALANCE,
+    };
 }
 
 function mapRule(row: ScopeRuleRow): BalanceScopeRule {
@@ -39,7 +58,7 @@ export class SupabaseBalanceSettingsRepository implements IBalanceSettingsReposi
 
         if (error) throw new Error(`Error loading balance settings: ${error.message}`);
         if (!data) return null;
-        return { ownerUserId: data.owner_user_id, defaultMode: data.default_mode as BalanceMode };
+        return mapSettings(data as SettingsRow);
     }
 
     async setDefaultMode(userId: UUID, mode: BalanceMode): Promise<BalanceSettings> {
@@ -54,7 +73,27 @@ export class SupabaseBalanceSettingsRepository implements IBalanceSettingsReposi
             .single();
 
         if (error) throw new Error(`Error saving balance settings: ${error.message}`);
-        return { ownerUserId: data.owner_user_id, defaultMode: data.default_mode as BalanceMode };
+        return mapSettings(data as SettingsRow);
+    }
+
+    /**
+     * El upsert solo manda su propia columna, así que un usuario que nunca
+     * eligió modo conserva el que la tabla pone por defecto en vez de que este
+     * guardado se lo fije.
+     */
+    async setShowRunningBalance(userId: UUID, show: boolean): Promise<BalanceSettings> {
+        const supabase = await createClient();
+        const { data, error } = await supabase
+            .from('financial_balance_settings')
+            .upsert(
+                { owner_user_id: userId, show_running_balance: show, updated_at: new Date().toISOString() },
+                { onConflict: 'owner_user_id' },
+            )
+            .select()
+            .single();
+
+        if (error) throw new Error(`Error saving balance settings: ${error.message}`);
+        return mapSettings(data as SettingsRow);
     }
 
     async getRules(userId: UUID): Promise<BalanceScopeRule[]> {

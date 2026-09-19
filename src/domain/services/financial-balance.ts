@@ -127,6 +127,51 @@ export function crossScopeTransfer(
     return 0;
 }
 
+export interface BalanceDeltaOptions {
+    categoryNameById?: ReadonlyMap<string, string>;
+    scope?: BalanceScope;
+    /**
+     * Modo "con tarjetas": los consumos a crédito también restan, en vez de
+     * quedar diferidos hasta que se paga la tarjeta. Es exactamente la
+     * diferencia entre `period.value` y `withCredit.value`.
+     */
+    includeCredit?: boolean;
+}
+
+/**
+ * Lo que **una** transacción le hace al balance: el sumando que
+ * {@link computeNetBalance} le asigna dentro del bucle.
+ *
+ * Existe para que el saldo corriente de la lista no vuelva a implementar las
+ * reglas por su cuenta. Son cinco casos con demasiada historia detrás —el
+ * crédito diferido, el ahorro que manda sobre el alcance, la transferencia que
+ * cruza el borde del presupuesto— y una segunda copia se habría desviado de
+ * esta al primer ajuste.
+ */
+export function transactionBalanceDelta(
+    t: BalanceTransaction,
+    options: BalanceDeltaOptions = {},
+): number {
+    const { categoryNameById, scope, includeCredit } = options;
+    const amount = Number(t.amount);
+
+    if (t.type === "TRANSFER") {
+        // La categoría manda sobre el scope: una transferencia marcada como
+        // ahorro resta una sola vez, aunque su destino esté además excluido.
+        if (isSavingsTransfer(t, categoryNameById)) return -amount;
+        if (isFundingTransfer(t, categoryNameById)) return amount;
+        return crossScopeTransfer(t, scope);
+    }
+
+    if (scope && !scope.isTransactionIncluded(t)) return 0;
+
+    if (isIncomeType(t.type)) return amount;
+    // Retiro: el efectivo cambia de forma, sigue disponible.
+    if (isWithdrawalType(t.type)) return 0;
+    if (t.paidWithCredit) return includeCredit ? -amount : 0;
+    return -amount;
+}
+
 export function computeNetBalance(
     transactions: readonly BalanceTransaction[],
     categoryNameById?: ReadonlyMap<string, string>,
@@ -135,29 +180,92 @@ export function computeNetBalance(
     let balance = 0;
 
     for (const t of transactions) {
-        const amount = Number(t.amount);
-
-        if (t.type === "TRANSFER") {
-            // La categoría manda sobre el scope: una transferencia marcada como
-            // ahorro resta una sola vez, aunque su destino esté además excluido.
-            if (isSavingsTransfer(t, categoryNameById)) { balance -= amount; continue; }
-            if (isFundingTransfer(t, categoryNameById)) { balance += amount; continue; }
-            balance += crossScopeTransfer(t, scope);
-            continue;
-        }
-
-        if (scope && !scope.isTransactionIncluded(t)) continue;
-
-        if (isIncomeType(t.type)) {
-            balance += amount;
-        } else if (isWithdrawalType(t.type)) {
-            // no-op: cash changes form, still available
-        } else if (!t.paidWithCredit) {
-            balance -= amount;
-        }
+        balance += transactionBalanceDelta(t, { categoryNameById, scope });
     }
 
     return Math.round(balance * 100) / 100;
+}
+
+/** Lo mínimo que hace falta para ordenar un libro diario y nombrar sus filas. */
+type LedgerTransaction = BalanceTransaction & {
+    id?: string | null;
+    date: string;
+    createdAt?: string;
+    status?: string;
+};
+
+export interface RunningBalanceEntry {
+    /** El saldo acumulado después de esta transacción. */
+    balance: number;
+    /**
+     * Si esta transacción movió el saldo. Falso cuando aportó 0 —crédito
+     * diferido, retiro, transferencia neutra, cuenta fuera del alcance, fila
+     * no contable—, y entonces su saldo es el de la fila anterior repetido.
+     * Sin este dato, tres filas seguidas con el mismo saldo se leen como un
+     * error de cálculo en vez de como la regla que son.
+     */
+    moved: boolean;
+}
+
+export type RunningBalanceOptions = BalanceDeltaOptions;
+
+/**
+ * Qué filas son dinero real. Las demás se listan igual —una detección sin
+ * revisar se ve en la pantalla— pero aportan 0 y repiten el saldo anterior,
+ * que es justo lo que hace con ellas el balance de la cabecera.
+ *
+ * Una fila sin estado cuenta: los cálculos del dominio se prueban con objetos
+ * mínimos, y exigir el campo convertiría cada prueba en un formulario.
+ */
+function isLedgerCountable(t: LedgerTransaction): boolean {
+    if (t.status === undefined) return true;
+    return (DASHBOARD_ACTIVE_STATUSES as readonly string[]).includes(t.status);
+}
+
+/**
+ * El saldo acumulado **después** de cada transacción, para leer la lista como
+ * un libro diario.
+ *
+ * Arranca en cero al principio del rango, así que el saldo de la transacción
+ * más reciente es exactamente el balance del periodo que muestra la cabecera.
+ * Cualquier otro origen —el saldo total de las cuentas, por ejemplo— mezclaría
+ * dos fuentes: ese sale de los saldos declarados y de movimientos que esta
+ * lista no tiene por qué contener.
+ *
+ * El orden es el cronológico, no el de la pantalla: la lista se ve de lo nuevo
+ * a lo viejo, pero un acumulado solo se puede construir al revés.
+ */
+export function computeRunningBalances(
+    transactions: readonly LedgerTransaction[],
+    options: RunningBalanceOptions = {},
+): Record<string, RunningBalanceEntry> {
+    const chronological = [...transactions].sort(compareLedgerOrder);
+
+    const balances: Record<string, RunningBalanceEntry> = {};
+    let running = 0;
+
+    for (const t of chronological) {
+        const delta = isLedgerCountable(t) ? transactionBalanceDelta(t, options) : 0;
+        running += delta;
+        if (t.id) {
+            balances[t.id] = { balance: Math.round(running * 100) / 100, moved: delta !== 0 };
+        }
+    }
+
+    return balances;
+}
+
+/**
+ * Fecha, y a igualdad de fecha el orden en que se registraron. Dos movimientos
+ * del mismo minuto son frecuentes —los importa el escáner en lote— y sin un
+ * desempate estable el saldo de esas filas bailaba entre recargas.
+ */
+function compareLedgerOrder(a: LedgerTransaction, b: LedgerTransaction): number {
+    const byDate = String(a.date).localeCompare(String(b.date));
+    if (byDate !== 0) return byDate;
+    const byCreated = String(a.createdAt ?? "").localeCompare(String(b.createdAt ?? ""));
+    if (byCreated !== 0) return byCreated;
+    return String(a.id ?? "").localeCompare(String(b.id ?? ""));
 }
 
 /**
