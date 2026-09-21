@@ -2,6 +2,7 @@ import type { IBankInstitutionRepository } from "@/domain/repositories/bank";
 import type { BankInstitution } from "@/domain/entities/bank";
 import type { UUID } from "@/domain/core";
 import { createClient } from "@/infrastructure/supabase/server";
+import { pickInstitutionByName } from "@/lib/institution-match";
 
 type Row = Record<string, unknown>;
 
@@ -75,15 +76,27 @@ export class SupabaseBankInstitutionRepository implements IBankInstitutionReposi
         return (data ?? []).map(mapToEntity);
     }
 
+    /**
+     * El emisor con ese nombre, **archivados incluidos**.
+     *
+     * El emparejamiento no se hace en SQL: lo decide {@link pickInstitutionByName},
+     * la misma función que usa el formulario, para que el escaneo y la pantalla
+     * no puedan discrepar sobre qué es el mismo banco. La versión anterior
+     * filtraba `is_deleted = false` y resolvía con `.ilike(...).maybeSingle()`,
+     * que falla con dos filas homónimas; `if (error || !data) return null`
+     * convertía tanto «está archivado» como «hay varios» en «no existe», y el
+     * llamador fundaba otro emisor en cada escaneo.
+     *
+     * Traer todos los emisores del usuario es barato: son decenas, no miles.
+     */
     async findByName(userId: UUID, name: string): Promise<BankInstitution | null> {
         const supabase = await createClient();
         const { data, error } = await supabase
             .from("bank_institutions").select("*")
-            .eq("owner_user_id", userId).eq("is_deleted", false)
-            .ilike("name", name).maybeSingle();
+            .eq("owner_user_id", userId);
 
         if (error || !data) return null;
-        return mapToEntity(data);
+        return pickInstitutionByName(data.map(mapToEntity), name);
     }
 
     async update(entity: BankInstitution): Promise<BankInstitution> {

@@ -882,7 +882,18 @@ export class BankService {
         if (!name) return null;
 
         const existing = await this.institutions.findByName(userId, name);
-        if (existing) return existing.id;
+        if (existing) {
+            // Si el usuario lo había archivado, se revive en vez de fundar otro.
+            // Crear uno nuevo era lo que hacía que borrar un duplicado lo trajera
+            // de vuelta, y el emisor nuevo estrenaba id: como la regla de balance
+            // cuelga del id, un banco excluido volvía a contar en el balance.
+            if (existing.isDeleted) {
+                await this.institutions.update({
+                    ...existing, isDeleted: false, updatedAt: new Date().toISOString(),
+                });
+            }
+            return existing.id;
+        }
 
         // Solo se crea cuando el nombre suena a emisor: un escaneo de FARMASHOP
         // no debe fundar un banco llamado FARMASHOP.

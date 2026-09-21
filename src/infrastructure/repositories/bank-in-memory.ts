@@ -1,4 +1,5 @@
 import { InMemoryRepository } from "./in-memory-repository";
+import { pickInstitutionByName } from "@/lib/institution-match";
 import type { UUID, ISODate } from "@/domain/core";
 import type {
     BankInstitution, BankAccount, BankCard,
@@ -20,10 +21,13 @@ export class InMemoryBankInstitutionRepository
         return (await this.findAll()).filter(i => i.ownerUserId === userId);
     }
 
+    /**
+     * Incluye los archivados a propósito: ver {@link pickInstitutionByName}.
+     * Por eso no se apoya en `findByOwnerId`, que los oculta.
+     */
     async findByName(userId: UUID, name: string): Promise<BankInstitution | null> {
-        const target = name.trim().toLowerCase();
-        return (await this.findByOwnerId(userId))
-            .find(i => i.name.trim().toLowerCase() === target) ?? null;
+        const todos = [...this.items.values()].filter(i => i.ownerUserId === userId);
+        return pickInstitutionByName(todos, name);
     }
 }
 
