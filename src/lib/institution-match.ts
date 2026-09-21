@@ -22,6 +22,54 @@ export function normalizeForMatch(str?: string | null): string {
     }
 }
 
+/** Lo mínimo que necesita {@link pickInstitutionByName} de una institución. */
+export interface NameableInstitution {
+    name: string;
+    createdAt: string;
+    isDeleted: boolean;
+}
+
+/**
+ * El emisor que ya existe con ese nombre, o `null`.
+ *
+ * Es el criterio único con el que la app decide «este banco ya lo tengo», y
+ * vive aquí —fuera de SQL— para que los dos repositorios no puedan discrepar:
+ * el escaneo comparaba con un `ilike` exacto mientras el formulario comparaba
+ * con {@link normalizeForMatch}, así que «COOP JARDIN AZUAYO» fundaba un emisor
+ * al lado de «Coop Jardín Azuayo».
+ *
+ * Tres reglas que no son cosméticas:
+ *
+ * 1. **Mira también los archivados.** Buscar solo entre los vivos hacía que
+ *    borrar un duplicado fuera justo lo que lo traía de vuelta: el siguiente
+ *    escaneo no lo encontraba y fundaba otro. Peor que cosmético — el emisor
+ *    nuevo estrena id, y la regla de balance del usuario cuelga del id, así que
+ *    un banco que él había excluido volvía a contar en su balance.
+ * 2. **Varios homónimos devuelven el más antiguo, nunca `null`.** La consulta
+ *    usaba `.maybeSingle()`, que da error con dos filas, y el llamador leía ese
+ *    error como «no existe»: una vez duplicado, cada escaneo añadía uno más.
+ * 3. **Emparejamiento exacto normalizado, no difuso.** Unir dos nombres
+ *    distintos del mismo banco es de la pantalla de fusión, que lo pregunta;
+ *    hacerlo en un escaneo automático uniría bancos distintos sin confirmación.
+ */
+export function pickInstitutionByName<T extends NameableInstitution>(
+    institutions: readonly T[],
+    name: string,
+): T | null {
+    const target = normalizeForMatch(name);
+    if (!target) return null;
+
+    const matches = institutions.filter(i => normalizeForMatch(i.name) === target);
+    if (matches.length === 0) return null;
+
+    // Un emisor vivo gana al archivado; entre iguales, el más antiguo, para que
+    // la elección no dependa del orden en que la base devuelva las filas.
+    return [...matches].sort((a, b) =>
+        Number(a.isDeleted) - Number(b.isDeleted) ||
+        a.createdAt.localeCompare(b.createdAt),
+    )[0];
+}
+
 function bigrams(s: string): string[] {
     const grams: string[] = [];
     for (let i = 0; i < s.length - 1; i++) grams.push(s.slice(i, i + 2));
