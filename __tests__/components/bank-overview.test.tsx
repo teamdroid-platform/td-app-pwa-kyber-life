@@ -297,6 +297,46 @@ describe("BankOverviewClient", () => {
         expect(screen.getByRole("link", { name: /Conciliar/i })).toBeInTheDocument();
     });
 
+    describe("cuentas cuyo emisor no está en la lista", () => {
+        /**
+         * El caso real: una limpieza de duplicados archivó los emisores del
+         * usuario y dejó su cuenta colgando de uno que esta pantalla no lista.
+         * La cuenta seguía viva en la base y aun así desapareció de la vista.
+         */
+        const huerfana: BankOverview = {
+            ...overview,
+            accounts: [{ ...overview.accounts[0], id: "a9", institutionId: "fantasma", lastFour: "9910" }],
+            cards: [],
+        };
+
+        it("las muestra en su propio grupo en vez de tragárselas", () => {
+            render(<BankOverviewClient initialData={huerfana} />);
+
+            expect(screen.getByText("XXXX9910")).toBeInTheDocument();
+            expect(screen.getByRole("button", { name: /Emisor no encontrado.*1 ítem/i })).toBeInTheDocument();
+        });
+
+        it("dice qué pasó y qué hacer, y no promete que los saldos se perdieron", () => {
+            render(<BankOverviewClient initialData={huerfana} />);
+
+            expect(screen.getByText(/Su banco ya no está en tu lista/i)).toBeInTheDocument();
+            expect(screen.getByText(/siguen intactos/i)).toBeInTheDocument();
+        });
+
+        it("el cajón no ofrece unificar: no es un emisor", () => {
+            render(<BankOverviewClient initialData={huerfana} />);
+
+            expect(screen.queryByRole("button", { name: /Acciones de Emisor no encontrado/i }))
+                .not.toBeInTheDocument();
+        });
+
+        it("con todos los emisores en su sitio el grupo no aparece", () => {
+            render(<BankOverviewClient initialData={overview} />);
+
+            expect(screen.queryByText(/Emisor no encontrado/i)).not.toBeInTheDocument();
+        });
+    });
+
     it("con la base vacía muestra el estado vacío en vez de reventar", () => {
         render(<BankOverviewClient initialData={{
             institutions: [], accounts: [], cards: [],
