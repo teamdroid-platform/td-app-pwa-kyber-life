@@ -7,6 +7,26 @@ jest.mock("next/navigation", () => ({
     useRouter: () => ({ refresh: jest.fn(), push: jest.fn() }),
 }));
 
+const deleteBankInstitutionAction = jest.fn().mockResolvedValue({ success: true, data: true });
+
+jest.mock("@/app/actions/bank", () => ({
+    deleteBankInstitutionAction: (...args: unknown[]) => deleteBankInstitutionAction(...args),
+    mergeBankInstitutionsAction: jest.fn().mockResolvedValue({ success: true, data: {} }),
+    createBankAccountAction: jest.fn().mockResolvedValue({ success: true, data: {} }),
+    updateBankAccountAction: jest.fn().mockResolvedValue({ success: true, data: {} }),
+    deleteBankAccountAction: jest.fn().mockResolvedValue({ success: true, data: true }),
+    createBankCardAction: jest.fn().mockResolvedValue({ success: true, data: {} }),
+    updateBankCardAction: jest.fn().mockResolvedValue({ success: true, data: {} }),
+    deleteBankCardAction: jest.fn().mockResolvedValue({ success: true, data: true }),
+    createBankInstitutionAction: jest.fn().mockResolvedValue({ success: true, data: {} }),
+    updateBankInstitutionAction: jest.fn().mockResolvedValue({ success: true, data: {} }),
+    convertAccountToCardAction: jest.fn().mockResolvedValue({ success: true, data: {} }),
+    registerBalanceSnapshotsAction: jest.fn().mockResolvedValue({ success: true, data: {} }),
+    registerBalanceSnapshotAction: jest.fn().mockResolvedValue({ success: true, data: {} }),
+}));
+
+jest.mock("sonner", () => ({ toast: { success: jest.fn(), error: jest.fn() } }));
+
 const STAMPS = { createdAt: "", updatedAt: "", isDeleted: false };
 
 const overview: BankOverview = {
@@ -295,6 +315,81 @@ describe("BankOverviewClient", () => {
         // Los números por atribuir se acumulan aunque no haya identidades sin
         // revisar; sin este enlace la pantalla solo se alcanzaba por URL.
         expect(screen.getByRole("link", { name: /Conciliar/i })).toBeInTheDocument();
+    });
+
+    describe("cuentas cuyo emisor no está en la lista", () => {
+        /**
+         * El caso real: una limpieza de duplicados archivó los emisores del
+         * usuario y dejó su cuenta colgando de uno que esta pantalla no lista.
+         * La cuenta seguía viva en la base y aun así desapareció de la vista.
+         */
+        const huerfana: BankOverview = {
+            ...overview,
+            accounts: [{ ...overview.accounts[0], id: "a9", institutionId: "fantasma", lastFour: "9910" }],
+            cards: [],
+        };
+
+        it("las muestra en su propio grupo en vez de tragárselas", () => {
+            render(<BankOverviewClient initialData={huerfana} />);
+
+            expect(screen.getByText("XXXX9910")).toBeInTheDocument();
+            expect(screen.getByRole("button", { name: /Emisor no encontrado.*1 ítem/i })).toBeInTheDocument();
+        });
+
+        it("dice qué pasó y qué hacer, y no promete que los saldos se perdieron", () => {
+            render(<BankOverviewClient initialData={huerfana} />);
+
+            expect(screen.getByText(/Su banco ya no está en tu lista/i)).toBeInTheDocument();
+            expect(screen.getByText(/siguen intactos/i)).toBeInTheDocument();
+        });
+
+        it("el cajón no ofrece unificar: no es un emisor", () => {
+            render(<BankOverviewClient initialData={huerfana} />);
+
+            expect(screen.queryByRole("button", { name: /Acciones de Emisor no encontrado/i }))
+                .not.toBeInTheDocument();
+        });
+
+        it("con todos los emisores en su sitio el grupo no aparece", () => {
+            render(<BankOverviewClient initialData={overview} />);
+
+            expect(screen.queryByText(/Emisor no encontrado/i)).not.toBeInTheDocument();
+        });
+    });
+
+    describe("archivar una institución", () => {
+        beforeEach(() => { deleteBankInstitutionAction.mockClear(); });
+
+        it("una institución vacía se archiva desde su menú", async () => {
+            render(<BankOverviewClient initialData={{
+                ...overview,
+                institutions: [...overview.institutions, VACIA],
+            }} />);
+
+            act(() => { fireEvent.click(screen.getByRole("button", { name: /Acciones de Cooperativa JEP/ })); });
+            const archivar = screen.getByRole("button", { name: /Archivar institución/ });
+            expect(archivar).toBeEnabled();
+
+            await act(async () => { fireEvent.click(archivar); });
+
+            expect(deleteBankInstitutionAction).toHaveBeenCalledWith("i8");
+        });
+
+        it("con cuentas dentro no se archiva, y dice qué hacer antes", () => {
+            render(<BankOverviewClient initialData={overview} />);
+
+            act(() => { fireEvent.click(screen.getByRole("button", { name: /Acciones de Banco del Austro/ })); });
+
+            // Archivar un emisor con cuentas las dejaría colgando de un emisor
+            // que la pantalla ya no lista: es justo lo que hizo desaparecer una
+            // cooperativa entera.
+            const archivar = screen.getByRole("button", { name: /Archivar institución/ });
+            expect(archivar).toBeDisabled();
+            expect(archivar).toHaveTextContent(/Antes mueve o archiva 1 cuenta · 2 tarjetas/i);
+
+            act(() => { fireEvent.click(archivar); });
+            expect(deleteBankInstitutionAction).not.toHaveBeenCalled();
+        });
     });
 
     it("con la base vacía muestra el estado vacío en vez de reventar", () => {

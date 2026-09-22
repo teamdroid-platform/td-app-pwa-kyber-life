@@ -2,8 +2,10 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import {
-    AlertTriangle, ChevronDown, ChevronRight, CreditCard, Landmark, Merge, Plus, Scale, Wallet,
+    AlertTriangle, ChevronDown, ChevronRight, CreditCard, Landmark, Merge, Plus, Scale, Trash2, Wallet,
 } from "lucide-react";
 import { BankBalanceHero } from "./BankBalanceHero";
 import { AccountRow } from "./AccountRow";
@@ -18,6 +20,7 @@ import { FormSheet } from "@/components/ui/form-sheet";
 import { cn } from "@/lib/utils";
 import { accountLabel } from "@/lib/bank-identity-label";
 import { findDuplicateInstitutions } from "@/lib/institution-duplicates";
+import { deleteBankInstitutionAction } from "@/app/actions/bank";
 import { money } from "../lib/format-money";
 import type {
     BankOverview, BankAccountWithBalance, BankCardWithDebt,
@@ -31,6 +34,12 @@ interface Group {
     cards: BankCardWithDebt[];
     total: number;
 }
+
+/**
+ * El cajón de lo que cuelga de un emisor que no está en la lista del usuario
+ * —archivado, o de otra cuenta—. Es una clave de pantalla, no un id guardado.
+ */
+const STRAY_GROUP_ID = "__emisor-desconocido__";
 
 /** Una opción del alta, con la misma forma que las del selector de pago. */
 function CreateTile({
@@ -75,7 +84,9 @@ function describeGroup(counts?: { accounts: number; cards: number }): string {
  */
 export function BankOverviewClient({ initialData }: { initialData: BankOverview }) {
     const { institutions, accounts, cards } = initialData;
+    const router = useRouter();
     const [addOpen, setAddOpen] = useState(false);
+    const [archivingInstitution, setArchivingInstitution] = useState(false);
     const [mergeGroupKey, setMergeGroupKey] = useState<string | null>(null);
     // El emisor cuyo menú está abierto, y el que se está unificando a mano.
     const [menuFor, setMenuFor] = useState<BankInstitution | null>(null);
@@ -132,6 +143,30 @@ export function BankOverviewClient({ initialData }: { initialData: BankOverview 
             });
         }
 
+        // Las que apuntan a un emisor que no está en la lista del usuario:
+        // archivado, o de otra cuenta. No caían en ningún grupo —tampoco en
+        // «Sin institución», porque emisor sí tienen, solo que uno que esta
+        // pantalla no conoce— y desaparecían sin que nada lo dijera.
+        //
+        // No es hipotético: una limpieza de emisores duplicados dejó una cuenta
+        // colgando del emisor de otra cuenta, y la cooperativa entera se
+        // esfumó de la pantalla con sus saldos intactos en la base.
+        const knownIds = new Set(institutions.map(i => i.id));
+        const isStray = (institutionId?: string | null) =>
+            Boolean(institutionId) && !knownIds.has(institutionId!);
+
+        const strayAccounts = accounts.filter(a => isStray(a.institutionId));
+        const strayCards = cards.filter(c => isStray(c.institutionId));
+        if (strayAccounts.length > 0 || strayCards.length > 0) {
+            byInstitution.push({
+                id: STRAY_GROUP_ID,
+                name: "Emisor no encontrado",
+                accounts: strayAccounts,
+                cards: strayCards,
+                total: strayAccounts.reduce((sum, a) => sum + a.balance, 0),
+            });
+        }
+
         return byInstitution;
     }, [institutions, accounts, cards]);
 
@@ -157,7 +192,28 @@ export function BankOverviewClient({ initialData }: { initialData: BankOverview 
         return map;
     }, [groups]);
 
+    /** Si al emisor le cuelga algo: con cuentas o tarjetas dentro no se archiva. */
+    const hasItems = (institutionId: string) => {
+        const counts = countsById.get(institutionId);
+        return Boolean(counts && counts.accounts + counts.cards > 0);
+    };
+
+    async function archiveInstitution(institution: BankInstitution) {
+        setArchivingInstitution(true);
+        const result = await deleteBankInstitutionAction(institution.id);
+        setArchivingInstitution(false);
+
+        if (!result.success) {
+            toast.error(result.error);
+            return;
+        }
+        setMenuFor(null);
+        toast.success(`${institution.name} archivada`);
+        router.refresh();
+    }
+
     const mergeGroup = duplicateGroups.find(g => g.fingerprint === mergeGroupKey);
+
     const mergeCandidates: MergeCandidate[] = (mergeGroup?.members ?? []).map(
         (institution: BankInstitution) => ({
             institution,
@@ -316,9 +372,10 @@ export function BankOverviewClient({ initialData }: { initialData: BankOverview 
                                     </span>
                                 </button>
 
-                                {/* Solo los emisores de verdad: «Efectivo» y
-                                    «Sin institución» son cajones, no bancos, y
-                                    no hay nada que unificar en ellos. */}
+                                {/* Solo los emisores de verdad: «Efectivo»,
+                                    «Sin institución» y «Emisor no encontrado»
+                                    son cajones, no bancos, y no hay nada que
+                                    unificar en ellos. */}
                                 {institutionById.get(key) && (
                                     <KebabButton
                                         label={`Acciones de ${group.name}`}
@@ -329,25 +386,39 @@ export function BankOverviewClient({ initialData }: { initialData: BankOverview 
 
                             {!isCollapsed && (
                                 count > 0 ? (
-                                    <div className="divide-y divide-border/50 overflow-hidden rounded-2xl border bg-card">
-                                        {group.accounts.map(account => (
-                                            <AccountRow
-                                                key={account.id}
-                                                account={account}
-                                                institutions={institutions}
-                                                accounts={accounts}
-                                            />
-                                        ))}
-                                        {group.cards.map(card => (
-                                            <CardRow
-                                                key={card.id}
-                                                card={card}
-                                                accountName={card.accountId ? accountNameById.get(card.accountId) : undefined}
-                                                institutions={institutions}
-                                                accounts={accounts}
-                                            />
-                                        ))}
-                                    </div>
+                                    <>
+                                        {/* Decir qué pasó y qué hacer, porque el
+                                            nombre del cajón solo dice lo primero. */}
+                                        {group.id === STRAY_GROUP_ID && (
+                                            <p className="flex items-start gap-2 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-xs text-amber-600 dark:text-amber-400">
+                                                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                                <span>
+                                                    Su banco ya no está en tu lista: lo archivaste o pertenece
+                                                    a otra cuenta. Asígnales uno desde cada fila y volverán a
+                                                    su grupo; sus saldos y movimientos siguen intactos.
+                                                </span>
+                                            </p>
+                                        )}
+                                        <div className="divide-y divide-border/50 overflow-hidden rounded-2xl border bg-card">
+                                            {group.accounts.map(account => (
+                                                <AccountRow
+                                                    key={account.id}
+                                                    account={account}
+                                                    institutions={institutions}
+                                                    accounts={accounts}
+                                                />
+                                            ))}
+                                            {group.cards.map(card => (
+                                                <CardRow
+                                                    key={card.id}
+                                                    card={card}
+                                                    accountName={card.accountId ? accountNameById.get(card.accountId) : undefined}
+                                                    institutions={institutions}
+                                                    accounts={accounts}
+                                                />
+                                            ))}
+                                        </div>
+                                    </>
                                 ) : (
                                     <p className="rounded-2xl border border-dashed bg-muted/20 px-3 py-2.5 text-xs text-muted-foreground">
                                         Sin cuentas ni tarjetas todavía.
@@ -375,6 +446,20 @@ export function BankOverviewClient({ initialData }: { initialData: BankOverview 
                                 setMenuFor(null);
                                 setMergingInto(source);
                             },
+                        },
+                        {
+                            label: archivingInstitution ? "Archivando…" : "Archivar institución",
+                            // Con cuentas dentro no se archiva: quedarían
+                            // colgando de un emisor que la pantalla ya no lista.
+                            // Es exactamente lo que hizo desaparecer una
+                            // cooperativa entera, así que aquí se corta antes.
+                            hint: hasItems(menuFor.id)
+                                ? `Antes mueve o archiva ${describeGroup(countsById.get(menuFor.id)).toLowerCase()}`
+                                : "Desaparece de la lista; un escaneo con su nombre la devuelve",
+                            icon: <Trash2 className="h-4 w-4" />,
+                            tone: "danger",
+                            disabled: hasItems(menuFor.id) || archivingInstitution,
+                            onSelect: () => archiveInstitution(menuFor),
                         },
                     ]}
                 />

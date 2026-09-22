@@ -13,6 +13,12 @@ export interface RowAction {
     href?: string;
     onSelect?: () => void;
     tone?: "default" | "danger";
+    /**
+     * Visible pero sin efecto. Se muestra en vez de esconderse porque lo que
+     * hay que comunicar es que la acción existe y qué falta para poder usarla
+     * —eso lo dice `hint`—; una opción ausente solo deja al usuario buscándola.
+     */
+    disabled?: boolean;
 }
 
 interface RowActionsSheetProps {
@@ -44,6 +50,7 @@ export function RowActionsSheet({
             <div className="flex flex-col">
                 {actions.map(action => {
                     const danger = action.tone === "danger";
+                    const disabled = action.disabled === true;
                     const content = (
                         <>
                             <span className={cn(
@@ -60,18 +67,28 @@ export function RowActionsSheet({
                                     {action.label}
                                 </span>
                                 {action.hint && (
-                                    <span className="block truncate text-[11px] text-muted-foreground">
+                                    <span className={cn(
+                                        "block text-[11px] text-muted-foreground",
+                                        // Deshabilitada, el motivo es lo único que
+                                        // explica por qué no pasa nada al tocarla:
+                                        // cortarlo con puntos suspensivos lo
+                                        // escondería justo cuando más falta hace.
+                                        disabled ? "whitespace-normal" : "truncate",
+                                    )}>
                                         {action.hint}
                                     </span>
                                 )}
                             </span>
-                            <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                            {!disabled && <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />}
                         </>
                     );
 
-                    const className = "flex w-full items-center gap-3 rounded-xl px-1 py-2.5 text-left transition-colors hover:bg-muted/50";
+                    const className = cn(
+                        "flex w-full items-center gap-3 rounded-xl px-1 py-2.5 text-left transition-colors",
+                        disabled ? "cursor-not-allowed opacity-50" : "hover:bg-muted/50",
+                    );
 
-                    return action.href ? (
+                    return action.href && !disabled ? (
                         <Link key={action.label} href={action.href} className={className}>
                             {content}
                         </Link>
@@ -79,6 +96,7 @@ export function RowActionsSheet({
                         <button
                             key={action.label}
                             type="button"
+                            disabled={disabled}
                             onClick={action.onSelect}
                             className={className}
                         >
