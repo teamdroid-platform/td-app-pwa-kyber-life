@@ -2,8 +2,10 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import {
-    AlertTriangle, ChevronDown, ChevronRight, CreditCard, Landmark, Merge, Plus, Scale, Wallet,
+    AlertTriangle, ChevronDown, ChevronRight, CreditCard, Landmark, Merge, Plus, Scale, Trash2, Wallet,
 } from "lucide-react";
 import { BankBalanceHero } from "./BankBalanceHero";
 import { AccountRow } from "./AccountRow";
@@ -18,6 +20,7 @@ import { FormSheet } from "@/components/ui/form-sheet";
 import { cn } from "@/lib/utils";
 import { accountLabel } from "@/lib/bank-identity-label";
 import { findDuplicateInstitutions } from "@/lib/institution-duplicates";
+import { deleteBankInstitutionAction } from "@/app/actions/bank";
 import { money } from "../lib/format-money";
 import type {
     BankOverview, BankAccountWithBalance, BankCardWithDebt,
@@ -81,7 +84,9 @@ function describeGroup(counts?: { accounts: number; cards: number }): string {
  */
 export function BankOverviewClient({ initialData }: { initialData: BankOverview }) {
     const { institutions, accounts, cards } = initialData;
+    const router = useRouter();
     const [addOpen, setAddOpen] = useState(false);
+    const [archivingInstitution, setArchivingInstitution] = useState(false);
     const [mergeGroupKey, setMergeGroupKey] = useState<string | null>(null);
     // El emisor cuyo menú está abierto, y el que se está unificando a mano.
     const [menuFor, setMenuFor] = useState<BankInstitution | null>(null);
@@ -187,7 +192,28 @@ export function BankOverviewClient({ initialData }: { initialData: BankOverview 
         return map;
     }, [groups]);
 
+    /** Si al emisor le cuelga algo: con cuentas o tarjetas dentro no se archiva. */
+    const hasItems = (institutionId: string) => {
+        const counts = countsById.get(institutionId);
+        return Boolean(counts && counts.accounts + counts.cards > 0);
+    };
+
+    async function archiveInstitution(institution: BankInstitution) {
+        setArchivingInstitution(true);
+        const result = await deleteBankInstitutionAction(institution.id);
+        setArchivingInstitution(false);
+
+        if (!result.success) {
+            toast.error(result.error);
+            return;
+        }
+        setMenuFor(null);
+        toast.success(`${institution.name} archivada`);
+        router.refresh();
+    }
+
     const mergeGroup = duplicateGroups.find(g => g.fingerprint === mergeGroupKey);
+
     const mergeCandidates: MergeCandidate[] = (mergeGroup?.members ?? []).map(
         (institution: BankInstitution) => ({
             institution,
@@ -420,6 +446,20 @@ export function BankOverviewClient({ initialData }: { initialData: BankOverview 
                                 setMenuFor(null);
                                 setMergingInto(source);
                             },
+                        },
+                        {
+                            label: archivingInstitution ? "Archivando…" : "Archivar institución",
+                            // Con cuentas dentro no se archiva: quedarían
+                            // colgando de un emisor que la pantalla ya no lista.
+                            // Es exactamente lo que hizo desaparecer una
+                            // cooperativa entera, así que aquí se corta antes.
+                            hint: hasItems(menuFor.id)
+                                ? `Antes mueve o archiva ${describeGroup(countsById.get(menuFor.id)).toLowerCase()}`
+                                : "Desaparece de la lista; un escaneo con su nombre la devuelve",
+                            icon: <Trash2 className="h-4 w-4" />,
+                            tone: "danger",
+                            disabled: hasItems(menuFor.id) || archivingInstitution,
+                            onSelect: () => archiveInstitution(menuFor),
                         },
                     ]}
                 />
