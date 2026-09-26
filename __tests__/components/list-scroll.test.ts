@@ -70,11 +70,23 @@ describe("restoreListScroll", () => {
         }
     }
 
+    /** Mueve la ventana como lo haría el navegador al hacer scrollTo. */
+    function setScrollY(y: number) {
+        Object.defineProperty(window, "scrollY", { value: y, configurable: true });
+    }
+
+    function setPageHeight(height: number) {
+        Object.defineProperty(document.documentElement, "scrollHeight", {
+            value: height, configurable: true,
+        });
+    }
+
     beforeEach(() => {
         frames = [];
-        scrollTo = jest.fn();
+        scrollTo = jest.fn((_x: number, y: number) => setScrollY(y));
         Object.defineProperty(window, "scrollTo", { value: scrollTo, writable: true });
         Object.defineProperty(window, "innerHeight", { value: 800, writable: true });
+        setScrollY(0);
         jest.spyOn(window, "requestAnimationFrame").mockImplementation(cb => {
             frames.push(cb);
             return frames.length;
@@ -83,20 +95,15 @@ describe("restoreListScroll", () => {
 
     afterEach(() => { jest.restoreAllMocks(); });
 
-    function setPageHeight(height: number) {
-        Object.defineProperty(document.documentElement, "scrollHeight", {
-            value: height, configurable: true,
-        });
-    }
-
     it("espera a que la lista tenga alto antes de dar por buena la posición", () => {
-        // Al montar, la lista todavía no ha pintado sus tarjetas.
+        // Al montar, la lista todavía no ha pintado sus tarjetas: no hay dónde
+        // ir, pero tampoco se da por hecho que ya está.
         setPageHeight(800);
         restoreListScroll(2000);
 
-        runFrames(1);
-        // Se intenta igual, pero solo se llega hasta donde la página da.
-        expect(scrollTo).toHaveBeenLastCalledWith(0, 0);
+        runFrames(4);
+        expect(scrollTo).not.toHaveBeenCalled();
+        expect(frames.length).toBeGreaterThan(0);
 
         // Las tarjetas aparecen y la página crece.
         setPageHeight(4000);
@@ -104,13 +111,43 @@ describe("restoreListScroll", () => {
         expect(scrollTo).toHaveBeenLastCalledWith(0, 2000);
     });
 
-    it("deja de intentarlo cuando la página ya llega", () => {
+    it("insiste si algo devuelve la ventana al principio después", () => {
+        // El router lleva la pantalla nueva al principio, y a veces lo hace
+        // después de este primer intento: acertar una vez no basta.
+        setPageHeight(4000);
+        restoreListScroll(2000);
+
+        runFrames(1);
+        expect(scrollTo).toHaveBeenLastCalledWith(0, 2000);
+
+        setScrollY(0);
+        runFrames(1);
+        expect(scrollTo).toHaveBeenLastCalledWith(0, 2000);
+    });
+
+    it("para cuando la posición se sostiene sola", () => {
+        setPageHeight(4000);
+        restoreListScroll(2000);
+
+        // Uno para llegar y tres en los que nadie la mueve.
+        runFrames(10);
+        expect(scrollTo).toHaveBeenCalledTimes(1);
+        expect(frames).toHaveLength(0);
+    });
+
+    it("suelta la posición en cuanto el usuario hace scroll", () => {
         setPageHeight(4000);
         restoreListScroll(2000);
 
         runFrames(1);
         expect(scrollTo).toHaveBeenCalledTimes(1);
-        expect(frames).toHaveLength(0);
+
+        window.dispatchEvent(new Event("wheel"));
+        setScrollY(300);
+        runFrames(5);
+
+        // No vuelve a moverla: la lleva el usuario.
+        expect(scrollTo).toHaveBeenCalledTimes(1);
     });
 
     it("se rinde en vez de perseguir un alto que ya no existe", () => {
@@ -119,7 +156,7 @@ describe("restoreListScroll", () => {
         restoreListScroll(5000, 3);
 
         runFrames(10);
-        expect(scrollTo).toHaveBeenCalledTimes(4);
+        expect(scrollTo).toHaveBeenCalledTimes(1);
         expect(frames).toHaveLength(0);
     });
 });

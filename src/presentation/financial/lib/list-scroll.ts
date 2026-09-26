@@ -78,26 +78,61 @@ export function readListScroll(key: string, now: number = Date.now()): ListScrol
 }
 
 /**
- * Vuelve a `y` en cuanto la página tenga alto suficiente.
+ * Vuelve a `y` y **se queda ahí** mientras la pantalla se termina de armar.
  *
- * Las tarjetas aparecen después del primer pintado, así que un `scrollTo`
- * suelto se queda corto: el documento todavía mide una pantalla. Se reintenta
- * fotograma a fotograma mientras la página siga creciendo, con un tope para no
- * quedarse persiguiendo una lista que nunca llega a ese alto —porque se borró
- * una transacción, por ejemplo—.
+ * Hay dos cosas que pelean por la posición. Las tarjetas aparecen después del
+ * primer pintado, así que un `scrollTo` suelto se queda corto: el documento
+ * todavía mide una pantalla. Y el router lleva la ventana al principio cuando
+ * monta la pantalla nueva, a veces después de este primer intento. Por eso no
+ * basta con acertar una vez: se reintenta fotograma a fotograma hasta que la
+ * posición se sostiene sola unos cuantos seguidos.
+ *
+ * Se abandona en cuanto el usuario toca el scroll —es suyo, no nuestro— y en
+ * todo caso al llegar al tope de fotogramas, para no quedarse persiguiendo un
+ * alto que ya no existe porque se borró la transacción del final.
  */
-export function restoreListScroll(y: number, maxFrames = 30): void {
+export function restoreListScroll(y: number, maxFrames = 40): void {
     let frames = 0;
+    let settled = 0;
+    let done = false;
+
+    const stop = () => {
+        done = true;
+        for (const event of USER_SCROLL_EVENTS) {
+            window.removeEventListener(event, stop);
+        }
+    };
+
+    for (const event of USER_SCROLL_EVENTS) {
+        window.addEventListener(event, stop, { passive: true, once: true });
+    }
 
     const step = () => {
-        const max = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
-        window.scrollTo(0, Math.min(y, max));
+        if (done) return;
 
-        // Llegó, o la página ya no puede crecer más hacia esa posición.
-        if (max >= y || frames >= maxFrames) return;
+        const max = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+        const target = Math.min(y, max);
+
+        if (Math.abs(window.scrollY - target) > 1) {
+            window.scrollTo(0, target);
+            settled = 0;
+        } else {
+            settled += 1;
+        }
+
         frames += 1;
+        // Llegó al sitio pedido y se mantuvo: nadie más lo está moviendo.
+        if (settled >= SETTLED_FRAMES && max >= y) return stop();
+        if (frames >= maxFrames) return stop();
+
         requestAnimationFrame(step);
     };
 
     requestAnimationFrame(step);
 }
+
+/** Gestos con los que el usuario dice que la posición la lleva él. */
+const USER_SCROLL_EVENTS = ["wheel", "touchstart", "keydown"] as const;
+
+/** Cuántos fotogramas seguidos tiene que aguantar la posición para darla por buena. */
+const SETTLED_FRAMES = 3;

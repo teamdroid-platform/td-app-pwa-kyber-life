@@ -97,17 +97,40 @@ beforeEach(() => {
 });
 
 describe("TransactionTimeline · volver al mismo sitio", () => {
+    /** Mueve la ventana y avisa, como haría el navegador. */
+    function scrollWindowTo(y: number) {
+        Object.defineProperty(window, "scrollY", { value: y, configurable: true });
+        window.dispatchEvent(new Event("scroll"));
+    }
+
     it("guarda dónde estaba la lista al salir de ella", () => {
         const view = render(
             <TransactionTimeline initialTransactions={[tx("1")]} searchFilters={FILTERS} />,
         );
 
-        Object.defineProperty(window, "scrollY", { value: 1840, writable: true });
+        scrollWindowTo(1840);
         // Abrir el detalle desmonta la lista: es el momento de anotar el sitio.
         view.unmount();
 
         const saved = JSON.parse(sessionStorage.getItem("kyber:list-scroll") ?? "{}");
         expect(saved).toMatchObject({ key: LIST_KEY, y: 1840, pages: 1 });
+    });
+
+    // La regresión que dejaba esto sin servir: al navegar, el router lleva la
+    // ventana arriba antes de que corran las limpiezas normales. Preguntar
+    // entonces «¿dónde estábamos?» respondía cero, y cero no se restaura.
+    it("guarda el sitio del usuario, no el cero al que salta el router", () => {
+        const view = render(
+            <TransactionTimeline initialTransactions={[tx("1")]} searchFilters={FILTERS} />,
+        );
+
+        scrollWindowTo(1840);
+        // El router monta la pantalla nueva y sube la ventana.
+        Object.defineProperty(window, "scrollY", { value: 0, configurable: true });
+        view.unmount();
+
+        const saved = JSON.parse(sessionStorage.getItem("kyber:list-scroll") ?? "{}");
+        expect(saved).toMatchObject({ y: 1840 });
     });
 
     it("al volver repone las páginas que había cargadas antes de moverse", async () => {
