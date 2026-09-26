@@ -19,6 +19,7 @@ import { toast } from "sonner";
 import type { BalanceSet } from "@/application/services/balance-service";
 import { type BalanceMode, DEFAULT_BALANCE_MODE } from "@/domain/entities/balance";
 import { readListScroll, restoreListScroll, writeListScroll } from "../lib/list-scroll";
+import { useIsomorphicLayoutEffect } from "@/hooks/use-isomorphic-layout-effect";
 
 // ─── Props ───────────────────────────────────────────────────
 
@@ -340,18 +341,36 @@ export function TransactionTimeline({ initialTransactions, allFilteredTransactio
     const pageRef = useRef(page);
     useEffect(() => { pageRef.current = page; }, [page]);
 
-    // Se guarda al salir de la pantalla. `pagehide` cubre lo que el desmontaje
-    // no ve: cerrar la pestaña o irse a otro sitio desde la barra del navegador.
-    useEffect(() => {
+    // Dónde está la lista **ahora mismo**, apuntado según se desplaza.
+    //
+    // No se puede preguntar al salir: al navegar, el router lleva la ventana
+    // arriba antes de que corran las limpiezas normales, así que para cuando
+    // se pregunta la respuesta ya es cero y no hay nada que restaurar. Esta es
+    // justo la razón por la que el primer intento de arreglar esto no servía.
+    const scrollYRef = useRef(0);
+
+    // Efecto de disposición y no normal: su limpieza corre en la fase de
+    // mutación, antes de que la pantalla nueva mueva la ventana, así que el
+    // oyente deja de escuchar antes del salto al principio y el valor apuntado
+    // sigue siendo el del usuario.
+    useIsomorphicLayoutEffect(() => {
+        scrollYRef.current = window.scrollY;
+        const track = () => { scrollYRef.current = window.scrollY; };
+
         const save = () => writeListScroll({
             key: listKey,
-            y: window.scrollY,
+            y: scrollYRef.current,
             pages: pageRef.current,
             savedAt: Date.now(),
         });
 
+        window.addEventListener("scroll", track, { passive: true });
+        // `pagehide` cubre lo que el desmontaje no ve: cerrar la pestaña o
+        // salir desde la barra del navegador.
         window.addEventListener("pagehide", save);
+
         return () => {
+            window.removeEventListener("scroll", track);
             window.removeEventListener("pagehide", save);
             save();
         };
