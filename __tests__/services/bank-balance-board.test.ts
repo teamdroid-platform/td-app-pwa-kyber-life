@@ -113,6 +113,55 @@ describe("registerBalanceSnapshots", () => {
     });
 });
 
+describe("un corte con fecha futura", () => {
+    /** Mañana a esta hora: lo que el formulario mandaba desde las 19:00. */
+    function tomorrow(): string {
+        return new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    }
+
+    async function accountOf(service: BankService): Promise<string> {
+        const inst = await service.createInstitution(USER, { name: "Banco del Austro", kind: "BANK" });
+        const account = await service.createAccount(USER, {
+            institutionId: inst.id, accountType: "SAVINGS", lastFour: "7417",
+        });
+        return account.id;
+    }
+
+    // Guardarlo no servía de nada y encima lo parecía: el saldo de una cuenta
+    // es el último corte HASTA HOY más lo posterior, así que un corte de
+    // mañana no entra hasta mañana. El usuario escribía su saldo, la app
+    // respondía «saldo registrado» y la pantalla seguía en el corte viejo.
+    it("se rechaza en vez de guardarse donde el saldo no lo ve", async () => {
+        const { service } = buildService();
+        const accountId = await accountOf(service);
+
+        await expect(service.registerBalanceSnapshot(USER, accountId, 0, tomorrow()))
+            .rejects.toThrow(/futura/i);
+
+        const [entry] = await service.getBalanceBoard(USER);
+        expect(entry.lastAsOf).toBeNull();
+    });
+
+    it("la puesta al día en bloque lo rechaza igual", async () => {
+        const { service } = buildService();
+        const accountId = await accountOf(service);
+
+        await expect(service.registerBalanceSnapshots(USER, tomorrow(), [
+            { accountId, balance: 0 },
+        ])).rejects.toThrow(/futura/i);
+    });
+
+    it("un corte de hoy sí se guarda, aunque sea de hace un instante", async () => {
+        const { service } = buildService();
+        const accountId = await accountOf(service);
+
+        await service.registerBalanceSnapshot(USER, accountId, 0, new Date().toISOString());
+
+        const [entry] = await service.getBalanceBoard(USER);
+        expect(entry.lastBalance).toBe(0);
+    });
+});
+
 describe("dos cortes el mismo día", () => {
     it("el saldo usa el último declarado, no el que corrige", async () => {
         const { service } = buildService();

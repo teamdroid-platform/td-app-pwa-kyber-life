@@ -90,6 +90,31 @@ describe("BalanceBoardClient", () => {
         expect(screen.queryByRole("button", { name: /Guardar/ })).not.toBeInTheDocument();
     });
 
+    describe("la fecha que propone", () => {
+        // 19:12 del 25 en Ecuador es ya el 26 en UTC. La suite corre fijada a
+        // America/Guayaquil (jest.global-setup.js), así que esto es la hora de
+        // un usuario real, no un montaje.
+        const NOCHE = new Date("2026-09-26T00:12:00.000Z");
+
+        beforeEach(() => { jest.useFakeTimers().setSystemTime(NOCHE); });
+        afterEach(() => { jest.useRealTimers(); });
+
+        it("es la de hoy aquí, no la de UTC", () => {
+            render(<BalanceBoardClient entries={ENTRIES} />);
+
+            // Con la fecha UTC el corte quedaba fechado mañana, y el saldo de
+            // la cuenta —último corte hasta hoy más lo posterior— lo ignoraba:
+            // la app decía «saldo registrado» y la pantalla no se movía.
+            expect(screen.getByLabelText("Fecha del corte")).toHaveValue("2026-09-25");
+        });
+
+        it("no deja elegir una fecha futura", () => {
+            render(<BalanceBoardClient entries={ENTRIES} />);
+
+            expect(screen.getByLabelText("Fecha del corte")).toHaveAttribute("max", "2026-09-25");
+        });
+    });
+
     it("muestra el último saldo declarado junto a cuándo fue", () => {
         render(<BalanceBoardClient entries={ENTRIES} />);
 
