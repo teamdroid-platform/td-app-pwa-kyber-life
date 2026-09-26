@@ -41,6 +41,24 @@ function stamps() {
 }
 
 /**
+ * Un corte de saldo con fecha futura no se puede guardar.
+ *
+ * El saldo de una cuenta es el último corte **hasta hoy** más los movimientos
+ * posteriores: un corte fechado mañana no entra en esa cuenta hasta que llegue
+ * mañana. Guardarlo en silencio era peor que rechazarlo —el usuario escribía
+ * su saldo, la app decía «saldo registrado» y la pantalla seguía mostrando el
+ * corte viejo, sin nada que explicara la diferencia.
+ *
+ * Pasaba a diario sin que nadie eligiera una fecha futura: el formulario
+ * proponía la fecha UTC, que en Ecuador es la de mañana desde las 19:00.
+ */
+function requireNotFuture(asOf: string): void {
+    if (new Date(asOf).getTime() > Date.now()) {
+        throw new Error("No se puede registrar un saldo con fecha futura");
+    }
+}
+
+/**
  * Pone el nombre del emisor sobre la cuenta o la tarjeta.
  *
  * `institutionName` no persiste —la tabla solo guarda el id— así que sin este
@@ -1042,6 +1060,7 @@ export class BankService {
     async registerBalanceSnapshot(
         userId: UUID, accountId: UUID, balance: number, asOf: string, note?: string,
     ): Promise<BankAccountBalanceSnapshot> {
+        requireNotFuture(asOf);
         return this.snapshots.create({
             id: randomUUID(),
             ownerUserId: userId,
@@ -1096,6 +1115,7 @@ export class BankService {
     async registerBalanceSnapshots(
         userId: UUID, asOf: string, entries: readonly { accountId: UUID; balance: number }[],
     ): Promise<BankAccountBalanceSnapshot[]> {
+        requireNotFuture(asOf);
         const owned = await this.accounts.findByOwnerId(userId);
 
         for (const entry of entries) {

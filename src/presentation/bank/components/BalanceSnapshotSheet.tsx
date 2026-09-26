@@ -8,6 +8,7 @@ import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { registerBalanceSnapshotAction } from "@/app/actions/bank";
+import { toDateInputValue } from "@/lib/date-range";
 import type { UUID } from "@/domain/core";
 
 interface BalanceSnapshotSheetProps {
@@ -18,9 +19,17 @@ interface BalanceSnapshotSheetProps {
     onOpenChange?: (open: boolean) => void;
 }
 
-/** Fecha de hoy en el formato que espera `<input type="date">`. */
+/**
+ * Fecha de hoy en el formato que espera `<input type="date">`, **en la zona
+ * del usuario**.
+ *
+ * `toISOString()` da la fecha UTC, que en Ecuador es la de mañana a partir de
+ * las 19:00. El corte se guardaba entonces con fecha futura y el saldo de la
+ * cuenta lo ignoraba —solo cuenta el último corte hasta hoy—, así que la app
+ * decía «saldo registrado» y la pantalla no se movía.
+ */
 function todayInput(): string {
-    return new Date().toISOString().slice(0, 10);
+    return toDateInputValue(new Date());
 }
 
 /**
@@ -95,9 +104,12 @@ export function BalanceSnapshotSheet({
             </Field>
 
             <Field label="A la fecha" htmlFor="snapshot-date">
+                {/* Sin `max` se puede elegir mañana, y un corte futuro no entra
+                    al saldo hasta que llegue esa fecha. */}
                 <Input
                     id="snapshot-date"
                     type="date"
+                    max={todayInput()}
                     value={asOf}
                     onChange={e => setAsOf(e.target.value)}
                 />

@@ -13,11 +13,17 @@ import { formatIdentityNumber } from "@/lib/format-bank-number";
 import { ACCOUNT_TYPE_ACRONYM, ACCOUNT_TYPE_LABEL } from "@/lib/bank-identity-label";
 import { daysAgoLabel } from "@/lib/balance-freshness";
 import { registerBalanceSnapshotsAction } from "@/app/actions/bank";
+import { toDateInputValue } from "@/lib/date-range";
 import type { AccountBalanceStatus } from "@/application/services/bank-service";
 
-/** Fecha de hoy en el formato que espera `<input type="date">`. */
+/**
+ * Fecha de hoy en el formato que espera `<input type="date">`, **en la zona
+ * del usuario**: `toISOString()` daría la UTC, que en Ecuador adelanta un día
+ * desde las 19:00 y dejaba el corte fechado en el futuro, donde el saldo de la
+ * cuenta no lo ve.
+ */
 function todayInput(): string {
-    return new Date().toISOString().slice(0, 10);
+    return toDateInputValue(new Date());
 }
 
 /** El emisor con el que se agrupa una cuenta; el efectivo no tiene ninguno. */
@@ -137,6 +143,7 @@ export function BalanceBoardClient({ entries }: BalanceBoardClientProps) {
                         <Input
                             id="board-as-of"
                             type="date"
+                            max={todayInput()}
                             value={asOf}
                             onChange={e => setAsOf(e.target.value)}
                             className="h-9 w-[9.5rem] shrink-0"

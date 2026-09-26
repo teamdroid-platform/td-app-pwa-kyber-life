@@ -15,16 +15,19 @@ import { AlertTriangle } from "lucide-react";
 import { accountLabel } from "@/lib/bank-identity-label";
 import { payCardAction } from "@/app/actions/bank";
 import { money } from "../lib/format-money";
+import { toDateInputValue } from "@/lib/date-range";
 import type { BankAccountWithBalance, BankCardWithDebt } from "@/application/services/bank-service";
 
 /**
  * `YYYY-MM-DD` de hoy en la zona del usuario. `toISOString` daría la fecha
  * UTC, que en Ecuador adelanta un día a partir de las 19:00.
+ *
+ * Delega en el helper compartido: esta misma cuenta se hacía a mano en tres
+ * pantallas y dos de ellas la tenían mal, con el corte de saldo fechado en el
+ * futuro como consecuencia.
  */
 function today(): string {
-    const now = new Date();
-    const local = new Date(now.getTime() - now.getTimezoneOffset() * 60_000);
-    return local.toISOString().slice(0, 10);
+    return toDateInputValue(new Date());
 }
 
 /**
