@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import type { BalanceSet } from "@/application/services/balance-service";
 import { type BalanceMode, DEFAULT_BALANCE_MODE } from "@/domain/entities/balance";
+import { readListScroll, restoreListScroll, writeListScroll } from "../lib/list-scroll";
 
 // ─── Props ───────────────────────────────────────────────────
 
@@ -328,6 +329,75 @@ export function TransactionTimeline({ initialTransactions, allFilteredTransactio
     useEffect(() => {
         loadMoreRef.current = loadMore;
     }, [loadMore]);
+
+    // ── Volver al mismo sitio de la lista ────────────────────
+    // Qué lista es esta, con sus filtros: la posición solo vale para la misma.
+    const listKey = useMemo(() => JSON.stringify(searchFilters ?? {}), [searchFilters]);
+
+    // El número de página vive en un ref además de en el estado porque quien lo
+    // guarda es el cierre de una limpieza de efecto, que ve el valor de cuando
+    // se montó y no el de ahora.
+    const pageRef = useRef(page);
+    useEffect(() => { pageRef.current = page; }, [page]);
+
+    // Se guarda al salir de la pantalla. `pagehide` cubre lo que el desmontaje
+    // no ve: cerrar la pestaña o irse a otro sitio desde la barra del navegador.
+    useEffect(() => {
+        const save = () => writeListScroll({
+            key: listKey,
+            y: window.scrollY,
+            pages: pageRef.current,
+            savedAt: Date.now(),
+        });
+
+        window.addEventListener("pagehide", save);
+        return () => {
+            window.removeEventListener("pagehide", save);
+            save();
+        };
+    }, [listKey]);
+
+    // Y se repone al volver, una sola vez. Si había más de una página cargada
+    // se piden otra vez antes de moverse: sin esas filas la lista no llega al
+    // sitio guardado y el salto se queda a medias.
+    const restoredRef = useRef(false);
+    useEffect(() => {
+        if (restoredRef.current) return;
+        restoredRef.current = true;
+
+        const snapshot = readListScroll(listKey);
+        if (!snapshot) return;
+
+        let cancelled = false;
+
+        (async () => {
+            for (let next = 2; next <= snapshot.pages; next++) {
+                const result = await searchPaginatedTransactionsAction({
+                    ...searchFilters,
+                    page: next,
+                    pageSize: PAGE_SIZE,
+                });
+                if (cancelled) return;
+                if (!result.success || !result.data) break;
+
+                const paginated = result.data as PaginatedResult<FinancialTransaction>;
+                setTransactions(prev => {
+                    const known = new Set(prev.map(t => t.id));
+                    return [...prev, ...paginated.data.filter(t => !known.has(t.id))];
+                });
+                setPage(next);
+                setHasMore(paginated.pagination.hasNextPage);
+                if (!paginated.pagination.hasNextPage) break;
+            }
+
+            if (!cancelled) restoreListScroll(snapshot.y);
+        })();
+
+        return () => { cancelled = true; };
+        // Solo al montar: `restoredRef` ya impide repetirlo, y depender de los
+        // filtros lo dispararía a mitad de una navegación entre pestañas.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     // ── Background Sync for Drafts ───────────────────────────
     useEffect(() => {
