@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowDownLeft, ArrowUpRight, ChevronRight, CreditCard } from "lucide-react";
+import { ArrowDownLeft, ArrowRightLeft, ArrowUpRight, ChevronRight, CreditCard } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { StepHeading } from "../WizardShell";
@@ -13,7 +13,9 @@ import {
 } from "@/lib/bank-identity-label";
 import { formatIdentityNumber, identityNumberFromDisplay } from "@/lib/format-bank-number";
 import { IdentityBadge } from "@/presentation/bank/components/IdentityBadge";
+import { resolveTransactionTypeOption } from "../../TransactionTypeChips";
 import type { BankAccount, BankCard, BankInstitution } from "@/domain/entities/bank";
+import type { FinancialTransactionType } from "@/domain/entities/financial";
 import type { ScannedAccountDecision, ScannedAccountView } from "@/application/services/bank-service";
 
 interface PaymentStepProps {
@@ -33,6 +35,10 @@ interface PaymentStepProps {
     /** Cuenta a la que entró el dinero, cuando el movimiento tiene dos lados. */
     destinationAccountId?: string | null;
     onDestinationChange?: (accountId: string | null) => void;
+    /** El tipo elegido, para poder explicar por qué este paso no pide destino. */
+    type?: FinancialTransactionType;
+    /** Cambiar el tipo sin salir de aquí, cuando resulta que sí tenía dos lados. */
+    onTypeChange?: (type: FinancialTransactionType) => void;
     /** Lo que el escaneo leyó en cada lado, para enseñarlo mientras no se elija. */
     scannedAccounts?: ScannedAccountView[];
     /**
@@ -58,7 +64,7 @@ interface PaymentStepProps {
 export function PaymentStep({
     accounts, cards, value, onChange, creditEligible,
     destinationEligible = false, destinationFirst = false, cleared, onClearedChange,
-    destinationAccountId, onDestinationChange, scannedAccounts = [],
+    destinationAccountId, onDestinationChange, type, onTypeChange, scannedAccounts = [],
     onScannedDecision, institutions = [], onAccountCreated, onCardCreated,
 }: PaymentStepProps) {
     // Un ingreso o una transferencia no se pagan con crédito, así que esas
@@ -168,6 +174,32 @@ export function PaymentStep({
                 )}
             </div>
 
+            {/* Sin fila de destino, la pregunta queda a medias y nada explica
+                por qué: un escaneo llega casi siempre como gasto, y quien
+                venía a registrar un traspaso entre sus cuentas se queda
+                mirando un formulario que no ofrece lo que busca. El tipo se
+                cambia en el primer paso, pero desde aquí eso no se ve. */}
+            {!hasDestination && !!onTypeChange && (
+                <button
+                    type="button"
+                    onClick={() => onTypeChange("TRANSFER")}
+                    className="mt-1 flex w-full items-center gap-2.5 rounded-xl border border-dashed border-border/60 p-2.5 text-left transition-colors hover:border-accent-primary hover:bg-accent-primary/5"
+                >
+                    <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-yellow-500/15 text-yellow-500">
+                        <ArrowRightLeft className="h-4 w-4" />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                        <span className="block text-sm text-text-primary">
+                            ¿Entró a otra cuenta tuya?
+                        </span>
+                        <span className="block text-[11px] text-text-tertiary">
+                            {`Un ${typeLabel(type)} no pregunta destino. Tócalo para volverlo transferencia.`}
+                        </span>
+                    </span>
+                    <ChevronRight className="h-4 w-4 shrink-0 text-text-tertiary" />
+                </button>
+            )}
+
             {creditEligible && (
                 <CreditRow
                     checked={!!value.paidWithCredit}
@@ -215,6 +247,11 @@ export function PaymentStep({
             />
         </>
     );
+}
+
+/** Cómo se llama el tipo en la frase que explica por qué no hay destino. */
+function typeLabel(type?: FinancialTransactionType): string {
+    return type ? resolveTransactionTypeOption(type).label.toLowerCase() : "gasto";
 }
 
 /**

@@ -385,6 +385,8 @@ export function TransactionWizard({
                         })}
                         destinationAccountId={values.bankDestinationAccountId}
                         onDestinationChange={(id) => setValue("bankDestinationAccountId", id)}
+                        type={values.type}
+                        onTypeChange={(v) => setValue("type", v)}
                         scannedAccounts={scannedAccountsWithChoice}
                         onScannedDecision={(raw, decision) => wizard.patch({
                             scannedOwnership: { ...values.scannedOwnership, [raw]: decision },
