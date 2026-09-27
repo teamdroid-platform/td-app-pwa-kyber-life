@@ -67,6 +67,26 @@ export function toDateInputValue(d: Date): string {
 }
 
 /**
+ * El instante con el que la app escribe «el comienzo de ese día».
+ *
+ * Finanzas guarda las fechas como **hora de pared etiquetada como UTC**: un
+ * gasto de las 19:25 se guarda `19:25Z`, sin convertir. Los cortes de saldo
+ * tienen que escribirse igual, porque se comparan con esas fechas para decidir
+ * qué movimientos son posteriores al corte. Convertir la medianoche local a
+ * UTC —que es lo que hacía `new Date(fecha).toISOString()`— metía cinco horas
+ * de desfase en esa comparación y dejaba movimientos enteros del lado
+ * equivocado: el saldo se quedaba clavado en lo declarado.
+ */
+export function wallClockDayStartISO(dateInput: string): string {
+    return `${dateInput}T00:00:00.000Z`;
+}
+
+/** La fecha de hoy en la zona de la app, en formato `YYYY-MM-DD`. */
+export function appToday(now: Date = new Date()): string {
+    return toDateInputValue(zonedNow(APP_TIMEZONE, now));
+}
+
+/**
  * Format a Date as a local `YYYY-MM-DDTHH:mm` string for <input type="datetime-local">.
  * Uses local wall-clock components (NOT toISOString, which is UTC) so the value
  * round-trips correctly: `new Date(value).toISOString()` recovers the right instant.

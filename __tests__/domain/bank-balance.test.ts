@@ -33,6 +33,36 @@ describe("computeAccountBalance", () => {
         expect(computeAccountBalance(snapshot, movs)).toBe(2104.18);
     });
 
+    // El caso real que dejó los saldos clavados: el corte se guardaba como
+    // instante (medianoche local convertida a UTC, 05:00Z) mientras que las
+    // fechas de los movimientos son hora de pared. Los movimientos de ese
+    // mismo día caían antes del corte y no sumaban. Con las dos fechas en la
+    // misma convención, el día entero cuenta.
+    it("los movimientos del mismo día cuentan sobre el corte de ese día", () => {
+        const snapshot: BankAccountBalanceSnapshot = {
+            id: "s", ownerUserId: "u", accountId: "a", balance: 0.91,
+            asOf: "2026-09-25T00:00:00.000Z", source: "MANUAL",
+            createdAt: "", updatedAt: "", isDeleted: false,
+        };
+        const movs = [
+            mov({ date: "2026-09-25T19:20:38Z", direction: "IN", amount: 830 }),
+            mov({ date: "2026-09-25T19:25:00Z", direction: "OUT", amount: 400 }),
+        ];
+
+        expect(computeAccountBalance(snapshot, movs)).toBe(430.91);
+    });
+
+    it("los del día anterior siguen fuera", () => {
+        const snapshot: BankAccountBalanceSnapshot = {
+            id: "s", ownerUserId: "u", accountId: "a", balance: 100,
+            asOf: "2026-09-25T00:00:00.000Z", source: "MANUAL",
+            createdAt: "", updatedAt: "", isDeleted: false,
+        };
+        const movs = [mov({ date: "2026-09-24T23:59:00Z", direction: "OUT", amount: 60 })];
+
+        expect(computeAccountBalance(snapshot, movs)).toBe(100);
+    });
+
     it("ignora las líneas de tarjeta", () => {
         const movs = [
             mov({ direction: "IN", amount: 100 }),

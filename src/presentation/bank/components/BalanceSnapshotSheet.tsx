@@ -8,7 +8,7 @@ import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { registerBalanceSnapshotAction } from "@/app/actions/bank";
-import { toDateInputValue } from "@/lib/date-range";
+import { toDateInputValue, wallClockDayStartISO } from "@/lib/date-range";
 import type { UUID } from "@/domain/core";
 
 interface BalanceSnapshotSheetProps {
@@ -59,7 +59,9 @@ export function BalanceSnapshotSheet({
         const result = await registerBalanceSnapshotAction({
             accountId,
             balance: parsed,
-            asOf: new Date(`${asOf}T00:00:00`).toISOString(),
+            // Hora de pared, como las fechas de las transacciones: son las que
+            // se comparan con este corte para saber qué vino después.
+            asOf: wallClockDayStartISO(asOf),
         });
         setSaving(false);
 

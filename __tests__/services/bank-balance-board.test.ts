@@ -7,6 +7,7 @@ import {
 } from "@/infrastructure/repositories/bank-in-memory";
 import { InMemoryFinancialTransactionRepository } from "@/infrastructure/repositories/implementations";
 import { BankIdentificationService } from "@/application/services/bank-identification-service";
+import { appToday, wallClockDayStartISO } from "@/lib/date-range";
 
 const USER = "11111111-1111-1111-1111-111111111111";
 const OTHER = "22222222-2222-2222-2222-222222222222";
@@ -114,9 +115,11 @@ describe("registerBalanceSnapshots", () => {
 });
 
 describe("un corte con fecha futura", () => {
-    /** Mañana a esta hora: lo que el formulario mandaba desde las 19:00. */
+    /** Mañana, en la convención de la app: lo que el formulario mandaba desde las 19:00. */
     function tomorrow(): string {
-        return new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+        const [y, m, d] = appToday().split("-").map(Number);
+        const next = new Date(Date.UTC(y, m - 1, d + 1));
+        return wallClockDayStartISO(next.toISOString().slice(0, 10));
     }
 
     async function accountOf(service: BankService): Promise<string> {
@@ -151,11 +154,12 @@ describe("un corte con fecha futura", () => {
         ])).rejects.toThrow(/futura/i);
     });
 
-    it("un corte de hoy sí se guarda, aunque sea de hace un instante", async () => {
+    it("un corte de hoy sí se guarda", async () => {
         const { service } = buildService();
         const accountId = await accountOf(service);
 
-        await service.registerBalanceSnapshot(USER, accountId, 0, new Date().toISOString());
+        // Como lo manda el formulario: el comienzo de hoy en hora de pared.
+        await service.registerBalanceSnapshot(USER, accountId, 0, wallClockDayStartISO(appToday()));
 
         const [entry] = await service.getBalanceBoard(USER);
         expect(entry.lastBalance).toBe(0);
