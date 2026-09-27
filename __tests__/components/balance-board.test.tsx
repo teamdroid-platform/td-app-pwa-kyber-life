@@ -67,8 +67,11 @@ describe("BalanceBoardClient", () => {
         fireEvent.click(screen.getByRole("button", { name: "Guardar 1 saldo" }));
 
         await waitFor(() => expect(saveAction).toHaveBeenCalledTimes(1));
+        // La fecha viaja en hora de pared, sin convertir: es la convención con
+        // la que se guardan las transacciones, y el saldo compara las dos.
+        // Convertida a UTC eran las 05:00Z y el desfase se comía movimientos.
         expect(saveAction).toHaveBeenCalledWith({
-            asOf: new Date("2026-08-20T00:00:00").toISOString(),
+            asOf: "2026-08-20T00:00:00.000Z",
             entries: [{ accountId: "a1", balance: 1900.5 }],
         });
     });

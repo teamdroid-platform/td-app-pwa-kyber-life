@@ -29,6 +29,7 @@ import { parseBankNumber } from "@/lib/bank-number-fingerprint";
 import { resolveFingerprint, type IdentityCandidate, type Resolution } from "@/lib/bank-number-match";
 import { formatBankNumber } from "@/lib/format-bank-number";
 import { cardLabel, identityAcronym, identityTypeLabel } from "@/lib/bank-identity-label";
+import { appToday } from "@/lib/date-range";
 import { BankIdentificationService } from "./bank-identification-service";
 
 function round2(value: number): number {
@@ -51,9 +52,13 @@ function stamps() {
  *
  * Pasaba a diario sin que nadie eligiera una fecha futura: el formulario
  * proponía la fecha UTC, que en Ecuador es la de mañana desde las 19:00.
+ *
+ * La comparación es entre días de calendario y no entre instantes, porque el
+ * corte se guarda en hora de pared: medirlo contra `Date.now()` mezclaría otra
+ * vez las dos convenciones y volvería a colar un día de más.
  */
 function requireNotFuture(asOf: string): void {
-    if (new Date(asOf).getTime() > Date.now()) {
+    if (asOf.slice(0, 10) > appToday()) {
         throw new Error("No se puede registrar un saldo con fecha futura");
     }
 }

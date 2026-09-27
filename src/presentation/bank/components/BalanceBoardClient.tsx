@@ -13,7 +13,7 @@ import { formatIdentityNumber } from "@/lib/format-bank-number";
 import { ACCOUNT_TYPE_ACRONYM, ACCOUNT_TYPE_LABEL } from "@/lib/bank-identity-label";
 import { daysAgoLabel } from "@/lib/balance-freshness";
 import { registerBalanceSnapshotsAction } from "@/app/actions/bank";
-import { toDateInputValue } from "@/lib/date-range";
+import { toDateInputValue, wallClockDayStartISO } from "@/lib/date-range";
 import type { AccountBalanceStatus } from "@/application/services/bank-service";
 
 /**
@@ -85,7 +85,9 @@ export function BalanceBoardClient({ entries }: BalanceBoardClientProps) {
 
         setSaving(true);
         const result = await registerBalanceSnapshotsAction({
-            asOf: new Date(`${asOf}T00:00:00`).toISOString(),
+            // Hora de pared, como las fechas de las transacciones: son las que
+            // se comparan con este corte para saber qué vino después.
+            asOf: wallClockDayStartISO(asOf),
             entries: parsed,
         });
         setSaving(false);
