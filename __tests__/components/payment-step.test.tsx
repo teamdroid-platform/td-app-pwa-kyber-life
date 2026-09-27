@@ -459,6 +459,39 @@ describe("PaymentStep — registrar lo que no está en la lista", () => {
         expect(altas[0]).toHaveAccessibleName("Cuenta Ahorros, corriente…");
     });
 
+    describe("cuando el tipo no admite destino", () => {
+        // El caso real: un escaneo llega como gasto y el usuario viene a
+        // registrar un traspaso entre sus cuentas. La fila de destino no está
+        // —un gasto no la tiene— y nada decía por qué ni cómo salir de ahí.
+        it("explica por qué falta y deja volverlo transferencia ahí mismo", () => {
+            const onTypeChange = jest.fn();
+            renderStep({ type: "EXPENSE", onTypeChange });
+
+            expect(screen.queryByText("Destino")).not.toBeInTheDocument();
+            const atajo = screen.getByRole("button", { name: /¿Entró a otra cuenta tuya\?/ });
+            expect(atajo).toHaveTextContent(/Un gasto no pregunta destino/i);
+
+            fireEvent.click(atajo);
+            expect(onTypeChange).toHaveBeenCalledWith("TRANSFER");
+        });
+
+        it("con el tipo ya puesto en transferencia, el atajo sobra", () => {
+            renderStep({
+                type: "TRANSFER", destinationEligible: true,
+                creditEligible: false, onTypeChange: jest.fn(),
+            });
+
+            expect(screen.getByText("Destino")).toBeInTheDocument();
+            expect(screen.queryByText(/¿Entró a otra cuenta tuya\?/)).not.toBeInTheDocument();
+        });
+
+        it("sin manera de cambiar el tipo no promete lo que no puede hacer", () => {
+            renderStep({ type: "EXPENSE" });
+
+            expect(screen.queryByText(/¿Entró a otra cuenta tuya\?/)).not.toBeInTheDocument();
+        });
+    });
+
     it("deja crear algo que no tiene que ver con el número leído", () => {
         renderStep({ scannedAccounts: [scannedCard("XXXX8361")] });
 
