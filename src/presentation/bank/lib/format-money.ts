@@ -12,7 +12,16 @@ export function signedMoney(value: number): string {
     return `${value < 0 ? "−" : "+"}${money(value)}`;
 }
 
-/** Fecha corta local: `12 ago`. */
+/**
+ * Fecha corta: `12 ago`.
+ *
+ * Se lee en UTC a propósito. Todo lo que llega aquí es hora de pared
+ * etiquetada como UTC —cortes de saldo, fechas de transacción— o una fecha
+ * sin hora (`2026-09-28`, que JavaScript también lee como medianoche UTC).
+ * Formateada en la zona del dispositivo, la medianoche de un día caía en la
+ * noche anterior: un corte «al 25» salía «al 24», y un vencimiento del 28,
+ * el 27.
+ */
 export function shortDate(iso: string): string {
-    return new Date(iso).toLocaleDateString("es-EC", { day: "numeric", month: "short" });
+    return new Date(iso).toLocaleDateString("es-EC", { day: "numeric", month: "short", timeZone: "UTC" });
 }
