@@ -8,9 +8,14 @@ jest.mock("next/navigation", () => ({
 }));
 
 const deleteBankInstitutionAction = jest.fn().mockResolvedValue({ success: true, data: true });
+const mergeBankCardsAction = jest.fn().mockResolvedValue({
+    success: true, data: { movedTransactions: 1, movedObservations: 0, movedStatements: 0 },
+});
 
 jest.mock("@/app/actions/bank", () => ({
     deleteBankInstitutionAction: (...args: unknown[]) => deleteBankInstitutionAction(...args),
+    mergeBankCardsAction: (...args: unknown[]) => mergeBankCardsAction(...args),
+    mergeBankAccountsAction: jest.fn(),
     mergeBankInstitutionsAction: jest.fn().mockResolvedValue({ success: true, data: {} }),
     createBankAccountAction: jest.fn().mockResolvedValue({ success: true, data: {} }),
     updateBankAccountAction: jest.fn().mockResolvedValue({ success: true, data: {} }),
@@ -389,6 +394,49 @@ describe("BankOverviewClient", () => {
 
             act(() => { fireEvent.click(archivar); });
             expect(deleteBankInstitutionAction).not.toHaveBeenCalled();
+        });
+    });
+
+    describe("unificar una tarjeta repetida", () => {
+        // El caso real: la misma Mastercard ••8361 registrada dos veces.
+        const repetida = {
+            ...overview.cards[0], id: "c9", brand: null, debt: 0, availableCredit: null,
+        };
+        const conRepetida = { ...overview, cards: [...overview.cards, repetida] };
+
+        it("la ofrece desde el menú de la fila", () => {
+            render(<BankOverviewClient initialData={conRepetida} />);
+
+            fireEvent.click(screen.getAllByRole("button", { name: "Acciones de TCR XXXX8361" })[1]);
+
+            expect(screen.getByRole("button", { name: /Unificar con otra tarjeta/ })).toBeInTheDocument();
+        });
+
+        it("solo con tarjetas del mismo tipo, y la de igual número primero y marcada", () => {
+            render(<BankOverviewClient initialData={conRepetida} />);
+
+            fireEvent.click(screen.getAllByRole("button", { name: "Acciones de TCR XXXX8361" })[1]);
+            fireEvent.click(screen.getByRole("button", { name: /Unificar con otra tarjeta/ }));
+
+            const sheet = screen.getByRole("dialog");
+            // La de débito (••2780) comparte emisor pero no es la misma tarjeta.
+            expect(within(sheet).queryByText("XXXX2780")).not.toBeInTheDocument();
+            expect(within(sheet).getByText("mismo número")).toBeInTheDocument();
+        });
+
+        it("pasa todo a la elegida", async () => {
+            render(<BankOverviewClient initialData={conRepetida} />);
+
+            fireEvent.click(screen.getAllByRole("button", { name: "Acciones de TCR XXXX8361" })[1]);
+            fireEvent.click(screen.getByRole("button", { name: /Unificar con otra tarjeta/ }));
+
+            const sheet = screen.getByRole("dialog");
+            fireEvent.click(within(sheet).getByRole("button", { name: /mismo número/ }));
+            await act(async () => {
+                fireEvent.click(within(sheet).getByRole("button", { name: /Pasar todo a XXXX8361/ }));
+            });
+
+            expect(mergeBankCardsAction).toHaveBeenCalledWith({ sourceIds: ["c9"], targetId: "c1" });
         });
     });
 

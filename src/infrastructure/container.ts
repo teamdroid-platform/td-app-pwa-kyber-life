@@ -30,7 +30,8 @@ import {
     InMemoryBankAccountBalanceSnapshotRepository,
     InMemoryBankCardStatementRepository,
     InMemoryBankMovementRepository,
-    InMemoryBankNumberObservationRepository
+    InMemoryBankNumberObservationRepository,
+    InMemoryBankIdentityMergeRepository,
 } from "./repositories/bank-in-memory";
 import { seedRepositories } from "./seed/seed-data";
 import { randomUUID } from "crypto";
@@ -67,6 +68,7 @@ import {
     SupabaseBalanceSettingsRepository
 } from "./repositories/supabase"; // Need to create this index or import individually
 import { SupabasePeriodSettingsRepository } from "./repositories/supabase/supabase-period-settings-repository";
+import { SupabaseBankIdentityMergeRepository } from "./repositories/supabase/supabase-bank-identity-merge-repository";
 
 // ... Previous imports ...
 
@@ -140,6 +142,19 @@ export const bankMovementRepository = singleton("bankMovementRepo", () => isSupa
 export const bankObservationRepository = singleton("bankObservationRepo", () => isSupabase
     ? new SupabaseBankNumberObservationRepository()
     : new InMemoryBankNumberObservationRepository());
+// Unificar cruza seis tablas: en Supabase es una función SQL transaccional; en
+// memoria necesita los repos que esa función toca.
+export const bankIdentityMergeRepository = singleton("bankIdentityMergeRepo", () => isSupabase
+    ? new SupabaseBankIdentityMergeRepository()
+    : new InMemoryBankIdentityMergeRepository(
+        bankCardRepository as InMemoryBankCardRepository,
+        bankAccountRepository as InMemoryBankAccountRepository,
+        bankSnapshotRepository as InMemoryBankAccountBalanceSnapshotRepository,
+        bankStatementRepository as InMemoryBankCardStatementRepository,
+        bankObservationRepository as InMemoryBankNumberObservationRepository,
+        financialTransactionRepository,
+        balanceSettingsRepository,
+    ));
 
 export const notificationRepository = singleton("notificationRepo", () => isSupabase ? new SupabaseNotificationRepository() : new InMemoryNotificationRepository());
 export const pushSubscriptionRepository = singleton("pushSubscriptionRepo", () => isSupabase ? new SupabasePushSubscriptionRepository() : new InMemoryPushSubscriptionRepository());
@@ -182,6 +197,7 @@ export const bankService = new BankService(
     financialTransactionRepository,
     bankIdentificationService,
     financialScannerTransactionRepository,
+    bankIdentityMergeRepository,
 );
 export const financialTransactionService = new FinancialTransactionService(
     financialTransactionRepository, 

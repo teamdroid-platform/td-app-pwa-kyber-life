@@ -415,6 +415,7 @@ export function BankOverviewClient({ initialData }: { initialData: BankOverview 
                                                     accountName={card.accountId ? accountNameById.get(card.accountId) : undefined}
                                                     institutions={institutions}
                                                     accounts={accounts}
+                                                    cards={cards}
                                                 />
                                             ))}
                                         </div>
