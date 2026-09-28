@@ -48,6 +48,53 @@ describe("CardDetailClient", () => {
     });
 });
 
+describe("CardDetailClient — tarjeta sin día de corte", () => {
+    // El caso real: una Mastercard con meses de consumos y dos pagos, pero sin
+    // día de corte configurado. Sin corte no hay estado de cuenta, sin estado
+    // no hay periodo, y la lista del periodo salía vacía debajo de una deuda
+    // que nada explicaba.
+    function mov(transactionId: string, direction: "CHARGE" | "PAYMENT", amount: number, date: string, description: string) {
+        return {
+            transactionId, ownerUserId: "u1", date, accountId: null, cardId: "card-1",
+            direction, amount, currency: "USD", description, merchant: null, categoryId: null,
+        };
+    }
+
+    function withHistory(): BankCardDetail {
+        return {
+            ...detail({ debt: 54.84 }),
+            movements: [
+                mov("t1", "CHARGE", 42.38, "2026-09-27T01:15:00.000Z", "Consumo en restaurante"),
+                mov("t2", "PAYMENT", 319.5, "2026-09-25T19:27:00.000Z", "Pago de tarjeta de crédito"),
+                mov("t3", "CHARGE", 19.99, "2026-08-18T10:00:00.000Z", "Suscripción Gemini"),
+            ],
+        } as unknown as BankCardDetail;
+    }
+
+    it("enseña los consumos y los pagos aunque no haya periodo", () => {
+        render(<CardDetailClient initialData={withHistory()} />);
+
+        expect(screen.queryByText("Sin consumos en este período.")).toBeNull();
+        expect(screen.getByText("Consumo en restaurante")).toBeInTheDocument();
+        expect(screen.getByText("Pago de tarjeta de crédito")).toBeInTheDocument();
+        expect(screen.getByText("Suscripción Gemini")).toBeInTheDocument();
+    });
+
+    it("los agrupa por mes, del más reciente al más viejo", () => {
+        render(<CardDetailClient initialData={withHistory()} />);
+
+        const meses = screen.getAllByRole("heading", { level: 3 }).map(h => h.textContent?.toLowerCase());
+        expect(meses[0]).toMatch(/septiembre/);
+        expect(meses[1]).toMatch(/agosto/);
+    });
+
+    it("explica por qué no hay estado de cuenta y cómo tenerlo", () => {
+        render(<CardDetailClient initialData={withHistory()} />);
+
+        expect(screen.getByText(/no tiene día de corte ni de pago/i)).toBeInTheDocument();
+    });
+});
+
 describe("PayCardSheet — arreglos ronda 1", () => {
     afterEach(() => {
         jest.useRealTimers();
@@ -130,7 +177,11 @@ describe("CardDetailClient — pagos sin origen en los movimientos", () => {
         return {
             ...base,
             openStatement: null,
-            periodMovements: [movimiento("tx-sin"), movimiento("tx-con")],
+            // Sin estado de cuenta el servicio no llena `periodMovements`: la
+            // pantalla enseña entonces la historia entera, que viaja en
+            // `movements`.
+            movements: [movimiento("tx-sin"), movimiento("tx-con")],
+            periodMovements: [],
             paymentsWithoutSource: ["tx-sin"],
         } as unknown as BankCardDetail;
     }
