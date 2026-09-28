@@ -11,7 +11,7 @@ import type {
 import type {
     IBankInstitutionRepository, IBankAccountRepository, IBankCardRepository,
     IBankAccountBalanceSnapshotRepository, IBankCardStatementRepository,
-    IBankMovementRepository,
+    IBankMovementRepository, IBankIdentityMergeRepository, IdentityMergeResult,
 } from "@/domain/repositories/bank";
 import type {
     IFinancialTransactionRepository, IFinancialScannerTransactionRepository,
@@ -39,6 +39,19 @@ function round2(value: number): number {
 function stamps() {
     const now = new Date().toISOString();
     return { createdAt: now, updatedAt: now, isDeleted: false };
+}
+
+/**
+ * Los orígenes de una unificación, sin repetidos y sin el destino. Unificar
+ * una identidad consigo misma la archivaría: es un error, no un no-op.
+ */
+function uniqueOthers(sourceIds: readonly UUID[], targetId: UUID, noun: string): UUID[] {
+    const sources = [...new Set(sourceIds)];
+    if (sources.includes(targetId)) {
+        throw new Error(`La ${noun} destino no puede estar entre las que se unifican`);
+    }
+    if (sources.length === 0) throw new Error(`Elige al menos una ${noun} a unificar`);
+    return sources;
 }
 
 /**
@@ -380,6 +393,8 @@ export class BankService {
         private readonly identification: BankIdentificationService,
         /** Opcional: sin él, `relinkHistory` no tiene de dónde leer los escaneos. */
         private readonly scannerTransactions?: IFinancialScannerTransactionRepository,
+        /** Opcional: sin él no se puede unificar tarjetas ni cuentas. */
+        private readonly merges?: IBankIdentityMergeRepository,
     ) {}
 
     // ─── Sincronización desde la transacción ─────────────────
@@ -1421,6 +1436,53 @@ export class BankService {
         }
 
         return { movedAccounts, movedCards, mergedInstitutions: sources.length };
+    }
+
+    /**
+     * Unifica tarjetas repetidas en una: consumos, pagos, estados de cuenta y
+     * los números que la identifican pasan a la que se queda, y las repetidas
+     * se archivan.
+     *
+     * El caso que lo motiva: la misma Mastercard registrada dos veces —una a
+     * mano, otra desde un escaneo—, con la deuda repartida entre las dos y
+     * ninguna de las dos diciendo la verdad.
+     *
+     * Solo entre tarjetas del mismo tipo: una de crédito y una de débito con el
+     * mismo número no son la misma tarjeta, y mezclar sus movimientos
+     * convertiría consumos a crédito en descuentos de una cuenta.
+     */
+    async mergeCards(userId: UUID, sourceIds: UUID[], targetId: UUID): Promise<IdentityMergeResult> {
+        const sources = uniqueOthers(sourceIds, targetId, "tarjeta");
+        const target = await this.requireCard(userId, targetId);
+        for (const id of sources) {
+            const source = await this.requireCard(userId, id);
+            if (source.cardType !== target.cardType) {
+                throw new Error("Solo se unifican tarjetas del mismo tipo");
+            }
+        }
+        return this.requireMerges().mergeCards(userId, sources, targetId);
+    }
+
+    /**
+     * Unifica cuentas repetidas en una: movimientos por los dos lados, cortes
+     * de saldo, tarjetas de débito que gastaban de ellas y los números que las
+     * identifican pasan a la que se queda, y las repetidas se archivan.
+     */
+    async mergeAccounts(userId: UUID, sourceIds: UUID[], targetId: UUID): Promise<IdentityMergeResult> {
+        const sources = uniqueOthers(sourceIds, targetId, "cuenta");
+        const target = await this.requireAccount(userId, targetId);
+        for (const id of sources) {
+            const source = await this.requireAccount(userId, id);
+            if ((source.accountType === "CASH") !== (target.accountType === "CASH")) {
+                throw new Error("El efectivo solo se unifica con efectivo");
+            }
+        }
+        return this.requireMerges().mergeAccounts(userId, sources, targetId);
+    }
+
+    private requireMerges(): IBankIdentityMergeRepository {
+        if (!this.merges) throw new Error("Unificar no está disponible en este modo");
+        return this.merges;
     }
 
     async createAccount(userId: UUID, input: CreateAccountInput): Promise<BankAccount> {

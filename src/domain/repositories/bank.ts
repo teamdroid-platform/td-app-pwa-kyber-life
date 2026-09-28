@@ -65,3 +65,29 @@ export interface IBankNumberObservationRepository extends IRepository<BankNumber
     /** Las que ya apuntan a una identidad; alimentan el emparejamiento. */
     findResolved(userId: UUID): Promise<BankNumberObservation[]>;
 }
+
+/** Lo que movió una unificación, para poder decirlo en el aviso. */
+export interface IdentityMergeResult {
+    movedTransactions: number;
+    movedObservations: number;
+    /** Solo en tarjetas. */
+    movedStatements?: number;
+    /** Solo en cuentas. */
+    movedSnapshots?: number;
+    /** Solo en cuentas: tarjetas de débito que gastaban de una repetida. */
+    movedCards?: number;
+}
+
+/**
+ * Unificar tarjetas o cuentas repetidas: todo lo que cuelga de las repetidas
+ * pasa a la que se queda, y las repetidas se archivan.
+ *
+ * Es un puerto propio y no un método de cada repositorio porque cruza hasta
+ * seis tablas, y tiene que hacerlo de una vez: a medio camino la historia
+ * quedaría repartida entre una identidad viva y otra archivada. En Supabase es
+ * una función SQL transaccional; en memoria, la misma secuencia a mano.
+ */
+export interface IBankIdentityMergeRepository {
+    mergeCards(userId: UUID, sourceIds: readonly UUID[], targetId: UUID): Promise<IdentityMergeResult>;
+    mergeAccounts(userId: UUID, sourceIds: readonly UUID[], targetId: UUID): Promise<IdentityMergeResult>;
+}

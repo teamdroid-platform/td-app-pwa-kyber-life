@@ -4,13 +4,14 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ArrowUpRight, CreditCard, Pencil, Trash2 } from "lucide-react";
+import { ArrowUpRight, CreditCard, Merge, Pencil, Trash2 } from "lucide-react";
 import { formatIdentityNumber } from "@/lib/format-bank-number";
 import { CARD_TYPE_ACRONYM, CARD_TYPE_LABEL } from "@/lib/bank-identity-label";
 import { deleteBankCardAction } from "@/app/actions/bank";
 import { IdentityBadge } from "./IdentityBadge";
 import { RowActionsSheet, KebabButton } from "./RowActionsSheet";
 import { CardFormSheet } from "./CardFormSheet";
+import { MergeIdentitySheet, type MergeIdentityOption } from "./MergeIdentitySheet";
 import { money } from "../lib/format-money";
 import { cn } from "@/lib/utils";
 import type { BankCardWithDebt } from "@/application/services/bank-service";
@@ -22,6 +23,21 @@ interface CardRowProps {
     accountName?: string;
     institutions: BankInstitution[];
     accounts: BankAccount[];
+    /** Todas las tarjetas del usuario, para ofrecer con cuál unificarla. */
+    cards?: BankCardWithDebt[];
+}
+
+/** Una tarjeta como opción de unificación: igual que se ve en la lista. */
+function asMergeOption(card: BankCardWithDebt): MergeIdentityOption {
+    const isCredit = card.cardType === "CREDIT";
+    return {
+        id: card.id,
+        acronym: CARD_TYPE_ACRONYM[card.cardType],
+        typeLabel: CARD_TYPE_LABEL[card.cardType],
+        number: formatIdentityNumber(card),
+        institutionName: card.institutionName?.trim() || "Sin institución",
+        amountLabel: isCredit ? (card.debt > 0 ? `debe ${money(card.debt)}` : "sin deuda") : undefined,
+    };
 }
 
 /**
@@ -29,7 +45,7 @@ interface CardRowProps {
  * acrónimo, número, y en la segunda línea solo lo que aporta —la marca, el
  * corte, la cuenta de la que descuenta un débito—.
  */
-export function CardRow({ card, accountName, institutions, accounts }: CardRowProps) {
+export function CardRow({ card, accountName, institutions, accounts, cards = [] }: CardRowProps) {
     const router = useRouter();
     const isCredit = card.cardType === "CREDIT";
     const number = formatIdentityNumber(card);
@@ -37,7 +53,14 @@ export function CardRow({ card, accountName, institutions, accounts }: CardRowPr
 
     const [menuOpen, setMenuOpen] = useState(false);
     const [editOpen, setEditOpen] = useState(false);
+    const [mergeOpen, setMergeOpen] = useState(false);
     const [archiving, setArchiving] = useState(false);
+
+    // Solo con las del mismo tipo: una de crédito y una de débito con el mismo
+    // número no son la misma tarjeta.
+    const mergeOptions = cards
+        .filter(c => c.id !== card.id && c.cardType === card.cardType && !c.isDeleted)
+        .map(asMergeOption);
 
     // Sin deuda es cero, no «menos cero»: el rojo se reserva para lo que de
     // verdad se debe, o dejaría de significar nada.
@@ -138,6 +161,12 @@ export function CardRow({ card, accountName, institutions, accounts }: CardRowPr
                         onSelect: () => { setMenuOpen(false); setEditOpen(true); },
                     },
                     {
+                        label: "Unificar con otra tarjeta",
+                        hint: "Si está registrada dos veces",
+                        icon: <Merge className="h-4 w-4" />,
+                        onSelect: () => { setMenuOpen(false); setMergeOpen(true); },
+                    },
+                    {
                         label: archiving ? "Archivando…" : "Archivar tarjeta",
                         icon: <Trash2 className="h-4 w-4" />,
                         tone: "danger",
@@ -153,6 +182,15 @@ export function CardRow({ card, accountName, institutions, accounts }: CardRowPr
                 open={editOpen}
                 onOpenChange={setEditOpen}
             />
+            {mergeOpen && (
+                <MergeIdentitySheet
+                    open
+                    onOpenChange={setMergeOpen}
+                    kind="CARD"
+                    source={asMergeOption(card)}
+                    options={mergeOptions}
+                />
+            )}
         </div>
     );
 }

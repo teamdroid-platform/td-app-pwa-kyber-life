@@ -118,6 +118,18 @@ export const dismissCardPaymentSchema = z.object({
  * orígenes: sería pedir que una institución se absorba a sí misma y dejaría el
  * grupo sin ninguna viva.
  */
+/**
+ * Unificar tarjetas o cuentas repetidas. La misma forma para las dos: se elige
+ * a cuál van las repetidas, y la que se queda no puede estar entre ellas.
+ */
+export const mergeIdentitiesSchema = z.object({
+    sourceIds: z.array(uuid).min(1, "Elige al menos una a unificar"),
+    targetId: uuid,
+}).refine(
+    ({ sourceIds, targetId }) => !sourceIds.includes(targetId),
+    { message: "La que se queda no puede estar entre las que se unifican", path: ["targetId"] },
+);
+
 export const mergeInstitutionsSchema = z.object({
     sourceIds: z.array(uuid).min(1, "Elige al menos una institución a unificar"),
     targetId: uuid,

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
-    ArrowUpRight, CreditCard, Landmark, Pencil, PiggyBank, Scale, Trash2, TrendingUp, Wallet,
+    ArrowUpRight, CreditCard, Landmark, Merge, Pencil, PiggyBank, Scale, Trash2, TrendingUp, Wallet,
 } from "lucide-react";
 import { formatIdentityNumber } from "@/lib/format-bank-number";
 import { ACCOUNT_TYPE_ACRONYM, ACCOUNT_TYPE_LABEL } from "@/lib/bank-identity-label";
@@ -14,6 +14,7 @@ import { IdentityBadge } from "./IdentityBadge";
 import { RowActionsSheet, KebabButton } from "./RowActionsSheet";
 import { AccountFormSheet } from "./AccountFormSheet";
 import { ConvertToCardSheet } from "./ConvertToCardSheet";
+import { MergeIdentitySheet, type MergeIdentityOption } from "./MergeIdentitySheet";
 import { BalanceSnapshotSheet } from "./BalanceSnapshotSheet";
 import { money, shortDate } from "../lib/format-money";
 import { cn } from "@/lib/utils";
@@ -26,6 +27,19 @@ const TYPE_ICON = {
     CASH: Wallet,
     INVESTMENT: TrendingUp,
 } as const;
+
+/** Una cuenta como opción de unificación: igual que se ve en la lista. */
+function asMergeOption(account: BankAccount): MergeIdentityOption {
+    const balance = (account as Partial<BankAccountWithBalance>).balance;
+    return {
+        id: account.id,
+        acronym: ACCOUNT_TYPE_ACRONYM[account.accountType],
+        typeLabel: ACCOUNT_TYPE_LABEL[account.accountType],
+        number: formatIdentityNumber(account) || ACCOUNT_TYPE_LABEL[account.accountType],
+        institutionName: account.institutionName?.trim() || "Sin institución",
+        amountLabel: typeof balance === "number" ? money(balance) : undefined,
+    };
+}
 
 interface AccountRowProps {
     account: BankAccountWithBalance;
@@ -57,6 +71,13 @@ export function AccountRow({ account, institutions, accounts }: AccountRowProps)
     const [editOpen, setEditOpen] = useState(false);
     const [snapshotOpen, setSnapshotOpen] = useState(false);
     const [convertOpen, setConvertOpen] = useState(false);
+    const [mergeOpen, setMergeOpen] = useState(false);
+
+    // El efectivo solo se une con efectivo: no es un número de banco.
+    const isCash = account.accountType === "CASH";
+    const mergeOptions = accounts
+        .filter(a => a.id !== account.id && !a.isDeleted && (a.accountType === "CASH") === isCash)
+        .map(asMergeOption);
     const [archiving, setArchiving] = useState(false);
 
     async function archive() {
@@ -150,6 +171,12 @@ export function AccountRow({ account, institutions, accounts }: AccountRowProps)
                         onSelect: () => { setMenuOpen(false); setConvertOpen(true); },
                     }]),
                     {
+                        label: "Unificar con otra cuenta",
+                        hint: "Si está registrada dos veces",
+                        icon: <Merge className="h-4 w-4" />,
+                        onSelect: () => { setMenuOpen(false); setMergeOpen(true); },
+                    },
+                    {
                         label: archiving ? "Archivando…" : "Archivar cuenta",
                         icon: <Trash2 className="h-4 w-4" />,
                         tone: "danger",
@@ -169,6 +196,15 @@ export function AccountRow({ account, institutions, accounts }: AccountRowProps)
                 open={snapshotOpen}
                 onOpenChange={setSnapshotOpen}
             />
+            {mergeOpen && (
+                <MergeIdentitySheet
+                    open
+                    onOpenChange={setMergeOpen}
+                    kind="ACCOUNT"
+                    source={asMergeOption(account)}
+                    options={mergeOptions}
+                />
+            )}
             {convertOpen && (
                 <ConvertToCardSheet
                     open

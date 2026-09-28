@@ -10,7 +10,9 @@ import type {
     IBankInstitutionRepository, IBankAccountRepository, IBankCardRepository,
     IBankAccountBalanceSnapshotRepository, IBankCardStatementRepository,
     IBankMovementRepository, BankMovementFilter, IBankNumberObservationRepository,
+    IBankIdentityMergeRepository, IdentityMergeResult,
 } from "@/domain/repositories/bank";
+import type { IBalanceSettingsRepository } from "@/domain/repositories/balance";
 import type { IFinancialTransactionRepository } from "@/domain/repositories/financial";
 
 export class InMemoryBankInstitutionRepository
@@ -216,5 +218,163 @@ export class InMemoryBankNumberObservationRepository
     async findResolved(userId: UUID): Promise<BankNumberObservation[]> {
         return (await this.findByOwnerId(userId))
             .filter(o => ["EXACT", "INFERRED", "MANUAL"].includes(o.resolution));
+    }
+}
+
+/**
+ * La unificación en memoria: la misma secuencia que la función SQL
+ * `merge_bank_cards` / `merge_bank_accounts`, a mano. Si divergieran, el modo
+ * MEMORY le mentiría al de SUPABASE sobre qué se mueve al unificar.
+ *
+ * Valida todo antes de tocar nada, igual que la función: en memoria no hay
+ * transacción que deshacer si algo falla a mitad.
+ */
+export class InMemoryBankIdentityMergeRepository implements IBankIdentityMergeRepository {
+    constructor(
+        private readonly cards: InMemoryBankCardRepository,
+        private readonly accounts: InMemoryBankAccountRepository,
+        private readonly snapshots: InMemoryBankAccountBalanceSnapshotRepository,
+        private readonly statements: InMemoryBankCardStatementRepository,
+        private readonly observations: InMemoryBankNumberObservationRepository,
+        private readonly transactions: IFinancialTransactionRepository,
+        private readonly balanceSettings?: IBalanceSettingsRepository,
+    ) {}
+
+    async mergeCards(userId: UUID, sourceIds: readonly UUID[], targetId: UUID): Promise<IdentityMergeResult> {
+        const target = await this.cards.findById(targetId);
+        if (!target || target.ownerUserId !== userId || target.isDeleted) {
+            throw new Error("Tarjeta destino no encontrada");
+        }
+        if (sourceIds.includes(targetId)) {
+            throw new Error("La tarjeta destino no puede estar entre las que se unifican");
+        }
+        const sources = await Promise.all(sourceIds.map(id => this.cards.findById(id)));
+        if (sources.some(s => !s || s.ownerUserId !== userId || s.cardType !== target.cardType)) {
+            throw new Error("Solo se unifican tarjetas tuyas y del mismo tipo");
+        }
+        const from = new Set(sourceIds);
+        const now = new Date().toISOString();
+
+        let movedTransactions = 0;
+        for (const t of await this.transactions.findByOwnerId(userId)) {
+            const card = t.bankCardId && from.has(t.bankCardId);
+            const payment = t.bankCardPaymentId && from.has(t.bankCardPaymentId);
+            if (!card && !payment) continue;
+            await this.transactions.update({
+                ...t,
+                bankCardId: card ? targetId : t.bankCardId,
+                bankCardPaymentId: payment ? targetId : t.bankCardPaymentId,
+                updatedAt: now,
+            });
+            movedTransactions += (card ? 1 : 0) + (payment ? 1 : 0);
+        }
+
+        let movedObservations = 0;
+        for (const o of await this.observations.findByOwnerId(userId)) {
+            if (!o.cardId || !from.has(o.cardId)) continue;
+            await this.observations.update({ ...o, cardId: targetId, updatedAt: now });
+            movedObservations += 1;
+        }
+
+        // Un estado por tarjeta y periodo: el que choca se archiva, el resto se muda.
+        const targetPeriods = new Set(
+            (await this.statements.findByCardId(targetId)).filter(s => !s.isDeleted).map(s => s.periodStart),
+        );
+        let movedStatements = 0;
+        for (const sourceId of sourceIds) {
+            for (const s of await this.statements.findByCardId(sourceId)) {
+                const clash = !s.isDeleted && targetPeriods.has(s.periodStart);
+                await this.statements.update({
+                    ...s, cardId: targetId, isDeleted: s.isDeleted || clash, updatedAt: now,
+                });
+                movedStatements += 1;
+            }
+        }
+
+        await this.balanceSettings?.clearRulesForTargets(userId, sourceIds);
+
+        const known = sources.filter((s): s is BankCard => !!s);
+        await this.cards.update({
+            ...target,
+            brand: target.brand ?? known.find(s => s.brand)?.brand ?? null,
+            bin: target.bin ?? known.find(s => s.bin)?.bin ?? null,
+            prefixDigits: target.prefixDigits ?? known.find(s => s.prefixDigits)?.prefixDigits ?? null,
+            creditLimit: target.creditLimit ?? known.find(s => s.creditLimit != null)?.creditLimit ?? null,
+            statementDay: target.statementDay ?? known.find(s => s.statementDay != null)?.statementDay ?? null,
+            dueDay: target.dueDay ?? known.find(s => s.dueDay != null)?.dueDay ?? null,
+            updatedAt: now,
+        });
+        for (const s of known) {
+            if (!s.isDeleted) await this.cards.update({ ...s, isDeleted: true, updatedAt: now });
+        }
+
+        return { movedTransactions, movedObservations, movedStatements };
+    }
+
+    async mergeAccounts(userId: UUID, sourceIds: readonly UUID[], targetId: UUID): Promise<IdentityMergeResult> {
+        const target = await this.accounts.findById(targetId);
+        if (!target || target.ownerUserId !== userId || target.isDeleted) {
+            throw new Error("Cuenta destino no encontrada");
+        }
+        if (sourceIds.includes(targetId)) {
+            throw new Error("La cuenta destino no puede estar entre las que se unifican");
+        }
+        const targetIsCash = target.accountType === "CASH";
+        const sources = await Promise.all(sourceIds.map(id => this.accounts.findById(id)));
+        if (sources.some(s => !s || s.ownerUserId !== userId || (s.accountType === "CASH") !== targetIsCash)) {
+            throw new Error("Solo se unifican cuentas tuyas, y el efectivo solo con efectivo");
+        }
+        const from = new Set(sourceIds);
+        const now = new Date().toISOString();
+
+        let movedTransactions = 0;
+        for (const t of await this.transactions.findByOwnerId(userId)) {
+            const src = t.bankSourceAccountId && from.has(t.bankSourceAccountId);
+            const dst = t.bankDestinationAccountId && from.has(t.bankDestinationAccountId);
+            if (!src && !dst) continue;
+            await this.transactions.update({
+                ...t,
+                bankSourceAccountId: src ? targetId : t.bankSourceAccountId,
+                bankDestinationAccountId: dst ? targetId : t.bankDestinationAccountId,
+                updatedAt: now,
+            });
+            movedTransactions += (src ? 1 : 0) + (dst ? 1 : 0);
+        }
+
+        let movedSnapshots = 0;
+        for (const sourceId of sourceIds) {
+            for (const s of await this.snapshots.findByAccountId(sourceId)) {
+                await this.snapshots.update({ ...s, accountId: targetId, updatedAt: now });
+                movedSnapshots += 1;
+            }
+        }
+
+        let movedCards = 0;
+        for (const c of await this.cards.findByOwnerId(userId)) {
+            if (!c.accountId || !from.has(c.accountId)) continue;
+            await this.cards.update({ ...c, accountId: targetId, updatedAt: now });
+            movedCards += 1;
+        }
+
+        let movedObservations = 0;
+        for (const o of await this.observations.findByOwnerId(userId)) {
+            if (!o.accountId || !from.has(o.accountId)) continue;
+            await this.observations.update({ ...o, accountId: targetId, updatedAt: now });
+            movedObservations += 1;
+        }
+
+        await this.balanceSettings?.clearRulesForTargets(userId, sourceIds);
+
+        const known = sources.filter((s): s is BankAccount => !!s);
+        await this.accounts.update({
+            ...target,
+            prefixDigits: target.prefixDigits ?? known.find(s => s.prefixDigits)?.prefixDigits ?? null,
+            updatedAt: now,
+        });
+        for (const s of known) {
+            if (!s.isDeleted) await this.accounts.update({ ...s, isDeleted: true, updatedAt: now });
+        }
+
+        return { movedTransactions, movedObservations, movedSnapshots, movedCards };
     }
 }

@@ -17,7 +17,7 @@ import {
     balanceSnapshotSchema, balanceSnapshotBatchSchema,
     statementTotalSchema,
     payCardSchema, confirmCardPaymentSchema, dismissCardPaymentSchema,
-    mergeInstitutionsSchema, convertToCardSchema,
+    mergeInstitutionsSchema, mergeIdentitiesSchema, convertToCardSchema,
 } from "@/lib/validators/bank-schemas";
 
 const idSchema = z.string().uuid();
@@ -188,6 +188,33 @@ export async function mergeBankInstitutionsAction(input: unknown) {
         const { sourceIds, targetId } = mergeInstitutionsSchema.parse(input);
         const result = await bankService.mergeInstitutions(userId, sourceIds, targetId);
         revalidateBanks();
+        return result;
+    });
+}
+
+/**
+ * Unifica tarjetas repetidas. Devuelve cuánto se movió para decirlo en el
+ * aviso: «se movieron 18 transacciones» confirma algo, «listo» no.
+ */
+export async function mergeBankCardsAction(input: unknown) {
+    return run("mergeBankCards", async userId => {
+        const { sourceIds, targetId } = mergeIdentitiesSchema.parse(input);
+        const result = await bankService.mergeCards(userId, sourceIds, targetId);
+        revalidateBanks();
+        revalidatePath(`/financial/banks/cards/${targetId}`);
+        return result;
+    });
+}
+
+/** Unifica cuentas repetidas, con los mismos avisos que las tarjetas. */
+export async function mergeBankAccountsAction(input: unknown) {
+    return run("mergeBankAccounts", async userId => {
+        const { sourceIds, targetId } = mergeIdentitiesSchema.parse(input);
+        const result = await bankService.mergeAccounts(userId, sourceIds, targetId);
+        revalidateBanks();
+        revalidatePath(`/financial/banks/accounts/${targetId}`);
+        // El saldo del home cuenta desde los cortes, y acaban de mudarse.
+        revalidatePath("/dashboard");
         return result;
     });
 }
