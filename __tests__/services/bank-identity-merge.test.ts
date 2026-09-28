@@ -101,7 +101,7 @@ describe("unificar tarjetas", () => {
         const { service, statements, original, repetida } = await twoMastercards();
         const base = {
             ownerUserId: USER, periodEnd: "2026-09-19", dueDate: "2026-10-05",
-            totalAmount: 0, minimumPayment: null, status: "OPEN" as const,
+            totalAmount: 0, computedAmount: 0, paidAmount: 0, minimumPayment: null, status: "OPEN" as const,
             createdAt: "", updatedAt: "", isDeleted: false,
         };
         await statements.create({ ...base, id: "s1", cardId: original.id, periodStart: "2026-08-20" });

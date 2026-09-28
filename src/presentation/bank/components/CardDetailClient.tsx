@@ -11,6 +11,28 @@ import { money, shortDate } from "../lib/format-money";
 import { computeStatementDue } from "@/domain/services/bank-balance";
 import { cn } from "@/lib/utils";
 import type { BankCardDetail } from "@/application/services/bank-service";
+import type { BankMovement } from "@/domain/entities/bank";
+
+/**
+ * Los movimientos agrupados por mes, del más reciente al más viejo.
+ *
+ * El mes se lee en UTC porque la fecha es hora de pared etiquetada como UTC:
+ * en la zona del dispositivo, un consumo del 1 a primera hora caería en el mes
+ * anterior.
+ */
+function groupByMonth(movements: BankMovement[]): { label: string; items: BankMovement[] }[] {
+    const sorted = [...movements].sort((a, b) => b.date.localeCompare(a.date));
+    const groups: { label: string; items: BankMovement[] }[] = [];
+    for (const movement of sorted) {
+        const label = new Date(movement.date).toLocaleDateString("es-EC", {
+            month: "long", year: "numeric", timeZone: "UTC",
+        });
+        const last = groups[groups.length - 1];
+        if (last && last.label === label) last.items.push(movement);
+        else groups.push({ label, items: [movement] });
+    }
+    return groups;
+}
 
 /** Días entre hoy y la fecha de vencimiento. Negativo si ya venció. */
 function daysUntil(date: string): number {
@@ -19,7 +41,7 @@ function daysUntil(date: string): number {
 }
 
 export function CardDetailClient({ initialData }: { initialData: BankCardDetail }) {
-    const { card, statements, periodMovements, payableAccounts } = initialData;
+    const { card, statements, movements, periodMovements, payableAccounts } = initialData;
     const withoutSource = new Set(initialData.paymentsWithoutSource ?? []);
     const number = formatBankNumber(card);
     const open = card.openStatement;
@@ -31,6 +53,24 @@ export function CardDetailClient({ initialData }: { initialData: BankCardDetail 
 
     const closed = statements.filter(s => s.id !== open?.id);
     const remaining = open ? daysUntil(open.dueDate) : null;
+
+    // Sin día de corte no hay estado de cuenta, y sin estado no hay «periodo»:
+    // la lista del periodo salía vacía aunque la tarjeta tuviera meses de
+    // consumos y pagos encima, y la deuda de arriba no tenía nada que la
+    // explicara. En ese caso se enseña la historia entera, por meses.
+    const hasCycle = !!open;
+    const history = hasCycle ? [] : groupByMonth(movements);
+
+    const renderMovement = (movement: BankMovement) => (
+        <MovementRow
+            key={`${movement.transactionId}-${movement.direction}`}
+            movement={movement}
+            withoutSource={
+                movement.direction === "PAYMENT"
+                && withoutSource.has(movement.transactionId)
+            }
+        />
+    );
 
     return (
         <div className="flex flex-col gap-4">
@@ -107,30 +147,53 @@ export function CardDetailClient({ initialData }: { initialData: BankCardDetail 
 
             {open && <StatementPanel statement={open} cardId={card.id} accounts={payableAccounts} />}
 
-            <section className="flex flex-col gap-2">
-                <h2 className="pt-1 text-[11px] uppercase tracking-wide text-muted-foreground">
-                    Consumos del período
-                </h2>
-                {periodMovements.length === 0 ? (
-                    <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed bg-muted/30 py-10 text-center">
-                        <Inbox className="h-8 w-8 opacity-20" />
-                        <p className="text-sm text-muted-foreground">
-                            Sin consumos en este período.
+            {hasCycle ? (
+                <section className="flex flex-col gap-2">
+                    <h2 className="pt-1 text-[11px] uppercase tracking-wide text-muted-foreground">
+                        Consumos del período
+                    </h2>
+                    {periodMovements.length === 0 ? (
+                        <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed bg-muted/30 py-10 text-center">
+                            <Inbox className="h-8 w-8 opacity-20" />
+                            <p className="text-sm text-muted-foreground">
+                                Sin consumos en este período.
+                            </p>
+                        </div>
+                    ) : (
+                        periodMovements.map(renderMovement)
+                    )}
+                </section>
+            ) : (
+                <section className="flex flex-col gap-2">
+                    <h2 className="pt-1 text-[11px] uppercase tracking-wide text-muted-foreground">
+                        Consumos y pagos
+                    </h2>
+                    {isCredit && (
+                        <p className="text-xs leading-relaxed text-muted-foreground">
+                            Esta tarjeta no tiene día de corte ni de pago, así que se muestra
+                            toda su historia. Configúralos en Bancos → Editar y la verás por
+                            estado de cuenta, con su vencimiento.
                         </p>
-                    </div>
-                ) : (
-                    periodMovements.map(movement => (
-                        <MovementRow
-                            key={`${movement.transactionId}-${movement.direction}`}
-                            movement={movement}
-                            withoutSource={
-                                movement.direction === "PAYMENT"
-                                && withoutSource.has(movement.transactionId)
-                            }
-                        />
-                    ))
-                )}
-            </section>
+                    )}
+                    {history.length === 0 ? (
+                        <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed bg-muted/30 py-10 text-center">
+                            <Inbox className="h-8 w-8 opacity-20" />
+                            <p className="text-sm text-muted-foreground">
+                                Todavía no hay consumos ni pagos con esta tarjeta.
+                            </p>
+                        </div>
+                    ) : (
+                        history.map(group => (
+                            <div key={group.label} className="flex flex-col gap-2">
+                                <h3 className="pt-2 text-xs font-semibold capitalize text-muted-foreground">
+                                    {group.label}
+                                </h3>
+                                {group.items.map(renderMovement)}
+                            </div>
+                        ))
+                    )}
+                </section>
+            )}
 
             {closed.length > 0 && (
                 <section className="flex flex-col gap-2 rounded-2xl border bg-card p-4">
