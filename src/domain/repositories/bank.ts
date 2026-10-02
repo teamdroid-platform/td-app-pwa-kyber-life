@@ -3,7 +3,7 @@ import { IRepository } from "./index";
 import {
     BankInstitution, BankAccount, BankCard,
     BankAccountBalanceSnapshot, BankCardStatement, BankMovement,
-    BankNumberObservation, BankNumberResolution
+    BankNumberObservation, BankNumberResolution, BankCardPayment
 } from "../entities/bank";
 
 export interface IBankInstitutionRepository extends IRepository<BankInstitution> {
@@ -51,7 +51,12 @@ export interface BankMovementFilter {
     limit?: number;
 }
 
-/** Solo lectura: la vista bank_movements se deriva de financial_transactions. */
+/** Pagos de tarjeta registrados desde Bancos, que no son transacciones. */
+export interface IBankCardPaymentRepository extends IRepository<BankCardPayment> {
+    findByCardId(userId: UUID, cardId: UUID): Promise<BankCardPayment[]>;
+}
+
+/** Solo lectura: la vista bank_movements se deriva de financial_transactions y bank_card_payments. */
 export interface IBankMovementRepository {
     find(userId: UUID, filter: BankMovementFilter): Promise<BankMovement[]>;
     findAllForOwner(userId: UUID): Promise<BankMovement[]>;

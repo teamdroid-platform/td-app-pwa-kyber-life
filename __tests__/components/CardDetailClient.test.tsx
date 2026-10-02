@@ -4,6 +4,7 @@ import type { BankCardDetail } from "@/application/services/bank-service";
 
 jest.mock("@/app/actions/bank", () => ({
     payCardAction: jest.fn().mockResolvedValue({ success: true, data: null }),
+    deleteCardPaymentAction: jest.fn().mockResolvedValue({ success: true, data: null }),
     setStatementTotalAction: jest.fn(),
 }));
 
@@ -21,13 +22,7 @@ function detail(overrides: Partial<BankCardDetail["card"]> = {}): BankCardDetail
             debt: 534.56, availableCredit: null, openStatement: null,
             ...overrides,
         },
-        statements: [], movements: [], periodMovements: [],
-        payableAccounts: [{
-            id: "acc-1", ownerUserId: "u1", accountType: "SAVINGS", currency: "USD",
-            status: "ACTIVE", isUnconfirmed: false, institutionName: "Pichincha",
-            createdAt: "2026-08-01T00:00:00Z", updatedAt: "2026-08-01T00:00:00Z",
-            isDeleted: false, balance: 1000, lastSnapshotAt: null,
-        }],
+        statements: [], movements: [], periodMovements: [], paymentsWithoutSource: [],
     } as unknown as BankCardDetail;
 }
 
@@ -129,26 +124,16 @@ describe("PayCardSheet — arreglos ronda 1", () => {
     });
 });
 
-describe("PayCardSheet — origen opcional y banco visible", () => {
-    it("llega con el origen sin definir y avisa de que ningún saldo se mueve", () => {
+describe("PayCardSheet — el pago no es una transacción", () => {
+    it("no pregunta desde qué cuenta y dice que ningún saldo se mueve", () => {
         render(<CardDetailClient initialData={detail()} />);
         fireEvent.click(screen.getByRole("button", { name: /pagar/i }));
 
-        expect(screen.getByRole("combobox", { name: /cuenta de origen/i }))
-            .toHaveTextContent(/sin definir/i);
-        expect(screen.getByTestId("sin-origen-aviso")).toBeInTheDocument();
+        expect(screen.queryByRole("combobox", { name: /cuenta de origen/i })).toBeNull();
+        expect(screen.getByText(/no crea una transacción/i)).toBeInTheDocument();
     });
 
-    it("cada cuenta del selector dice de qué banco es", () => {
-        render(<CardDetailClient initialData={detail()} />);
-        fireEvent.click(screen.getByRole("button", { name: /pagar/i }));
-        fireEvent.click(screen.getByRole("combobox", { name: /cuenta de origen/i }));
-
-        const opcion = screen.getByRole("option", { name: /ahorros xxxx?\s*8361|ahorros/i });
-        expect(opcion).toHaveTextContent(/Pichincha/);
-    });
-
-    it("registra el pago con la cuenta en null cuando no se define", async () => {
+    it("registra el pago solo con tarjeta, monto y fecha", async () => {
         const { payCardAction } = jest.requireMock("@/app/actions/bank");
         payCardAction.mockClear();
         payCardAction.mockResolvedValue({ success: true, data: null });
@@ -158,10 +143,34 @@ describe("PayCardSheet — origen opcional y banco visible", () => {
         fireEvent.click(screen.getByRole("button", { name: /registrar pago/i }));
 
         await waitFor(() => {
-            expect(payCardAction).toHaveBeenCalledWith(
-                expect.objectContaining({ cardId: "card-1", sourceAccountId: null, amount: 534.56 }),
-            );
+            expect(payCardAction).toHaveBeenCalledWith({
+                cardId: "card-1", amount: 534.56, date: expect.any(String),
+            });
         });
+    });
+});
+
+describe("CardDetailClient — pagos registrados desde Bancos", () => {
+    function conPago(cardPaymentId: string | null): BankCardDetail {
+        return {
+            ...detail(),
+            movements: [{
+                transactionId: "p1", ownerUserId: "u1", date: "2026-09-05T12:00:00Z",
+                accountId: null, cardId: "card-1", direction: "PAYMENT",
+                amount: 100, currency: "USD", description: "Pago Mastercard XXXX8361",
+                merchant: null, categoryId: null, cardPaymentId,
+            }],
+        } as unknown as BankCardDetail;
+    }
+
+    it("se pueden borrar desde la tarjeta, que es donde existen", () => {
+        render(<CardDetailClient initialData={conPago("p1")} />);
+        expect(screen.getByRole("button", { name: /borrar pago/i })).toBeInTheDocument();
+    });
+
+    it("un pago que es transacción no se borra desde aquí", () => {
+        render(<CardDetailClient initialData={conPago(null)} />);
+        expect(screen.queryByRole("button", { name: /borrar pago/i })).toBeNull();
     });
 });
 

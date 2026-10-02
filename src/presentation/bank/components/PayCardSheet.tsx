@@ -8,15 +8,10 @@ import { Input } from "@/components/ui/input";
 import {
     Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger,
 } from "@/components/ui/sheet";
-import {
-    Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
-import { AlertTriangle } from "lucide-react";
-import { accountLabel } from "@/lib/bank-identity-label";
 import { payCardAction } from "@/app/actions/bank";
 import { money } from "../lib/format-money";
 import { toDateInputValue } from "@/lib/date-range";
-import type { BankAccountWithBalance, BankCardWithDebt } from "@/application/services/bank-service";
+import type { BankCardWithDebt } from "@/application/services/bank-service";
 
 /**
  * `YYYY-MM-DD` de hoy en la zona del usuario. `toISOString` daría la fecha
@@ -30,17 +25,8 @@ function today(): string {
     return toDateInputValue(new Date());
 }
 
-/**
- * El valor del selector cuando el usuario no declara la cuenta.
- *
- * Radix no admite `SelectItem` con valor vacío, así que el «no lo sé» viaja
- * como una cadena propia y se traduce a null justo antes de enviar.
- */
-const SIN_ORIGEN = "__sin_origen__";
-
 interface PayCardSheetProps {
     card: BankCardWithDebt;
-    accounts: BankAccountWithBalance[];
 }
 
 /**
@@ -49,15 +35,15 @@ interface PayCardSheetProps {
  * El monto llega precargado con la deuda entera: «marcar como pagada» es este
  * mismo sheet sin tocar el campo, no una contabilidad aparte. Editarlo permite
  * el pago parcial.
+ *
+ * No pregunta desde qué cuenta: el pago no es una transacción. La salida de
+ * dinero el usuario ya la tiene registrada —la trae el escaneo del banco o la
+ * anota él—, y aquí solo se dice que la deuda está pagada.
  */
-export function PayCardSheet({ card, accounts }: PayCardSheetProps) {
+export function PayCardSheet({ card }: PayCardSheetProps) {
     const router = useRouter();
     const [open, setOpen] = useState(false);
     const [saving, setSaving] = useState(false);
-    // El origen no se presupone: cada pago dice de qué cuenta salió, o declara
-    // que no se sabe. Adivinar la cuenta más probable ahorraba un toque a costa
-    // de firmar por el usuario de dónde salió su dinero.
-    const [accountId, setAccountId] = useState<string>(SIN_ORIGEN);
     const [amount, setAmount] = useState(String(card.debt));
     const [date, setDate] = useState(today());
 
@@ -69,7 +55,6 @@ export function PayCardSheet({ card, accounts }: PayCardSheetProps) {
             // `card.debt`, o algo que el usuario haya escrito y no enviado.
             setAmount(String(card.debt));
             setDate(today());
-            setAccountId(SIN_ORIGEN);
         }
         setOpen(next);
     }
@@ -84,7 +69,6 @@ export function PayCardSheet({ card, accounts }: PayCardSheetProps) {
         setSaving(true);
         const result = await payCardAction({
             cardId: card.id,
-            sourceAccountId: accountId === SIN_ORIGEN ? null : accountId,
             amount: parsed,
             date: new Date(`${date}T12:00:00`).toISOString(),
         });
@@ -110,45 +94,10 @@ export function PayCardSheet({ card, accounts }: PayCardSheetProps) {
                 </SheetHeader>
 
                 <>
-                        <label className="flex flex-col gap-1.5 text-sm">
-                            <span className="text-muted-foreground">Desde</span>
-                            <Select value={accountId} onValueChange={setAccountId}>
-                                <SelectTrigger
-                                    aria-label="Cuenta de origen"
-                                    className="h-auto py-2 [&>span]:block [&>span]:min-w-0 [&>span]:text-left"
-                                >
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value={SIN_ORIGEN}>
-                                        <TwoLine
-                                            title="Sin definir"
-                                            subtitle="De dónde salió, sin registrar"
-                                        />
-                                    </SelectItem>
-                                    {accounts.map(a => (
-                                        <SelectItem key={a.id} value={a.id}>
-                                            <TwoLine
-                                                title={accountLabel(a)}
-                                                subtitle={a.institutionName ?? "Sin banco"}
-                                            />
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </label>
-
-                        {accountId === SIN_ORIGEN && (
-                            <p
-                                data-testid="sin-origen-aviso"
-                                className="flex gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs leading-relaxed text-amber-200"
-                            >
-                                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                                <span>
-                                    La deuda bajará, pero ninguna cuenta reflejará la salida.
-                                </span>
-                            </p>
-                        )}
+                        <p className="text-xs leading-relaxed text-muted-foreground">
+                            Baja la deuda de la tarjeta. No crea una transacción ni mueve el
+                            saldo de tus cuentas.
+                        </p>
 
                         <label className="flex flex-col gap-1.5 text-sm">
                             <span className="text-muted-foreground">Monto</span>
@@ -176,19 +125,5 @@ export function PayCardSheet({ card, accounts }: PayCardSheetProps) {
                 </>
             </SheetContent>
         </Sheet>
-    );
-}
-
-/**
- * Una opción del selector en dos líneas: qué cuenta arriba, de qué banco
- * debajo. El banco es lo que distingue entre dos cuentas del mismo tipo, y sin
- * él dos «Ahorros» del mismo largo son indistinguibles.
- */
-function TwoLine({ title, subtitle }: { title: string; subtitle: string }) {
-    return (
-        <span className="flex min-w-0 flex-col">
-            <span className="truncate text-sm">{title}</span>
-            <span className="truncate text-xs text-muted-foreground">{subtitle}</span>
-        </span>
     );
 }

@@ -4,13 +4,13 @@ import type { UUID, ISODate } from "@/domain/core";
 import type {
     BankInstitution, BankAccount, BankCard,
     BankAccountBalanceSnapshot, BankCardStatement, BankMovement,
-    BankNumberObservation, BankNumberResolution,
+    BankNumberObservation, BankNumberResolution, BankCardPayment,
 } from "@/domain/entities/bank";
 import type {
     IBankInstitutionRepository, IBankAccountRepository, IBankCardRepository,
     IBankAccountBalanceSnapshotRepository, IBankCardStatementRepository,
     IBankMovementRepository, BankMovementFilter, IBankNumberObservationRepository,
-    IBankIdentityMergeRepository, IdentityMergeResult,
+    IBankIdentityMergeRepository, IdentityMergeResult, IBankCardPaymentRepository,
 } from "@/domain/repositories/bank";
 import type { IBalanceSettingsRepository } from "@/domain/repositories/balance";
 import type { IFinancialTransactionRepository } from "@/domain/repositories/financial";
@@ -122,13 +122,28 @@ export class InMemoryBankCardStatementRepository
     }
 }
 
+export class InMemoryBankCardPaymentRepository
+    extends InMemoryRepository<BankCardPayment>
+    implements IBankCardPaymentRepository {
+
+    async findByCardId(userId: UUID, cardId: UUID): Promise<BankCardPayment[]> {
+        return (await this.findAll())
+            .filter(p => p.ownerUserId === userId && p.cardId === cardId)
+            .sort((a, b) => Date.parse(b.date) - Date.parse(a.date));
+    }
+
+    async findByOwnerId(userId: UUID): Promise<BankCardPayment[]> {
+        return (await this.findAll()).filter(p => p.ownerUserId === userId);
+    }
+}
+
 /** Estados que la vista SQL excluye; se repiten aquí para que ambas coincidan. */
 const EXCLUDED_STATUSES = ["REJECTED", "DELETED", "DUPLICATE"];
 
 /**
  * Deriva las líneas del libro mayor desde las transacciones en memoria,
- * aplicando las mismas seis reglas que la vista `bank_movements`. No guarda
- * nada propio: si divergiera de la vista, los saldos en modo MEMORY mentirían
+ * aplicando las mismas reglas que la vista `bank_movements`, más los pagos
+ * de tarjeta registrados desde Bancos. No guarda nada propio: si divergiera de la vista, los saldos en modo MEMORY mentirían
  * respecto a los de SUPABASE.
  */
 export class InMemoryBankMovementRepository implements IBankMovementRepository {
@@ -136,6 +151,7 @@ export class InMemoryBankMovementRepository implements IBankMovementRepository {
         private readonly transactions: IFinancialTransactionRepository,
         private readonly cards: IBankCardRepository,
         private readonly statements: IBankCardStatementRepository,
+        private readonly cardPayments?: InMemoryBankCardPaymentRepository,
     ) {}
 
     async findAllForOwner(userId: UUID): Promise<BankMovement[]> {
@@ -176,6 +192,18 @@ export class InMemoryBankMovementRepository implements IBankMovementRepository {
             if (paidCardId) {
                 out.push({ ...base, accountId: null, cardId: paidCardId, direction: "PAYMENT" });
             }
+        }
+
+        // Espejo de la última rama de la vista: el pago registrado desde
+        // Bancos es una línea PAYMENT de su tarjeta y de nada más.
+        for (const p of await this.cardPayments?.findByOwnerId(userId) ?? []) {
+            out.push({
+                transactionId: p.id, ownerUserId: p.ownerUserId, date: p.date,
+                accountId: null, cardId: p.cardId, direction: "PAYMENT",
+                amount: Number(p.amount), currency: p.currency,
+                description: p.description ?? null, merchant: null, categoryId: null,
+                cardPaymentId: p.id,
+            });
         }
 
         return out.sort((a, b) => Date.parse(b.date) - Date.parse(a.date));
@@ -238,6 +266,7 @@ export class InMemoryBankIdentityMergeRepository implements IBankIdentityMergeRe
         private readonly observations: InMemoryBankNumberObservationRepository,
         private readonly transactions: IFinancialTransactionRepository,
         private readonly balanceSettings?: IBalanceSettingsRepository,
+        private readonly cardPayments?: InMemoryBankCardPaymentRepository,
     ) {}
 
     async mergeCards(userId: UUID, sourceIds: readonly UUID[], targetId: UUID): Promise<IdentityMergeResult> {
@@ -267,6 +296,12 @@ export class InMemoryBankIdentityMergeRepository implements IBankIdentityMergeRe
                 updatedAt: now,
             });
             movedTransactions += (card ? 1 : 0) + (payment ? 1 : 0);
+        }
+
+        for (const p of await this.cardPayments?.findByOwnerId(userId) ?? []) {
+            if (!from.has(p.cardId)) continue;
+            await this.cardPayments!.update({ ...p, cardId: targetId, updatedAt: now });
+            movedTransactions += 1;
         }
 
         let movedObservations = 0;

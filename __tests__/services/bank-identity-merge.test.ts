@@ -4,6 +4,7 @@ import {
     InMemoryBankCardRepository, InMemoryBankAccountBalanceSnapshotRepository,
     InMemoryBankCardStatementRepository, InMemoryBankMovementRepository,
     InMemoryBankNumberObservationRepository, InMemoryBankIdentityMergeRepository,
+    InMemoryBankCardPaymentRepository,
 } from "@/infrastructure/repositories/bank-in-memory";
 import {
     InMemoryFinancialTransactionRepository, InMemoryBalanceSettingsRepository,
@@ -21,16 +22,17 @@ function build() {
     const snapshots = new InMemoryBankAccountBalanceSnapshotRepository();
     const statements = new InMemoryBankCardStatementRepository();
     const transactions = new InMemoryFinancialTransactionRepository();
-    const movements = new InMemoryBankMovementRepository(transactions, cards, statements);
+    const cardPayments = new InMemoryBankCardPaymentRepository();
+    const movements = new InMemoryBankMovementRepository(transactions, cards, statements, cardPayments);
     const observations = new InMemoryBankNumberObservationRepository();
     const settings = new InMemoryBalanceSettingsRepository();
     const identification = new BankIdentificationService(observations, accounts, cards, institutions);
     const merges = new InMemoryBankIdentityMergeRepository(
-        cards, accounts, snapshots, statements, observations, transactions, settings,
+        cards, accounts, snapshots, statements, observations, transactions, settings, cardPayments,
     );
     const service = new BankService(
         institutions, accounts, cards, snapshots, statements, movements, transactions,
-        identification, undefined, merges,
+        identification, undefined, merges, cardPayments,
     );
     return { service, cards, accounts, snapshots, statements, transactions, settings };
 }
@@ -74,6 +76,18 @@ describe("unificar tarjetas", () => {
         const all = await transactions.findByOwnerId(USER);
         expect(all.find(t => t.id === "t2")?.bankCardId).toBe(original.id);
         expect(all.find(t => t.id === "t3")?.bankCardPaymentId).toBe(original.id);
+    });
+
+    it("los pagos registrados desde Bancos en la repetida bajan la deuda de la que se queda", async () => {
+        const { service, transactions, original, repetida } = await twoMastercards();
+        await tx(transactions, "consumo", { bankCardId: original.id, amount: 100, paidWithCredit: true });
+        const pago = await service.payCard(USER, repetida.id, 40, "2026-09-21T10:00:00.000Z");
+
+        await service.mergeCards(USER, [repetida.id], original.id);
+
+        const detail = await service.getCardDetail(USER, original.id);
+        expect(detail?.movements.find(m => m.cardPaymentId === pago.id)).toBeDefined();
+        expect(detail?.card.debt).toBe(60);
     });
 
     it("archiva la repetida y la que se queda sigue viva", async () => {

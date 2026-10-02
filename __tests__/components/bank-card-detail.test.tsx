@@ -25,7 +25,7 @@ const detail: BankCardDetail = {
     statements: [statement],
     movements: [],
     periodMovements: [],
-    payableAccounts: [],
+    paymentsWithoutSource: [],
 };
 
 describe("CardDetailClient", () => {
@@ -67,8 +67,9 @@ describe("CardDetailClient", () => {
         expect(screen.queryByText(/cupo usado/i)).not.toBeInTheDocument();
     });
 
-    it("sin cuentas para pagar avisa en vez de ofrecer el botón", () => {
+    it("el estado se marca como pagado sin pedir una cuenta", () => {
         render(<CardDetailClient initialData={detail} />);
-        expect(screen.getByText(/registra una cuenta/i)).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: /como pagado/i })).toBeInTheDocument();
+        expect(screen.queryByText(/registra una cuenta/i)).toBeNull();
     });
 });

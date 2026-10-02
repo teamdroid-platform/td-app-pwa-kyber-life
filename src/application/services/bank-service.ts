@@ -3,7 +3,7 @@ import type { UUID } from "@/domain/core";
 import type {
     BankInstitution, BankAccount, BankCard,
     BankAccountBalanceSnapshot, BankCardStatement, BankMovement,
-    BankNumberObservation,
+    BankNumberObservation, BankCardPayment,
 } from "@/domain/entities/bank";
 import type {
     FinancialTransaction, FinancialScannerTransaction,
@@ -12,6 +12,7 @@ import type {
     IBankInstitutionRepository, IBankAccountRepository, IBankCardRepository,
     IBankAccountBalanceSnapshotRepository, IBankCardStatementRepository,
     IBankMovementRepository, IBankIdentityMergeRepository, IdentityMergeResult,
+    IBankCardPaymentRepository,
 } from "@/domain/repositories/bank";
 import type {
     IFinancialTransactionRepository, IFinancialScannerTransactionRepository,
@@ -138,10 +139,10 @@ export interface BankCardDetail {
     statements: BankCardStatement[];
     movements: BankMovement[];
     periodMovements: BankMovement[];
-    /** Cuentas desde las que se puede pagar el estado. */
-    payableAccounts: BankAccountWithBalance[];
     /**
      * Los pagos que no dicen de qué cuenta salieron, por id de transacción.
+     * Solo cuentan las transacciones: un pago registrado desde Bancos no
+     * declara cuenta a propósito, no le falta nada.
      *
      * Un movimiento `PAYMENT` nunca nombra cuenta —la salida viaja en su propia
      * línea `OUT`—, así que desde el movimiento no hay forma de distinguir el
@@ -395,6 +396,8 @@ export class BankService {
         private readonly scannerTransactions?: IFinancialScannerTransactionRepository,
         /** Opcional: sin él no se puede unificar tarjetas ni cuentas. */
         private readonly merges?: IBankIdentityMergeRepository,
+        /** Opcional: sin él no se puede pagar una tarjeta desde Bancos. */
+        private readonly cardPayments?: IBankCardPaymentRepository,
     ) {}
 
     // ─── Sincronización desde la transacción ─────────────────
@@ -1041,11 +1044,9 @@ export class BankService {
 
         await this.closeDueStatements(userId, new Date());
 
-        const [statements, movements, allAccounts, allMovements, institutions] = await Promise.all([
+        const [statements, movements, institutions] = await Promise.all([
             this.statements.findByCardId(cardId),
             this.movements.find(userId, { cardId }),
-            this.accounts.findByOwnerId(userId),
-            this.movements.findAllForOwner(userId),
             this.institutions.findByOwnerId(userId),
         ]);
 
@@ -1057,21 +1058,16 @@ export class BankService {
                 m.date <= `${open.periodEnd}T23:59:59Z`)
             : [];
 
-        const payableAccounts = await Promise.all(
-            allAccounts
-                .filter(a => !a.isUnconfirmed && a.status === "ACTIVE")
-                .map(async a => namedByInstitution(await this.withBalance(a, allMovements), institutions)),
-        );
-
-        const paymentIds = movements.filter(m => m.direction === "PAYMENT").map(m => m.transactionId);
+        const paymentIds = movements
+            .filter(m => m.direction === "PAYMENT" && !m.cardPaymentId)
+            .map(m => m.transactionId);
         const paid = await Promise.all(paymentIds.map(id => this.transactions.findById(id)));
         const paymentsWithoutSource = paid
             .filter(t => t && !t.bankSourceAccountId)
             .map(t => t!.id);
 
         return {
-            card: withDebt, statements, movements, periodMovements, payableAccounts,
-            paymentsWithoutSource,
+            card: withDebt, statements, movements, periodMovements, paymentsWithoutSource,
         };
     }
 
@@ -1200,24 +1196,21 @@ export class BankService {
     }
 
     /**
-     * Registra un pago a una tarjeta.
+     * Registra un pago a una tarjeta desde Bancos.
      *
-     * Es el único camino de pago: lo llaman tanto el botón del detalle de
-     * tarjeta como el del estado de cuenta. El importe abona primero el estado
-     * abierto —lo que tiene vencimiento— y el resto baja la deuda corriente;
-     * sin estado abierto, todo va a la deuda. Sale **una** transacción, que
-     * lleva la tarjeta siempre y el estado solo cuando abonó algo.
+     * No crea una transacción: el dinero que sale de la cuenta para pagar la
+     * tarjeta el usuario ya lo registra por su lado —lo trae el escaneo o lo
+     * anota—, y como transacción salía dos veces en la lista y restaba dos
+     * veces del balance. Aquí solo se dice «esta deuda está pagada»: baja la
+     * deuda de la tarjeta y no mueve el saldo de ninguna cuenta.
      *
-     * `sourceAccountId` puede venir en null: hay pagos de los que el usuario no
-     * sabe —o no quiere declarar— de qué cuenta salieron. Sin ese campo la
-     * vista no emite la línea `OUT`, así que la deuda de la tarjeta baja y
-     * ningún saldo se mueve. Es una verdad a medias registrada como tal, en
-     * vez de una cuenta inventada que cuadre las cifras.
+     * El importe abona primero el estado abierto —lo que tiene vencimiento— y
+     * el resto baja la deuda corriente; sin estado abierto, todo va a la deuda.
      */
     async payCard(
-        userId: UUID, cardId: UUID, sourceAccountId: UUID | null,
-        amount: number, date: string,
-    ): Promise<FinancialTransaction> {
+        userId: UUID, cardId: UUID, amount: number, date: string,
+    ): Promise<BankCardPayment> {
+        const payments = this.requireCardPayments();
         const card = await this.cards.findById(cardId);
         if (!card || card.ownerUserId !== userId) throw new Error("Tarjeta no encontrada");
         if (card.cardType !== "CREDIT") throw new Error("Solo se puede pagar una tarjeta de crédito");
@@ -1225,24 +1218,17 @@ export class BankService {
         const openStatement = await this.statements.findOpenForCard(cardId);
         const { toStatement } = allocatePayment(amount, openStatement);
 
-        const transaction = await this.transactions.create({
+        const payment = await payments.create({
             id: randomUUID(),
             ownerUserId: userId,
-            type: "PAYMENT",
-            status: "MANUAL",
+            cardId,
+            statementId: toStatement > 0 ? openStatement!.id : null,
             amount,
             currency: card.currency,
-            description: `Pago ${cardLabel(card)}`,
-            merchant: card.institutionName ?? cardLabel(card),
             date,
-            paidWithCredit: false,
-            possibleDuplicate: false,
-            bankSourceAccountId: sourceAccountId ?? null,
-            bankCardPaymentId: cardId,
-            bankCardStatementId: toStatement > 0 ? openStatement!.id : null,
-            bankInstitutionId: card.institutionId,
+            description: `Pago ${cardLabel(card)}`,
             ...stamps(),
-        } as FinancialTransaction);
+        });
 
         if (toStatement > 0 && openStatement) {
             const paidAmount = round2(Number(openStatement.paidAmount) + toStatement);
@@ -1255,7 +1241,46 @@ export class BankService {
             });
         }
 
-        return transaction;
+        return payment;
+    }
+
+    /**
+     * Borra un pago registrado desde Bancos. La deuda vuelve sola —la vista
+     * deja de ver la línea—; lo que hay que deshacer a mano es el abono al
+     * estado de cuenta.
+     *
+     * El abono se recalcula con los pagos que quedan en vez de restar el
+     * importe: un pago que pasó del total abonó solo una parte al estado, y
+     * restarlo entero dejaría el estado con menos de lo que de verdad se pagó.
+     * Como los pagos llenan el estado en orden, lo abonado es la suma de los
+     * que quedan, tope el total.
+     */
+    async deleteCardPayment(userId: UUID, paymentId: UUID): Promise<void> {
+        const payments = this.requireCardPayments();
+        const payment = await payments.findById(paymentId);
+        if (!payment || payment.ownerUserId !== userId) throw new Error("Pago no encontrado");
+
+        await payments.delete(paymentId);
+        if (!payment.statementId) return;
+
+        const statement = await this.statements.findById(payment.statementId);
+        if (!statement || statement.ownerUserId !== userId) return;
+
+        const total = Number(statement.totalAmount ?? statement.computedAmount);
+        const remaining = (await payments.findByCardId(userId, payment.cardId))
+            .filter(p => p.statementId === statement.id && p.id !== paymentId)
+            .reduce((sum, p) => sum + Number(p.amount), 0);
+        const paidAmount = round2(Math.min(total, remaining));
+        await this.statements.update({
+            ...statement,
+            paidAmount,
+            status: statement.status === "PAID" && paidAmount < total ? "OPEN" : statement.status,
+        });
+    }
+
+    private requireCardPayments(): IBankCardPaymentRepository {
+        if (!this.cardPayments) throw new Error("Pagos de tarjeta no disponibles");
+        return this.cardPayments;
     }
 
     /**

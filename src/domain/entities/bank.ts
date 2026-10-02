@@ -104,6 +104,27 @@ export interface BankCardStatement extends BaseEntity {
     status: BankStatementStatus;
 }
 
+/**
+ * Un pago de tarjeta registrado desde Bancos.
+ *
+ * No es una transacción a propósito: el dinero que sale de la cuenta para
+ * pagar la tarjeta el usuario ya lo registra por su lado —lo trae el escaneo
+ * del banco o lo anota como gasto—, y como transacción aparecía dos veces en
+ * la lista y restaba dos veces del balance. Esto solo dice «esta deuda ya está
+ * pagada»: baja la deuda de la tarjeta y abona su estado de cuenta.
+ */
+export interface BankCardPayment extends BaseEntity {
+    ownerUserId: UUID;
+    cardId: UUID;
+    /** El estado de cuenta al que se abonó, si había uno abierto. */
+    statementId?: UUID | null;
+    amount: number;
+    currency: string;
+    /** Hora de pared etiquetada como UTC, como todas las fechas de Finanzas. */
+    date: ISODate;
+    description?: string | null;
+}
+
 /** Fila de la vista bank_movements. No es una entidad persistida. */
 export interface BankMovement {
     transactionId: UUID;
@@ -117,6 +138,11 @@ export interface BankMovement {
     description?: string | null;
     merchant?: string | null;
     categoryId?: UUID | null;
+    /**
+     * Si la línea es un pago registrado desde Bancos y no una transacción: ese
+     * se borra desde la tarjeta, porque en Transacciones no existe.
+     */
+    cardPaymentId?: UUID | null;
 }
 
 export type BankNumberResolution = 'EXACT' | 'INFERRED' | 'MANUAL' | 'EXTERNAL' | 'PENDING';
