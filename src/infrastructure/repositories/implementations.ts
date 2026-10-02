@@ -99,12 +99,17 @@ function sortTransactions(
     const field = sort?.field ?? "date";
     const factor = (sort?.direction ?? "desc") === "asc" ? 1 : -1;
 
+    // Mismo desempate que la consulta de Supabase: registro y luego id.
+    const tieBreak = (a: FinancialTransaction, b: FinancialTransaction) =>
+        ((a.createdAt || "").localeCompare(b.createdAt || "")
+            || String(a.id ?? "").localeCompare(String(b.id ?? ""))) * factor;
+
     return [...transactions].sort((a, b) => {
-        if (field === "amount") return (Number(a.amount) - Number(b.amount)) * factor;
+        if (field === "amount") return (Number(a.amount) - Number(b.amount)) * factor || tieBreak(a, b);
         if (field === "description") {
-            return (a.description || "").localeCompare(b.description || "", "es") * factor;
+            return (a.description || "").localeCompare(b.description || "", "es") * factor || tieBreak(a, b);
         }
-        return (a.date || "").localeCompare(b.date || "") * factor;
+        return (a.date || "").localeCompare(b.date || "") * factor || tieBreak(a, b);
     });
 }
 

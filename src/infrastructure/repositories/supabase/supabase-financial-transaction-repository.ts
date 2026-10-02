@@ -255,7 +255,11 @@ export class SupabaseFinancialTransactionRepository implements IFinancialTransac
 
         qb = this.applyFilters(qb, query, filters);
 
-        const { data, error } = await qb.order('date', { ascending: false });
+        // El mismo desempate que la lista paginada y el saldo corriente.
+        const { data, error } = await qb
+            .order('date', { ascending: false })
+            .order('created_at', { ascending: false })
+            .order('id', { ascending: false });
         if (error || !data) return [];
         return data.map(row => this.mapToEntity(row));
     }
@@ -294,12 +298,19 @@ export class SupabaseFinancialTransactionRepository implements IFinancialTransac
         // aquí solo se traduce al nombre de columna. Nunca se interpola texto
         // de la URL en `.order()`, que es donde acabaría construyendo SQL.
         const sortColumn = SORT_COLUMNS[sort?.field ?? "date"];
+        const ascending = sort?.direction === "asc";
         dataQb = dataQb
-            .order(sortColumn, { ascending: sort?.direction === "asc" })
-            // Segundo criterio estable: sin él, dos importes iguales pueden
-            // cambiar de sitio entre páginas y una fila se repite o se pierde
-            // al hacer scroll.
-            .order('id', { ascending: false })
+            .order(sortColumn, { ascending })
+            // Desempate: a igual fecha, el orden en que se registraron, y
+            // después el id. Es el mismo que usa el saldo corriente
+            // (`computeRunningBalances`), al revés porque la lista va de lo
+            // nuevo a lo viejo. Si no coinciden, dos pagos de la misma hora
+            // salen en un orden y su saldo se calcula en el otro: la columna
+            // de saldos sube y baja sin motivo, y la fila de al lado parece
+            // la culpable. También evita que un importe repetido cambie de
+            // sitio entre páginas y una fila se repita o se pierda.
+            .order('created_at', { ascending })
+            .order('id', { ascending })
             .range(from, to);
 
         const { data, error } = await dataQb;
