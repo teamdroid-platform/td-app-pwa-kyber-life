@@ -33,10 +33,10 @@ CREATE INDEX bank_card_payments_owner_idx ON bank_card_payments (owner_user_id);
 CREATE INDEX bank_card_payments_card_idx  ON bank_card_payments (card_id) WHERE NOT is_deleted;
 
 ALTER TABLE bank_card_payments ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Users can view own bank_card_payments"   ON bank_card_payments FOR SELECT USING (auth.uid() = owner_user_id);
-CREATE POLICY "Users can insert own bank_card_payments" ON bank_card_payments FOR INSERT WITH CHECK (auth.uid() = owner_user_id);
-CREATE POLICY "Users can update own bank_card_payments" ON bank_card_payments FOR UPDATE USING (auth.uid() = owner_user_id);
-CREATE POLICY "Users can delete own bank_card_payments" ON bank_card_payments FOR DELETE USING (auth.uid() = owner_user_id);
+CREATE POLICY "bcp_select"   ON bank_card_payments FOR SELECT USING (auth.uid() = owner_user_id);
+CREATE POLICY "bcp_insert" ON bank_card_payments FOR INSERT WITH CHECK (auth.uid() = owner_user_id);
+CREATE POLICY "bcp_update" ON bank_card_payments FOR UPDATE USING (auth.uid() = owner_user_id);
+CREATE POLICY "bcp_delete" ON bank_card_payments FOR DELETE USING (auth.uid() = owner_user_id);
 
 -- La vista suma una rama: cada pago de la tabla es una línea PAYMENT de su
 -- tarjeta. `card_payment_id` va al final —una vista solo admite columnas
