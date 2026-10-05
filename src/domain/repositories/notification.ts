@@ -1,6 +1,6 @@
 import { UUID } from "../core";
 import { IRepository } from "./index";
-import { Notification, PushSubscription } from "../entities/notification";
+import { Notification, NotificationType, PushSubscription } from "../entities/notification";
 
 export interface NotificationQueryOptions {
     /** When true, only notifications that haven't been read yet are returned. */
@@ -12,6 +12,8 @@ export interface INotificationRepository extends IRepository<Notification> {
     countUnread(userId: UUID): Promise<number>;
     markAsRead(id: UUID, userId: UUID): Promise<void>;
     markAllAsRead(userId: UUID): Promise<void>;
+    /** Marks every unread notification of one type as read. */
+    markTypeAsRead(userId: UUID, type: NotificationType): Promise<void>;
 }
 
 export interface IPushSubscriptionRepository extends IRepository<PushSubscription> {

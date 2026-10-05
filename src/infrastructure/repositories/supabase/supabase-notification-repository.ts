@@ -1,4 +1,4 @@
-import type { Notification } from "@/domain/entities/notification";
+import type { Notification, NotificationType } from "@/domain/entities/notification";
 import type { INotificationRepository, NotificationQueryOptions } from "@/domain/repositories/notification";
 import type { UUID } from "@/domain/core";
 import { createClient } from "@/infrastructure/supabase/server";
@@ -117,6 +117,18 @@ export class SupabaseNotificationRepository implements INotificationRepository {
             .from(this.tableName)
             .update({ is_read: true, read_at: new Date().toISOString() })
             .eq('owner_user_id', userId)
+            .eq('is_read', false);
+
+        if (error) throw error;
+    }
+
+    async markTypeAsRead(userId: UUID, type: NotificationType): Promise<void> {
+        const supabase = await createClient();
+        const { error } = await supabase
+            .from(this.tableName)
+            .update({ is_read: true, read_at: new Date().toISOString() })
+            .eq('owner_user_id', userId)
+            .eq('type', type)
             .eq('is_read', false);
 
         if (error) throw error;

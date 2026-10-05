@@ -52,6 +52,17 @@ export async function markNotificationReadAction(id: string) {
     }
 }
 
+export async function markScanNotificationsReadAction() {
+    try {
+        const userId = await requireUserId();
+        await notificationService.markScanResultsAsRead(userId);
+        return { success: true, data: null };
+    } catch (error) {
+        console.error("Error marking scan notifications as read:", error);
+        return { success: false, error: (error as Error).message };
+    }
+}
+
 export async function markAllNotificationsReadAction() {
     try {
         const userId = await requireUserId();
