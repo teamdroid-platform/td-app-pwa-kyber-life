@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useEffect, useRef, useState, type FocusEvent, type ReactNode } from "react";
 import { ArrowLeft, Receipt, RotateCcw, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { WIZARD_STEPS, type WizardScreen } from "../../hooks/useTransactionWizard";
@@ -46,9 +46,14 @@ export function WizardShell({
     const stepIndex = WIZARD_STEPS.findIndex((s) => s.id === screen);
     const isSummary = screen === "summary";
     const canGoBack = focus || isSummary || stepIndex > 0;
+    const { typing, onFocusCapture, onBlurCapture } = useTyping();
 
     return (
-        <div className="mx-auto flex w-full max-w-lg flex-1 flex-col">
+        <div
+            className="mx-auto flex w-full max-w-lg flex-1 flex-col"
+            onFocusCapture={onFocusCapture}
+            onBlurCapture={onBlurCapture}
+        >
             <header className="flex flex-col gap-2.5">
                 <div className="flex items-center gap-2.5">
                     {canGoBack && (
@@ -130,7 +135,20 @@ export function WizardShell({
 
             <div className="flex flex-1 flex-col gap-4 pb-4 pt-4">{children}</div>
 
-            <div className="sticky bottom-3 z-10 -mx-1 flex flex-col gap-2 px-1">{footer}</div>
+            {/* Floating, the footer lands right where the keyboard pushes the
+                field being typed in — over the search box and the filtered
+                list. While typing it drops back into the flow, after the
+                content, and floats again once the keyboard closes. */}
+            <div
+                data-testid="wizard-footer"
+                data-floating={!typing}
+                className={cn(
+                    "z-10 -mx-1 flex flex-col gap-2 px-1",
+                    !typing && "sticky bottom-3",
+                )}
+            >
+                {footer}
+            </div>
         </div>
     );
 }
@@ -138,6 +156,45 @@ export function WizardShell({
 interface StepHeadingProps {
     question: string;
     hint?: string;
+}
+
+/** Inputs that open the soft keyboard; checkboxes, radios and buttons don't. */
+const NON_TEXT_INPUTS = new Set([
+    "button", "checkbox", "color", "file", "hidden", "image", "radio", "range", "reset", "submit",
+]);
+
+function opensKeyboard(el: EventTarget | null): boolean {
+    if (el instanceof HTMLTextAreaElement) return true;
+    if (el instanceof HTMLInputElement) return !NON_TEXT_INPUTS.has(el.type);
+    return el instanceof HTMLElement && el.isContentEditable;
+}
+
+/**
+ * Whether the user is typing in a field inside the wizard.
+ *
+ * Losing focus is resolved a beat later: tapping a footer button blurs the
+ * field first, and un-floating the footer in that same instant would move the
+ * button out from under the finger before the click lands.
+ */
+function useTyping() {
+    const [typing, setTyping] = useState(false);
+    const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    useEffect(() => () => {
+        if (timer.current) clearTimeout(timer.current);
+    }, []);
+
+    const onFocusCapture = (e: FocusEvent) => {
+        if (!opensKeyboard(e.target)) return;
+        if (timer.current) clearTimeout(timer.current);
+        setTyping(true);
+    };
+    const onBlurCapture = () => {
+        if (timer.current) clearTimeout(timer.current);
+        timer.current = setTimeout(() => setTyping(opensKeyboard(document.activeElement)), 200);
+    };
+
+    return { typing, onFocusCapture, onBlurCapture };
 }
 
 /** The one question a step asks, plus an optional line of context under it. */
