@@ -16,7 +16,7 @@ import {
     createCardSchema, updateCardSchema,
     balanceSnapshotSchema, balanceSnapshotBatchSchema,
     statementTotalSchema,
-    payCardSchema, confirmCardPaymentSchema, dismissCardPaymentSchema,
+    payCardSchema, deleteCardPaymentSchema, confirmCardPaymentSchema, dismissCardPaymentSchema,
     mergeInstitutionsSchema, mergeIdentitiesSchema, convertToCardSchema,
 } from "@/lib/validators/bank-schemas";
 
@@ -341,14 +341,22 @@ export async function setStatementTotalAction(input: unknown) {
 export async function payCardAction(input: unknown) {
     return run("payCard", async userId => {
         const v = payCardSchema.parse(input);
-        const result = await bankService.payCard(
-            userId, v.cardId, v.sourceAccountId, v.amount, v.date,
-        );
+        const result = await bankService.payCard(userId, v.cardId, v.amount, v.date);
+        // No es una transacción: solo cambia la deuda de la tarjeta, así que
+        // ni la lista de transacciones ni el dashboard se enteran.
         revalidateBanks();
-        // El pago es un gasto real, así que también mueve el dashboard financiero.
-        revalidatePath("/financial");
-        revalidatePath("/financial/transactions");
+        revalidatePath(`/financial/banks/cards/${v.cardId}`);
         return result;
+    });
+}
+
+export async function deleteCardPaymentAction(input: unknown) {
+    return run("deleteCardPayment", async userId => {
+        const v = deleteCardPaymentSchema.parse(input);
+        await bankService.deleteCardPayment(userId, v.paymentId);
+        // Se borra desde el detalle de la tarjeta, que cuelga de Bancos.
+        revalidatePath("/financial/banks", "layout");
+        return { paymentId: v.paymentId };
     });
 }
 

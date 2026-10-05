@@ -89,19 +89,4 @@ describe("el emisor viaja con la cuenta y con la tarjeta", () => {
 
         expect(detail?.card.institutionName).toBe("Banco Guayaquil");
     });
-
-    it("las cuentas con que se paga una tarjeta llegan con su emisor", async () => {
-        const service = buildService();
-        const inst = await service.createInstitution(USER, { name: "Banco del Pacífico", kind: "BANK" });
-        await service.createAccount(USER, {
-            institutionId: inst.id, accountType: "SAVINGS", lastFour: "1860",
-        });
-        const card = await service.createCard(USER, {
-            institutionId: inst.id, cardType: "CREDIT", brand: "Visa", lastFour: "2780",
-        });
-
-        const detail = await service.getCardDetail(USER, card.id);
-
-        expect(detail?.payableAccounts[0].institutionName).toBe("Banco del Pacífico");
-    });
 });

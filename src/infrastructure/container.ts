@@ -32,6 +32,7 @@ import {
     InMemoryBankMovementRepository,
     InMemoryBankNumberObservationRepository,
     InMemoryBankIdentityMergeRepository,
+    InMemoryBankCardPaymentRepository,
 } from "./repositories/bank-in-memory";
 import { seedRepositories } from "./seed/seed-data";
 import { randomUUID } from "crypto";
@@ -69,6 +70,7 @@ import {
 } from "./repositories/supabase"; // Need to create this index or import individually
 import { SupabasePeriodSettingsRepository } from "./repositories/supabase/supabase-period-settings-repository";
 import { SupabaseBankIdentityMergeRepository } from "./repositories/supabase/supabase-bank-identity-merge-repository";
+import { SupabaseBankCardPaymentRepository } from "./repositories/supabase/supabase-bank-card-payment-repository";
 
 // ... Previous imports ...
 
@@ -134,11 +136,17 @@ export const periodSettingsRepository = singleton("periodSettingsRepo", () =>
     isSupabase ? new SupabasePeriodSettingsRepository() : new InMemoryPeriodSettingsRepository());
 export const bankSnapshotRepository = singleton("bankSnapshotRepo", () => isSupabase ? new SupabaseBankAccountBalanceSnapshotRepository() : new InMemoryBankAccountBalanceSnapshotRepository());
 export const bankStatementRepository = singleton("bankStatementRepo", () => isSupabase ? new SupabaseBankCardStatementRepository() : new InMemoryBankCardStatementRepository());
+export const bankCardPaymentRepository = singleton("bankCardPaymentRepo", () => isSupabase
+    ? new SupabaseBankCardPaymentRepository()
+    : new InMemoryBankCardPaymentRepository());
 export const bankMovementRepository = singleton("bankMovementRepo", () => isSupabase
     ? new SupabaseBankMovementRepository()
-    // La versión in-memory deriva los movimientos de las transacciones, así que
-    // necesita los tres repos de los que la vista SQL hace JOIN.
-    : new InMemoryBankMovementRepository(financialTransactionRepository, bankCardRepository, bankStatementRepository));
+    // La versión in-memory deriva los movimientos de las transacciones y los
+    // pagos de tarjeta, así que necesita los repos que la vista SQL junta.
+    : new InMemoryBankMovementRepository(
+        financialTransactionRepository, bankCardRepository, bankStatementRepository,
+        bankCardPaymentRepository as InMemoryBankCardPaymentRepository,
+    ));
 export const bankObservationRepository = singleton("bankObservationRepo", () => isSupabase
     ? new SupabaseBankNumberObservationRepository()
     : new InMemoryBankNumberObservationRepository());
@@ -154,6 +162,7 @@ export const bankIdentityMergeRepository = singleton("bankIdentityMergeRepo", ()
         bankObservationRepository as InMemoryBankNumberObservationRepository,
         financialTransactionRepository,
         balanceSettingsRepository,
+        bankCardPaymentRepository as InMemoryBankCardPaymentRepository,
     ));
 
 export const notificationRepository = singleton("notificationRepo", () => isSupabase ? new SupabaseNotificationRepository() : new InMemoryNotificationRepository());
@@ -198,6 +207,7 @@ export const bankService = new BankService(
     bankIdentificationService,
     financialScannerTransactionRepository,
     bankIdentityMergeRepository,
+    bankCardPaymentRepository,
 );
 export const financialTransactionService = new FinancialTransactionService(
     financialTransactionRepository, 

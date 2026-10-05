@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { ArrowUpRight, ArrowDownLeft, CreditCard, Banknote } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { money } from "../lib/format-money";
@@ -22,9 +23,11 @@ interface MovementRowProps {
      * cuenta refleja la salida y el dato sigue faltando.
      */
     withoutSource?: boolean;
+    /** Acción al final de la fila, como borrar un pago registrado desde Bancos. */
+    action?: ReactNode;
 }
 
-export function MovementRow({ movement, runningBalance, withoutSource }: MovementRowProps) {
+export function MovementRow({ movement, runningBalance, withoutSource, action }: MovementRowProps) {
     const { Icon, chip, amount, sign } = STYLE[movement.direction];
     const title = movement.merchant || movement.description || "Movimiento";
     const subtitle = movement.merchant && movement.description ? movement.description : null;
@@ -57,6 +60,7 @@ export function MovementRow({ movement, runningBalance, withoutSource }: Movemen
                     </span>
                 )}
             </span>
+            {action}
         </div>
     );
 }

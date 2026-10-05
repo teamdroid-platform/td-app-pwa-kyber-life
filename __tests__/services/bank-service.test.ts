@@ -3,7 +3,7 @@ import {
     InMemoryBankInstitutionRepository, InMemoryBankAccountRepository,
     InMemoryBankCardRepository, InMemoryBankAccountBalanceSnapshotRepository,
     InMemoryBankCardStatementRepository, InMemoryBankMovementRepository,
-    InMemoryBankNumberObservationRepository,
+    InMemoryBankNumberObservationRepository, InMemoryBankCardPaymentRepository,
 } from "@/infrastructure/repositories/bank-in-memory";
 import { InMemoryFinancialTransactionRepository } from "@/infrastructure/repositories/implementations";
 import { BankIdentificationService } from "@/application/services/bank-identification-service";
@@ -19,11 +19,13 @@ function buildService() {
     const snapshots = new InMemoryBankAccountBalanceSnapshotRepository();
     const statements = new InMemoryBankCardStatementRepository();
     const transactions = new InMemoryFinancialTransactionRepository();
-    const movements = new InMemoryBankMovementRepository(transactions, cards, statements);
+    const cardPayments = new InMemoryBankCardPaymentRepository();
+    const movements = new InMemoryBankMovementRepository(transactions, cards, statements, cardPayments);
     const observations = new InMemoryBankNumberObservationRepository();
     const identification = new BankIdentificationService(observations, accounts, cards, institutions);
     const service = new BankService(
         institutions, accounts, cards, snapshots, statements, movements, transactions, identification,
+        undefined, undefined, cardPayments,
     );
     return { service, institutions, accounts, cards, snapshots, statements, transactions };
 }
@@ -199,37 +201,31 @@ describe("payCard (sobre estado de cuenta)", () => {
         return { ...ctx, cuenta, card, statement };
     }
 
-    it("crea un gasto real que sale de la cuenta y salda el estado", async () => {
-        const { service, statements, cuenta, card, statement } = await cardWithOpenStatement();
-        const updatedStatement = { ...statement, computedAmount: 611.4 };
-        await statements.update(updatedStatement);
+    it("registra el pago en la tarjeta y salda el estado", async () => {
+        const { service, statements, card, statement } = await cardWithOpenStatement();
+        await statements.update({ ...statement, computedAmount: 611.4 });
 
-        const created = await service.payCard(
-            USER, card.id, cuenta.id, 611.4, "2026-08-26T00:00:00Z",
-        );
+        const created = await service.payCard(USER, card.id, 611.4, "2026-08-26T00:00:00Z");
 
-        expect(created.bankCardStatementId).toBe(statement.id);
-        expect(created.bankSourceAccountId).toBe(cuenta.id);
-        // Un pago de tarjeta no es un consumo diferido: es dinero que sale hoy.
-        expect(created.paidWithCredit).toBe(false);
-
+        expect(created.cardId).toBe(card.id);
+        expect(created.statementId).toBe(statement.id);
         const after = await statements.findById(statement.id);
         expect(after!.paidAmount).toBe(611.4);
         expect(after!.status).toBe("PAID");
     });
 
     it("un pago parcial deja el estado abierto", async () => {
-        const { service, statements, cuenta, card, statement } = await cardWithOpenStatement();
+        const { service, statements, card, statement } = await cardWithOpenStatement();
         await statements.update({ ...statement, computedAmount: 611.4 });
 
-        await service.payCard(USER, card.id, cuenta.id, 200, "2026-08-26T00:00:00Z");
+        await service.payCard(USER, card.id, 200, "2026-08-26T00:00:00Z");
 
         const after = await statements.findById(statement.id);
         expect(after!.paidAmount).toBe(200);
         expect(after!.status).toBe("OPEN");
     });
 
-    it("el pago baja la deuda de la tarjeta y el saldo de la cuenta", async () => {
+    it("el pago baja la deuda de la tarjeta y no toca el saldo de ninguna cuenta", async () => {
         const { service, statements, transactions, cuenta, card, statement } = await cardWithOpenStatement();
         await service.registerBalanceSnapshot(USER, cuenta.id, 1000, "2026-08-01T00:00:00Z");
         await transactions.create(tx({
@@ -237,11 +233,13 @@ describe("payCard (sobre estado de cuenta)", () => {
         }));
         await statements.update({ ...statement, computedAmount: 300 });
 
-        await service.payCard(USER, card.id, cuenta.id, 300, "2026-08-26T00:00:00Z");
+        await service.payCard(USER, card.id, 300, "2026-08-26T00:00:00Z");
 
         const overview = await service.getOverview(USER);
         expect(overview.totalDebt).toBe(0);
-        expect(overview.totalAvailable).toBe(700);
+        // La salida del dinero el usuario la registra por su lado; el pago
+        // desde Bancos no la vuelve a restar.
+        expect(overview.totalAvailable).toBe(1000);
     });
 });
 
@@ -259,12 +257,10 @@ describe("payCard", () => {
         const card = await creditCard(cards, "card-a");
         await transactions.create(tx({ amount: 534.56, bankCardId: card.id, paidWithCredit: true }));
 
-        const payment = await service.payCard(USER, card.id, "acc-1", 534.56, NOW);
+        const payment = await service.payCard(USER, card.id, 534.56, NOW);
 
-        expect(payment.type).toBe("PAYMENT");
-        expect(payment.bankCardPaymentId).toBe(card.id);
-        expect(payment.bankCardStatementId).toBeFalsy();
-        expect(payment.bankSourceAccountId).toBe("acc-1");
+        expect(payment.cardId).toBe(card.id);
+        expect(payment.statementId).toBeFalsy();
         expect((await service.getCardDetail(USER, card.id))!.card.debt).toBe(0);
     });
 
@@ -279,16 +275,16 @@ describe("payCard", () => {
         } as never);
         await transactions.create(tx({ amount: 500, bankCardId: card.id, paidWithCredit: true }));
 
-        const payment = await service.payCard(USER, card.id, "acc-1", 200, NOW);
+        const payment = await service.payCard(USER, card.id, 200, NOW);
 
-        expect(payment.bankCardStatementId).toBe("st-b");
+        expect(payment.statementId).toBe("st-b");
         const saved = await statements.findById("st-b");
         expect(Number(saved!.paidAmount)).toBe(180);
         expect(saved!.status).toBe("PAID");
         expect((await service.getCardDetail(USER, card.id))!.card.debt).toBe(300);
     });
 
-    it("crea una sola transacción aunque abone el estado", async () => {
+    it("no crea ninguna transacción", async () => {
         const { service, cards, statements, transactions } = buildService();
         const card = await creditCard(cards, "card-c");
         await statements.create({
@@ -299,8 +295,20 @@ describe("payCard", () => {
         } as never);
 
         const before = (await transactions.findByOwnerId(USER)).length;
-        await service.payCard(USER, card.id, "acc-1", 100, NOW);
-        expect((await transactions.findByOwnerId(USER)).length).toBe(before + 1);
+        await service.payCard(USER, card.id, 100, NOW);
+        expect((await transactions.findByOwnerId(USER)).length).toBe(before);
+    });
+
+    it("el pago sale en la tarjeta como pago de Bancos, no como pago sin origen", async () => {
+        const { service, cards } = buildService();
+        const card = await creditCard(cards, "card-d");
+
+        const payment = await service.payCard(USER, card.id, 50, NOW);
+
+        const detail = await service.getCardDetail(USER, card.id);
+        const line = detail!.movements.find(m => m.direction === "PAYMENT");
+        expect(line?.cardPaymentId).toBe(payment.id);
+        expect(detail!.paymentsWithoutSource).toHaveLength(0);
     });
 
     it("rechaza una tarjeta de otro usuario", async () => {
@@ -311,7 +319,7 @@ describe("payCard", () => {
             isDeleted: false,
         } as never);
 
-        await expect(service.payCard(USER, "card-ajena", "acc-1", 10, NOW))
+        await expect(service.payCard(USER, "card-ajena", 10, NOW))
             .rejects.toThrow("Tarjeta no encontrada");
     });
 
@@ -323,8 +331,61 @@ describe("payCard", () => {
             isDeleted: false,
         } as never);
 
-        await expect(service.payCard(USER, "card-debito", "acc-1", 10, NOW))
+        await expect(service.payCard(USER, "card-debito", 10, NOW))
             .rejects.toThrow("Solo se puede pagar una tarjeta de crédito");
+    });
+});
+
+describe("deleteCardPayment", () => {
+    async function paidCard() {
+        const ctx = buildService();
+        const card = await ctx.cards.create({
+            id: "card-del", ownerUserId: USER, cardType: "CREDIT", currency: "USD",
+            status: "ACTIVE", isUnconfirmed: false, createdAt: NOW, updatedAt: NOW,
+            isDeleted: false,
+        } as never);
+        await ctx.statements.create({
+            id: "st-del", ownerUserId: USER, cardId: card.id,
+            periodStart: "2026-08-01", periodEnd: "2026-08-31", dueDate: "2026-09-15",
+            computedAmount: 180, totalAmount: null, paidAmount: 0, status: "OPEN",
+            createdAt: NOW, updatedAt: NOW, isDeleted: false,
+        } as never);
+        await ctx.transactions.create(tx({ amount: 500, bankCardId: card.id, paidWithCredit: true }));
+        return { ...ctx, card };
+    }
+
+    it("la deuda vuelve y el estado se reabre", async () => {
+        const { service, statements, card } = await paidCard();
+        const payment = await service.payCard(USER, card.id, 200, NOW);
+
+        await service.deleteCardPayment(USER, payment.id);
+
+        const saved = await statements.findById("st-del");
+        expect(Number(saved!.paidAmount)).toBe(0);
+        expect(saved!.status).toBe("OPEN");
+        expect((await service.getCardDetail(USER, card.id))!.card.debt).toBe(500);
+    });
+
+    it("lo abonado al estado se recalcula con los pagos que quedan", async () => {
+        const { service, statements, card } = await paidCard();
+        await service.payCard(USER, card.id, 100, NOW);
+        const second = await service.payCard(USER, card.id, 50, NOW);
+        await service.payCard(USER, card.id, 100, NOW); // llena el estado: 30 al estado, 70 a la deuda
+
+        await service.deleteCardPayment(USER, second.id);
+
+        const saved = await statements.findById("st-del");
+        // Quedan 100 + 100 abonados al estado de 180: tope el total.
+        expect(Number(saved!.paidAmount)).toBe(180);
+        expect((await service.getCardDetail(USER, card.id))!.card.debt).toBe(300);
+    });
+
+    it("no borra el pago de otro usuario", async () => {
+        const { service, card } = await paidCard();
+        const payment = await service.payCard(USER, card.id, 20, NOW);
+
+        await expect(service.deleteCardPayment("otro", payment.id))
+            .rejects.toThrow("Pago no encontrado");
     });
 });
 
@@ -500,62 +561,5 @@ describe("bandeja de pagos por confirmar", () => {
 
         await expect(service.confirmCardPayment(USER, t.id, "card-debito-2780"))
             .rejects.toThrow("Solo se puede pagar una tarjeta de crédito");
-    });
-});
-
-describe("payCard sin cuenta de origen", () => {
-    async function creditCardWithDebt(built: ReturnType<typeof buildService>, id: string) {
-        const card = await built.cards.create({
-            id, ownerUserId: USER, cardType: "CREDIT", currency: "USD",
-            status: "ACTIVE", isUnconfirmed: false, createdAt: NOW, updatedAt: NOW,
-            isDeleted: false,
-        } as never);
-        await built.transactions.create(tx({
-            amount: 534.56, bankCardId: card.id, paidWithCredit: true,
-        }));
-        return card;
-    }
-
-    it("baja la deuda sin atar ninguna cuenta", async () => {
-        const built = buildService();
-        const card = await creditCardWithDebt(built, "card-sin-origen");
-
-        const payment = await built.service.payCard(USER, card.id, null, 534.56, NOW);
-
-        expect(payment.bankSourceAccountId).toBeFalsy();
-        expect(payment.bankCardPaymentId).toBe(card.id);
-        expect((await built.service.getCardDetail(USER, card.id))!.card.debt).toBe(0);
-    });
-
-    it("no mueve el saldo de ninguna cuenta", async () => {
-        const built = buildService();
-        const card = await creditCardWithDebt(built, "card-saldo-intacto");
-        const account = await built.accounts.create({
-            id: "acc-intacta", ownerUserId: USER, accountType: "SAVINGS", currency: "USD",
-            status: "ACTIVE", isUnconfirmed: false, createdAt: NOW, updatedAt: NOW,
-            isDeleted: false,
-        } as never);
-        await built.snapshots.create({
-            id: "snap-1", ownerUserId: USER, accountId: account.id, balance: 1000,
-            asOf: "2026-08-01", source: "MANUAL", createdAt: NOW, updatedAt: NOW,
-            isDeleted: false,
-        } as never);
-
-        await built.service.payCard(USER, card.id, null, 534.56, NOW);
-
-        const detail = await built.service.getAccountDetail(USER, account.id);
-        expect(detail!.account.balance).toBe(1000);
-    });
-
-    it("senala el pago sin origen en el detalle de la tarjeta", async () => {
-        const built = buildService();
-        const card = await creditCardWithDebt(built, "card-senalada");
-
-        const payment = await built.service.payCard(USER, card.id, null, 100, NOW);
-        const conCuenta = await built.service.payCard(USER, card.id, "acc-1", 50, NOW);
-
-        const detail = await built.service.getCardDetail(USER, card.id);
-        expect(detail!.paymentsWithoutSource).toContain(payment.id);
-        expect(detail!.paymentsWithoutSource).not.toContain(conCuenta.id);
     });
 });

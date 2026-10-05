@@ -16,13 +16,14 @@ function mapToEntity(row: Record<string, unknown>): BankMovement {
         description: (row.description as string) ?? null,
         merchant: (row.merchant as string) ?? null,
         categoryId: (row.category_id as string) ?? null,
+        cardPaymentId: (row.card_payment_id as string) ?? null,
     };
 }
 
 /**
  * Solo lectura sobre la vista `bank_movements`, que explota cada transacción en
- * líneas de libro mayor. No hay create ni update: la transacción es la única
- * fuente de verdad, así que estas filas no existen por sí solas.
+ * líneas de libro mayor, más los pagos de tarjeta registrados desde Bancos. No
+ * hay create ni update: estas filas no existen por sí solas.
  */
 export class SupabaseBankMovementRepository implements IBankMovementRepository {
     async find(userId: UUID, filter: BankMovementFilter): Promise<BankMovement[]> {

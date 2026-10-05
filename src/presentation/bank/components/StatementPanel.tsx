@@ -7,19 +7,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { computeStatementDue } from "@/domain/services/bank-balance";
 import { payCardAction, setStatementTotalAction } from "@/app/actions/bank";
-import { accountLabel } from "@/lib/bank-identity-label";
 import { money, shortDate } from "../lib/format-money";
 import { cn } from "@/lib/utils";
 import type { BankCardStatement } from "@/domain/entities/bank";
-import type { BankAccountWithBalance } from "@/application/services/bank-service";
 
 interface StatementPanelProps {
     statement: BankCardStatement;
     cardId: string;
-    accounts: BankAccountWithBalance[];
 }
 
-export function StatementPanel({ statement, cardId, accounts }: StatementPanelProps) {
+export function StatementPanel({ statement, cardId }: StatementPanelProps) {
     const router = useRouter();
     const [paying, setPaying] = useState(false);
     const [editingTotal, setEditingTotal] = useState(false);
@@ -33,17 +30,12 @@ export function StatementPanel({ statement, cardId, accounts }: StatementPanelPr
         : null;
     const due = computeStatementDue(statement);
 
-    // De momento se paga desde la primera cuenta activa. Con una sola cuenta
-    // bancaria registrada acierta siempre; elegir entre varias es un sheet que
-    // se añade cuando haga falta.
-    const source = accounts.find(a => a.accountType !== "CASH") ?? accounts[0];
-
+    // El pago solo salda la deuda: no es una transacción ni sale de ninguna
+    // cuenta, así que no hay origen que elegir.
     async function handlePay() {
-        if (!source) return;
         setPaying(true);
         const result = await payCardAction({
             cardId,
-            sourceAccountId: source.id,
             amount: due,
             date: new Date().toISOString(),
         });
@@ -122,15 +114,9 @@ export function StatementPanel({ statement, cardId, accounts }: StatementPanelPr
             <Row label="Pagado" value={money(statement.paidAmount)} tone="good" />
 
             {due > 0 && (
-                source ? (
-                    <Button onClick={handlePay} disabled={paying} className="mt-1 w-full">
-                        {paying ? "Registrando…" : `Pagar ${money(due)} desde ${accountLabel(source)}`}
-                    </Button>
-                ) : (
-                    <p className="mt-1 text-xs leading-relaxed text-amber-500">
-                        Registra una cuenta para poder pagar este estado.
-                    </p>
-                )
+                <Button onClick={handlePay} disabled={paying} className="mt-1 w-full">
+                    {paying ? "Registrando…" : `Marcar ${money(due)} como pagado`}
+                </Button>
             )}
         </section>
     );

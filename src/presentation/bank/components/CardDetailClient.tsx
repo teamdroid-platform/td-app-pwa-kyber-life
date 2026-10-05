@@ -7,6 +7,7 @@ import { formatBankNumber } from "@/lib/format-bank-number";
 import { StatementPanel } from "./StatementPanel";
 import { PayCardSheet } from "./PayCardSheet";
 import { MovementRow } from "./MovementRow";
+import { DeleteCardPaymentButton } from "./DeleteCardPaymentButton";
 import { money, shortDate } from "../lib/format-money";
 import { computeStatementDue } from "@/domain/services/bank-balance";
 import { cn } from "@/lib/utils";
@@ -41,7 +42,7 @@ function daysUntil(date: string): number {
 }
 
 export function CardDetailClient({ initialData }: { initialData: BankCardDetail }) {
-    const { card, statements, movements, periodMovements, payableAccounts } = initialData;
+    const { card, statements, movements, periodMovements } = initialData;
     const withoutSource = new Set(initialData.paymentsWithoutSource ?? []);
     const number = formatBankNumber(card);
     const open = card.openStatement;
@@ -69,6 +70,9 @@ export function CardDetailClient({ initialData }: { initialData: BankCardDetail 
                 movement.direction === "PAYMENT"
                 && withoutSource.has(movement.transactionId)
             }
+            action={movement.cardPaymentId ? (
+                <DeleteCardPaymentButton paymentId={movement.cardPaymentId} amount={movement.amount} />
+            ) : undefined}
         />
     );
 
@@ -103,7 +107,7 @@ export function CardDetailClient({ initialData }: { initialData: BankCardDetail 
                             {money(card.debt)}
                         </h2>
                         {isCredit && card.debt > 0 && (
-                            <PayCardSheet card={card} accounts={payableAccounts} />
+                            <PayCardSheet card={card} />
                         )}
                     </div>
                     <div className="flex flex-wrap gap-2">
@@ -145,7 +149,7 @@ export function CardDetailClient({ initialData }: { initialData: BankCardDetail 
                 </section>
             )}
 
-            {open && <StatementPanel statement={open} cardId={card.id} accounts={payableAccounts} />}
+            {open && <StatementPanel statement={open} cardId={card.id} />}
 
             {hasCycle ? (
                 <section className="flex flex-col gap-2">
