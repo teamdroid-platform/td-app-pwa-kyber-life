@@ -14,9 +14,11 @@ import type { BankCardStatement } from "@/domain/entities/bank";
 interface StatementPanelProps {
     statement: BankCardStatement;
     cardId: string;
+    /** Deuda total de la tarjeta: el tope de lo que este estado puede pedir. */
+    debt: number;
 }
 
-export function StatementPanel({ statement, cardId }: StatementPanelProps) {
+export function StatementPanel({ statement, cardId, debt }: StatementPanelProps) {
     const router = useRouter();
     const [paying, setPaying] = useState(false);
     const [editingTotal, setEditingTotal] = useState(false);
@@ -28,7 +30,13 @@ export function StatementPanel({ statement, cardId }: StatementPanelProps) {
     const gap = declared != null
         ? Math.round((Number(declared) - Number(statement.computedAmount)) * 100) / 100
         : null;
-    const due = computeStatementDue(statement);
+    const statementDue = computeStatementDue(statement);
+    // Lo pagado de más en periodos anteriores queda como saldo a favor y baja
+    // la deuda total. El estado no lo sabe —solo cuenta sus consumos—, así que
+    // sin este tope pedía pagar más de lo que se debe y la tarjeta quedaba en
+    // negativo.
+    const due = Math.max(0, Math.min(statementDue, Math.round(debt * 100) / 100));
+    const credit = Math.round((statementDue - due) * 100) / 100;
 
     // El pago solo salda la deuda: no es una transacción ni sale de ninguna
     // cuenta, así que no hay origen que elegir.
@@ -112,6 +120,10 @@ export function StatementPanel({ statement, cardId }: StatementPanelProps) {
             )}
 
             <Row label="Pagado" value={money(statement.paidAmount)} tone="good" />
+
+            {credit > 0 && (
+                <Row label="Cubierto por saldo a favor" value={money(credit)} tone="good" />
+            )}
 
             {due > 0 && (
                 <Button onClick={handlePay} disabled={paying} className="mt-1 w-full">

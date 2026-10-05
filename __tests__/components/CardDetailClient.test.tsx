@@ -206,3 +206,39 @@ describe("CardDetailClient — pagos sin origen en los movimientos", () => {
         expect(screen.queryByText(/sin origen/i)).toBeNull();
     });
 });
+
+describe("StatementPanel — saldo a favor de periodos anteriores", () => {
+    // El caso real: el estado suma $461,81 en consumos, pero un pago anterior
+    // dejó $64,16 a favor y la deuda total es $397,65.
+    function conSaldoAFavor(debt: number): BankCardDetail {
+        const statement = {
+            id: "st-1", ownerUserId: "u1", cardId: "card-1",
+            periodStart: "2026-09-21", periodEnd: "2026-10-20", dueDate: "2026-10-28",
+            computedAmount: 461.81, totalAmount: null, paidAmount: 0, status: "OPEN",
+            createdAt: "2026-09-21T00:00:00Z", updatedAt: "2026-09-21T00:00:00Z", isDeleted: false,
+        };
+        const base = detail({ debt, openStatement: statement } as never);
+        return { ...base, statements: [statement] } as unknown as BankCardDetail;
+    }
+
+    it("no pide pagar más que la deuda total", () => {
+        render(<CardDetailClient initialData={conSaldoAFavor(397.65)} />);
+
+        expect(screen.getByRole("button", { name: /marcar \$397,65 como pagado/i })).toBeInTheDocument();
+        expect(screen.getByText("Cubierto por saldo a favor")).toBeInTheDocument();
+        expect(screen.getByText("$64,16")).toBeInTheDocument();
+    });
+
+    it("sin saldo a favor pide el estado entero", () => {
+        render(<CardDetailClient initialData={conSaldoAFavor(900)} />);
+
+        expect(screen.getByRole("button", { name: /marcar \$461,81 como pagado/i })).toBeInTheDocument();
+        expect(screen.queryByText("Cubierto por saldo a favor")).toBeNull();
+    });
+
+    it("con la deuda saldada no ofrece pagar el estado", () => {
+        render(<CardDetailClient initialData={conSaldoAFavor(0)} />);
+
+        expect(screen.queryByRole("button", { name: /como pagado/i })).toBeNull();
+    });
+});
