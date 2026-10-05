@@ -333,3 +333,12 @@
     /* Firefox */
   }
 }
+/*
+ * Mientras el asistente de transacciones edita un solo dato, la cabecera de la
+ * página se oculta: su flecha (salir de la página) quedaba encima de la de la
+ * edición (volver al resumen), y dos flechas atrás que hacen cosas distintas
+ * confunden. La edición queda con una sola salida, su X.
+ */
+body:has([data-wizard-focus="true"]) [data-page-header] {
+  display: none;
+}

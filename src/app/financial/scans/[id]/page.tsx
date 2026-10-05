@@ -61,7 +61,7 @@ export default async function ScanDetailsPage({ params }: ScanDetailsPageProps) 
     return (
         <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
             {/* ── Page Header ──────────────────────────────── */}
-            <div className="flex items-center gap-4 mb-6">
+            <div data-page-header className="flex items-center gap-4 mb-6">
                 <Link 
                     href="/financial/scans"
                     className="p-2 -ml-2 rounded-full hover:bg-bg-secondary text-text-secondary hover:text-text-primary transition-colors"

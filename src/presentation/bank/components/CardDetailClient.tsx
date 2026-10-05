@@ -149,7 +149,7 @@ export function CardDetailClient({ initialData }: { initialData: BankCardDetail 
                 </section>
             )}
 
-            {open && <StatementPanel statement={open} cardId={card.id} />}
+            {open && <StatementPanel statement={open} cardId={card.id} debt={card.debt} />}
 
             {hasCycle ? (
                 <section className="flex flex-col gap-2">

@@ -27,7 +27,7 @@ export default async function TransactionDetailPage({
     return (
         <div className="flex flex-col gap-6 max-w-5xl mx-auto w-full">
             {/* ── Page Header ──────────────────────────────── */}
-            <div className="flex items-center gap-4">
+            <div data-page-header className="flex items-center gap-4">
                 <Button variant="ghost" size="icon" asChild className="rounded-full shrink-0">
                     <Link href="/financial/transactions">
                         <ArrowLeft className="h-5 w-5" />

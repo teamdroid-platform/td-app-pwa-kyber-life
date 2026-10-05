@@ -13,7 +13,7 @@ export default function FinancialScannerPage() {
         <div className="flex flex-col min-h-[calc(100vh-64px)] bg-transparent p-4 md:p-8">
             <div className="max-w-4xl mx-auto w-full space-y-6">
                 {/* Header */}
-                <div className="flex items-center justify-between">
+                <div data-page-header className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
                         <Link 
                             href="/financial/scans"

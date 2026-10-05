@@ -505,6 +505,7 @@ export function TransactionWizard({
                 screen={screen}
                 focus={focus}
                 onBack={wizard.back}
+                onCancelFocus={wizard.cancelFocus}
                 onClose={onClose}
                 onOpenSummary={() => wizard.goTo("summary")}
                 onReset={mode === "edit" && wizard.isDirty && isSummary ? wizard.reset : undefined}
