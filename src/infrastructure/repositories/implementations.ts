@@ -1,5 +1,5 @@
 import { InMemoryRepository } from "./in-memory-repository";
-import { User, Supermarket, Category, Unit, GenericItem, BrandProduct, Template, TemplateItem, Purchase, PurchaseLine, PriceObservation, PasswordResetToken, FinancialTransaction, FinancialTransactionAuditLog, FinancialScanExecution, FinancialScannerTransaction, FinancialInstitution, FinancialInstitutionType, FinancialCategory, Notification, PushSubscription } from "@/domain/entities";
+import { User, Supermarket, Category, Unit, GenericItem, BrandProduct, Template, TemplateItem, Purchase, PurchaseLine, PriceObservation, PasswordResetToken, FinancialTransaction, FinancialTransactionAuditLog, FinancialScanExecution, FinancialScannerTransaction, FinancialInstitution, FinancialInstitutionType, FinancialCategory, Notification, NotificationType, PushSubscription } from "@/domain/entities";
 import { IUserRepository, ISupermarketRepository, ICategoryRepository, IUnitRepository, IGenericItemRepository, IBrandProductRepository, ITemplateRepository, ITemplateItemRepository, IPurchaseRepository, IPurchaseLineRepository, IPriceObservationRepository, IPasswordResetTokenRepository, IFinancialTransactionRepository, IFinancialTransactionAuditLogRepository, IFinancialScanExecutionRepository, IFinancialScannerTransactionRepository, IFinancialInstitutionTypeRepository, IFinancialInstitutionRepository, IFinancialCategoryRepository, INotificationRepository, IPushSubscriptionRepository, NotificationQueryOptions, DashboardRangeFilter } from "@/domain/repositories";
 import { UUID } from "@/domain/core";
 import { PaginationParams, PaginatedResult, TransactionSearchFilters, TransactionSort } from "@/domain/pagination";
@@ -493,6 +493,15 @@ export class InMemoryNotificationRepository extends InMemoryRepository<Notificat
         const now = new Date().toISOString();
         for (const item of this.items.values()) {
             if (item.ownerUserId === userId && !item.isRead) {
+                item.isRead = true;
+                item.readAt = now;
+            }
+        }
+    }
+    async markTypeAsRead(userId: UUID, type: NotificationType): Promise<void> {
+        const now = new Date().toISOString();
+        for (const item of this.items.values()) {
+            if (item.ownerUserId === userId && item.type === type && !item.isRead) {
                 item.isRead = true;
                 item.readAt = now;
             }

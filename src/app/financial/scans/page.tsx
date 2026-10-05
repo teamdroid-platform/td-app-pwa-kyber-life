@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { TransactionTabs } from "@/presentation/financial/components/TransactionTabs";
 import { RobotLoader } from "@/components/ui/RobotLoader";
+import { MarkScanNotificationsRead } from "@/presentation/components/notifications/MarkScanNotificationsRead";
 
 export const metadata: Metadata = {
     title: "Bandeja de escaneos financieros - KyberLife",
@@ -15,6 +16,7 @@ export const metadata: Metadata = {
 export default async function ScansInboxPage() {
     return (
         <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
+            <MarkScanNotificationsRead />
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-2">
                 <div>
                     <h2 className="text-3xl font-bold tracking-tight flex items-center gap-2">

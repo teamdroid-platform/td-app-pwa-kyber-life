@@ -29,4 +29,14 @@ export class NotificationService {
     async markAllAsRead(userId: UUID): Promise<void> {
         return this.notificationRepo.markAllAsRead(userId);
     }
+
+    /**
+     * Opening the scans inbox is reviewing what the scans brought in, so the
+     * "new scan completed" notices are read by then and should stop piling up
+     * in the bell. Failures stay unread: they report a problem the inbox
+     * doesn't show.
+     */
+    async markScanResultsAsRead(userId: UUID): Promise<void> {
+        return this.notificationRepo.markTypeAsRead(userId, "SCAN_COMPLETED");
+    }
 }

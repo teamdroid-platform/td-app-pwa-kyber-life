@@ -7,6 +7,13 @@ import type { RealtimeChannel } from "@supabase/supabase-js";
 const POLLING_FALLBACK_MS = 60_000;
 
 /**
+ * Fired on `window` when this tab changes notifications outside the bell
+ * (e.g. opening the scans inbox marks scan notices as read). Realtime only
+ * listens for inserts, so without it the badge would keep the old count.
+ */
+export const NOTIFICATIONS_CHANGED_EVENT = "kyber:notifications-changed";
+
+/**
  * Subscribes to new rows in `notifications` for this user via Supabase
  * Realtime (websockets). Falls back to polling `onRefresh` on an interval
  * if the channel never reaches SUBSCRIBED (e.g. Realtime disabled on the
@@ -52,8 +59,12 @@ export function useNotificationsRealtime(userId: string | undefined, onRefresh: 
                 }
             });
 
+        const onLocalChange = () => onRefreshRef.current();
+        window.addEventListener(NOTIFICATIONS_CHANGED_EVENT, onLocalChange);
+
         return () => {
             stopPolling();
+            window.removeEventListener(NOTIFICATIONS_CHANGED_EVENT, onLocalChange);
             if (channel) supabase.removeChannel(channel);
         };
     }, [userId]);
