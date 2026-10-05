@@ -151,7 +151,11 @@ export function WizardShell({
                 )}
             </header>
 
-            <div className="flex flex-1 flex-col gap-4 pb-4 pt-4">{children}</div>
+            {/* Sin flex-1: el contenido no se estira, así los botones quedan
+                justo debajo de la sección y no al fondo de la pantalla con un
+                hueco en medio. Si el paso es más alto que la pantalla, el pie
+                sigue flotando abajo (sticky). */}
+            <div className="flex flex-col gap-4 pb-4 pt-4">{children}</div>
 
             {/* Floating, the footer lands right where the keyboard pushes the
                 field being typed in — over the search box and the filtered
