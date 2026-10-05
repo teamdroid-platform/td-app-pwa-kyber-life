@@ -29,7 +29,7 @@ export default async function NewTransactionPage({
 
     return (
         <div className="flex-1 space-y-4 p-4 pt-6 md:p-8">
-            <div className="mb-6 flex items-center space-x-2">
+            <div data-page-header className="mb-6 flex items-center space-x-2">
                 <Button variant="ghost" size="icon" asChild>
                     <Link href="/financial/transactions">
                         <ArrowLeft className="h-5 w-5" />

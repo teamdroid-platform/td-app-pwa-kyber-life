@@ -40,3 +40,41 @@ describe("WizardShell — teclado abierto", () => {
         expect(screen.getByTestId("wizard-footer")).toHaveAttribute("data-floating", "true");
     });
 });
+
+describe("WizardShell — editando un solo dato", () => {
+    it("no muestra flecha atrás, solo una X que cancela la edición", () => {
+        const onBack = jest.fn();
+        const onCancelFocus = jest.fn();
+        render(
+            <WizardShell title="Editar monto y descripción" screen="amount" focus
+                onBack={onBack} onCancelFocus={onCancelFocus} footer={null}>
+                <p>paso</p>
+            </WizardShell>,
+        );
+
+        expect(screen.queryByRole("button", { name: "Volver" })).toBeNull();
+        fireEvent.click(screen.getByRole("button", { name: "Cerrar edición" }));
+        expect(onCancelFocus).toHaveBeenCalled();
+        expect(onBack).not.toHaveBeenCalled();
+    });
+
+    it("se marca para que la página oculte su propia cabecera", () => {
+        const { container } = render(
+            <WizardShell title="Editar categoría" screen="category" focus onBack={() => {}} footer={null}>
+                <p>paso</p>
+            </WizardShell>,
+        );
+        expect(container.querySelector('[data-wizard-focus="true"]')).not.toBeNull();
+    });
+
+    it("recorriendo los pasos conserva la flecha atrás y no oculta nada", () => {
+        const { container } = render(
+            <WizardShell title="Nueva transacción" screen="category" focus={false} onBack={() => {}} footer={null}>
+                <p>paso</p>
+            </WizardShell>,
+        );
+        expect(screen.getByRole("button", { name: "Volver" })).toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: "Cerrar edición" })).toBeNull();
+        expect(container.querySelector('[data-wizard-focus="true"]')).toBeNull();
+    });
+});

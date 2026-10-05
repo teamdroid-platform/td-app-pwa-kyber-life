@@ -12,6 +12,8 @@ interface WizardShellProps {
     /** Focus mode drops the multi-segment progress: there is no walk to measure. */
     focus: boolean;
     onBack: () => void;
+    /** Focus mode's X: discards the edit, same as the footer's "Cancelar". */
+    onCancelFocus?: () => void;
     onClose?: () => void;
     /** Jump straight to the summary. Hidden on the summary itself and in focus mode. */
     onOpenSummary?: () => void;
@@ -36,6 +38,7 @@ export function WizardShell({
     screen,
     focus,
     onBack,
+    onCancelFocus,
     onClose,
     onOpenSummary,
     onReset,
@@ -51,12 +54,13 @@ export function WizardShell({
     return (
         <div
             className="mx-auto flex w-full max-w-lg flex-1 flex-col"
+            data-wizard-focus={focus}
             onFocusCapture={onFocusCapture}
             onBlurCapture={onBlurCapture}
         >
             <header className="flex flex-col gap-2.5">
                 <div className="flex items-center gap-2.5">
-                    {canGoBack && (
+                    {canGoBack && !focus && (
                         <button
                             type="button"
                             onClick={onBack}
@@ -91,6 +95,20 @@ export function WizardShell({
                         >
                             <Receipt className="h-3.5 w-3.5" />
                             Resumen
+                        </button>
+                    )}
+
+                    {/* Editando un solo dato la salida es cerrar la edición,
+                        no ir atrás: una X a la derecha, la única de la
+                        pantalla, porque la cabecera de la página se oculta. */}
+                    {focus && (
+                        <button
+                            type="button"
+                            onClick={onCancelFocus ?? onBack}
+                            aria-label="Cerrar edición"
+                            className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-border/40 bg-bg-secondary/60 text-text-secondary transition-colors hover:text-text-primary"
+                        >
+                            <X className="h-4 w-4" />
                         </button>
                     )}
 
