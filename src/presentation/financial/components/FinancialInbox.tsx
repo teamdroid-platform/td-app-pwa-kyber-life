@@ -532,11 +532,10 @@ export function FinancialInbox() {
                                         key={tx.id}
                                         className={cn(
                                             "group relative overflow-hidden rounded-2xl border bg-white/95 shadow-sm shadow-slate-200/50 backdrop-blur-sm py-0 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md dark:bg-slate-900/60 dark:shadow-md dark:shadow-black/20 dark:hover:shadow-lg",
-                                            // El fondo y el borde toman el color de la categoría, muy
-                                            // lavados: tiñen la tarjeta entera, así que a poco que
-                                            // suban compiten con el chip y el icono, que son los que
-                                            // llevan el color de verdad.
-                                            categoryVisual.cardClass,
+                                            // El fondo y el borde toman el color del tipo —el mismo del
+                                            // icono—, muy lavados: gasto rojo, ingreso verde,
+                                            // transferencia amarilla, retiro índigo.
+                                            typeVisual.cardClass,
                                             "flex flex-col cursor-pointer active:scale-[0.99]",
                                             isOpening && "scale-[0.99] border-indigo-400/60 ring-1 ring-indigo-400/40",
                                             isProcessing && "opacity-60 pointer-events-none"

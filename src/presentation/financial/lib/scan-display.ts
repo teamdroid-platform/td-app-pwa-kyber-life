@@ -65,11 +65,26 @@ export function getTypeVisualConfig(txType?: string | null): CategoryVisualConfi
     return {
         icon: Icon,
         containerClass: TYPE_CONTAINER_CLASS[type] ?? TYPE_CONTAINER_CLASS.OTHER,
-        // El lavado de la tarjeta se queda en manos de la categoría: teñir el
-        // fondo entero por tipo pondría media bandeja del mismo color.
-        cardClass: "",
+        // La tarjeta de la bandeja se tiñe por tipo, igual que su icono: de un
+        // vistazo se distingue lo que sale de lo que entra. La categoría ya
+        // tiene su color en el chip.
+        cardClass: TYPE_CARD_CLASS[type] ?? TYPE_CARD_CLASS.OTHER,
     };
 }
+
+/** El lavado de la tarjeta por tipo: los mismos colores que el icono, muy bajos. */
+const TYPE_CARD_CLASS: Record<string, string> = {
+    INCOME: "bg-emerald-500/[0.08] border-emerald-500/35 hover:border-emerald-500/55",
+    DEPOSIT: "bg-emerald-500/[0.08] border-emerald-500/35 hover:border-emerald-500/55",
+    REFUND: "bg-emerald-500/[0.08] border-emerald-500/35 hover:border-emerald-500/55",
+    EXPENSE: "bg-rose-500/[0.08] border-rose-500/35 hover:border-rose-500/55",
+    PAYMENT: "bg-rose-500/[0.08] border-rose-500/35 hover:border-rose-500/55",
+    TRANSFER: "bg-yellow-500/[0.08] border-yellow-500/35 hover:border-yellow-500/55",
+    WITHDRAWAL: "bg-indigo-500/[0.08] border-indigo-500/35 hover:border-indigo-500/55",
+    FEE: "bg-amber-500/[0.08] border-amber-500/35 hover:border-amber-500/55",
+    TAX: "bg-amber-500/[0.08] border-amber-500/35 hover:border-amber-500/55",
+    OTHER: "bg-zinc-500/[0.06] border-zinc-500/30 hover:border-zinc-500/50",
+};
 
 /**
  * Borde, fondo y color de letra por tipo, en la paleta que ya usan la tarjeta
