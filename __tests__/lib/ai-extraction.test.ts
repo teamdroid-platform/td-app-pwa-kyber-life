@@ -2,6 +2,7 @@ import {
     collectPendingCreations,
     resolveEntityStatus,
     toAmountValue,
+    toCaptureAccountViews,
     toCurrency,
     toWizardValues,
 } from "@/presentation/financial/lib/ai-extraction";
@@ -176,6 +177,117 @@ describe("toWizardValues", () => {
             extraction({ tags: ["  comida ", "Comida", "", "viaje"] }), { fallbackDate: FALLBACK_DATE },
         );
         expect(values.tags).toEqual(["comida", "viaje"]);
+    });
+
+    it("mapea source con tarjeta de débito asignando bankCardId y bankSourceAccountId", () => {
+        const { values } = toWizardValues(
+            extraction({
+                source: {
+                    kind: "card",
+                    card_id: "c-debit-1",
+                    account_id: "a-austro-1",
+                    card_type: "debit",
+                    bank_institution_id: "b-1",
+                    bank_name: "Banco del Austro",
+                    last_four: "9012",
+                },
+            }),
+            { fallbackDate: FALLBACK_DATE },
+        );
+
+        expect(values.bankCardId).toBe("c-debit-1");
+        expect(values.bankSourceAccountId).toBe("a-austro-1");
+        expect(values.paidWithCredit).toBe(false);
+    });
+
+    it("mapea source con tarjeta de crédito activando paidWithCredit", () => {
+        const { values } = toWizardValues(
+            extraction({
+                source: {
+                    kind: "card",
+                    card_id: "c-credit-1",
+                    account_id: null,
+                    card_type: "credit",
+                    bank_institution_id: "b-1",
+                    bank_name: "Banco Pichincha",
+                    last_four: "9563",
+                },
+            }),
+            { fallbackDate: FALLBACK_DATE },
+        );
+
+        expect(values.bankCardId).toBe("c-credit-1");
+        expect(values.bankSourceAccountId).toBeNull();
+        expect(values.paidWithCredit).toBe(true);
+    });
+
+    it("mapea transferencias con source y destination a sus respectivas cuentas", () => {
+        const { values } = toWizardValues(
+            extraction({
+                type: "transfer",
+                source: {
+                    kind: "account",
+                    card_id: null,
+                    account_id: "a-src-1",
+                    card_type: null,
+                    bank_institution_id: null,
+                    bank_name: "Austro",
+                    last_four: null,
+                },
+                destination: {
+                    kind: "account",
+                    account_id: "a-dst-2",
+                    bank_institution_id: null,
+                    bank_name: "Pichincha",
+                    last_four: null,
+                },
+            }),
+            { fallbackDate: FALLBACK_DATE },
+        );
+
+        expect(values.type).toBe("TRANSFER");
+        expect(values.bankSourceAccountId).toBe("a-src-1");
+        expect(values.bankDestinationAccountId).toBe("a-dst-2");
+    });
+});
+
+describe("toCaptureAccountViews", () => {
+    it("genera vistas de cuenta no registrada cuando source tiene mención pero no ID resuelto", () => {
+        const ext = extraction({
+            source: {
+                kind: "card",
+                card_id: null,
+                account_id: null,
+                card_type: "debit",
+                bank_institution_id: null,
+                bank_name: "Banco del Austro",
+                last_four: null,
+            },
+        });
+
+        const views = toCaptureAccountViews(ext);
+        expect(views).toHaveLength(1);
+        expect(views[0].role).toBe("SOURCE");
+        expect(views[0].kind).toBe("CARD");
+        expect(views[0].match).toBeNull();
+        expect(views[0].institutionHint).toBe("Banco del Austro");
+    });
+
+    it("retorna lista vacía si source ya tiene card_id o account_id resuelto", () => {
+        const ext = extraction({
+            source: {
+                kind: "card",
+                card_id: "c-1",
+                account_id: "a-1",
+                card_type: "debit",
+                bank_institution_id: "b-1",
+                bank_name: "Banco del Austro",
+                last_four: "1234",
+            },
+        });
+
+        const views = toCaptureAccountViews(ext);
+        expect(views).toHaveLength(0);
     });
 });
 
