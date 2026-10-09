@@ -391,12 +391,13 @@ function describe(
 
     if (scanned) {
         const matched = scanned.match;
+        const isCard = scanned.kind === "CARD";
         return (
             <IdentityLine
-                acronym={matched ? matched.typeAcronym : UNKNOWN_TYPE_ACRONYM}
-                meaning={matched ? matched.typeLabel : "Tipo desconocido: aún sin registrar"}
+                acronym={matched ? matched.typeAcronym : (isCard ? "TAR" : UNKNOWN_TYPE_ACRONYM)}
+                meaning={matched ? matched.typeLabel : (isCard ? "Tarjeta: aún sin registrar" : "Tipo desconocido: aún sin registrar")}
                 number={identityNumberFromDisplay(scanned.display)}
-                sub={matched ? (matched.institutionName ?? matched.typeLabel) : "sin registrar"}
+                sub={matched ? (matched.institutionName ?? matched.typeLabel) : [scanned.institutionHint, "sin registrar"].filter(Boolean).join(" · ")}
                 title={scanned.raw}
             />
         );
