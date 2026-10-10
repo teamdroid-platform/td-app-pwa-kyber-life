@@ -141,6 +141,25 @@ describe("PaymentStep — el paso cabe en dos filas", () => {
         expect(screen.getByText("sin registrar")).toBeInTheDocument();
     });
 
+    it("muestra la sugerencia de institución y tipo de tarjeta cuando el escaneo detectó emisor no registrado", () => {
+        const tarjetaSinRegistrar: ScannedAccountView = {
+            role: "SOURCE",
+            raw: "TDB Banco del Austro",
+            display: "TDB",
+            kind: "CARD",
+            resolution: "PENDING",
+            match: null,
+            institutionHint: "Banco del Austro",
+            ownership: "MINE",
+            decision: null,
+        };
+
+        renderStep({ scannedAccounts: [tarjetaSinRegistrar] });
+
+        expect(screen.getByTitle(/Tarjeta/)).toHaveTextContent("TAR");
+        expect(screen.getByText("Banco del Austro · sin registrar")).toBeInTheDocument();
+    });
+
     it("y lo elegido cuando ya hay elección", () => {
         renderStep({ value: { accountId: "a1", paidWithCredit: false } });
 

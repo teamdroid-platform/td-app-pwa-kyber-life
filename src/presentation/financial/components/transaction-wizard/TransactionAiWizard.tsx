@@ -9,7 +9,12 @@ import { wallClockInputToISO } from "@/lib/date-range";
 import { createTransactionAction } from "@/app/actions/financial-transactions";
 import type { AiExtraction } from "@/lib/validators/ai-capture-schemas";
 import type { WizardValues } from "../../hooks/useTransactionWizard";
-import { collectPendingCreations, resolveEntityStatus, toWizardValues } from "../../lib/ai-extraction";
+import {
+    collectPendingCreations,
+    resolveEntityStatus,
+    toCaptureAccountViews,
+    toWizardValues,
+} from "../../lib/ai-extraction";
 import {
     CaptureSourceNote,
     EntityStatusBadge,
@@ -46,6 +51,11 @@ export function TransactionAiWizard({ extraction, method, sourceText, onDiscard 
     // every render would make an untouched date drift while the user reviews.
     const { values: initialValues, currency } = useMemo(
         () => toWizardValues(extraction, { fallbackDate: nowValue() }),
+        [extraction],
+    );
+
+    const scannedAccounts = useMemo(
+        () => toCaptureAccountViews(extraction),
         [extraction],
     );
 
@@ -101,6 +111,7 @@ export function TransactionAiWizard({ extraction, method, sourceText, onDiscard 
             mode="confirm"
             initialValues={initialValues}
             currency={currency}
+            scannedAccounts={scannedAccounts}
             submitLabel="Crear transacción"
             onSubmit={handleSubmit}
             onClose={() => router.push("/financial/transactions")}

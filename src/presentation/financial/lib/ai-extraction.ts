@@ -2,6 +2,7 @@ import { isoToWallClockInput } from "@/lib/date-range";
 import type { AiExtraction } from "@/lib/validators/ai-capture-schemas";
 import type { WizardValues } from "../hooks/useTransactionWizard";
 import { normalizeTransactionType } from "./transaction-type";
+import type { ScannedAccountView } from "@/application/services/bank-service";
 
 // ─── Field coercion ──────────────────────────────────────────
 
@@ -90,6 +91,37 @@ export function toWizardValues(extraction: AiExtraction, { fallbackDate }: ToWiz
 
     const institutionName = toText(extraction.institution_name);
     const categoryName = toText(extraction.category_name);
+
+    const source = extraction.source;
+    const destination = extraction.destination;
+
+    let bankCardId: string | null = null;
+    let bankSourceAccountId: string | null = null;
+    let paidWithCredit = false;
+
+    if (source) {
+        if (source.card_id) {
+            bankCardId = source.card_id;
+            if (source.card_type === "debit") {
+                bankSourceAccountId = source.account_id ?? null;
+            }
+        } else if (source.account_id) {
+            bankSourceAccountId = source.account_id;
+        }
+
+        if (source.card_type === "credit") {
+            paidWithCredit = type === "EXPENSE";
+        } else if (source.card_type === "debit") {
+            paidWithCredit = false;
+        } else {
+            paidWithCredit = type === "EXPENSE" && toBoolean(extraction.is_credit_card);
+        }
+    } else {
+        paidWithCredit = type === "EXPENSE" && toBoolean(extraction.is_credit_card);
+    }
+
+    const bankDestinationAccountId = destination?.account_id ?? null;
+
     return {
         currency: toCurrency(extraction.currency),
         dateWasInferred: !date,
@@ -105,12 +137,66 @@ export function toWizardValues(extraction: AiExtraction, { fallbackDate }: ToWiz
             // silently pointing at a record. Keep them together or not at all.
             institutionId: institutionName ? extraction.institution_id ?? null : null,
             categoryId: categoryName ? extraction.category_id ?? null : null,
-            paidWithCredit: type === "EXPENSE" && toBoolean(extraction.is_credit_card),
+            paidWithCredit,
+            bankCardId,
+            bankSourceAccountId,
+            bankDestinationAccountId,
             date: date ?? fallbackDate,
             notes: toText(extraction.notes),
             tags: toTags(extraction.tags),
         },
     };
+}
+
+/**
+ * Convierte menciones de cuentas y tarjetas no registradas (sin ID) en vistas
+ * ScannedAccountView para que el wizard las muestre en el paso de pago como pendientes.
+ */
+export function toCaptureAccountViews(extraction: AiExtraction): ScannedAccountView[] {
+    const views: ScannedAccountView[] = [];
+
+    const source = extraction.source;
+    if (source && !source.card_id && !source.account_id) {
+        const isCard = source.card_type || source.kind === "card";
+        const raw = [source.bank_name, source.card_type, source.last_four ? `****${source.last_four}` : null]
+            .filter(Boolean)
+            .join(" ") || "Origen detectado";
+        const display = source.last_four ? `•••• ${source.last_four}` : (source.bank_name || "Sin registrar");
+
+        views.push({
+            role: "SOURCE",
+            raw,
+            display,
+            kind: isCard ? "CARD" : "ACCOUNT",
+            resolution: "PENDING",
+            match: null,
+            institutionHint: source.bank_name ?? null,
+            ownership: "MINE",
+            decision: null,
+        });
+    }
+
+    const destination = extraction.destination;
+    if (destination && !destination.account_id) {
+        const raw = [destination.bank_name, destination.last_four ? `****${destination.last_four}` : null]
+            .filter(Boolean)
+            .join(" ") || "Destino detectado";
+        const display = destination.last_four ? `•••• ${destination.last_four}` : (destination.bank_name || "Sin registrar");
+
+        views.push({
+            role: "DESTINATION",
+            raw,
+            display,
+            kind: "ACCOUNT",
+            resolution: "PENDING",
+            match: null,
+            institutionHint: destination.bank_name ?? null,
+            ownership: "MINE",
+            decision: null,
+        });
+    }
+
+    return views;
 }
 
 // ─── What the values mean against the user's own catalogs ────

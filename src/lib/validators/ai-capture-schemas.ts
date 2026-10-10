@@ -42,12 +42,31 @@ const looseNumber = z.union([z.number(), z.string()]).nullish().catch(null);
 const looseBoolean = z.union([z.boolean(), z.string()]).nullish().catch(null);
 const looseTags = z.array(z.string()).nullish().catch(null);
 
+const looseSource = z.object({
+    kind: looseString,
+    card_id: looseUuid,
+    account_id: looseUuid,
+    card_type: looseString,
+    bank_institution_id: looseUuid,
+    bank_name: looseString,
+    last_four: looseString,
+}).nullish().catch(null).default(null);
+
+const looseDestination = z.object({
+    kind: looseString,
+    account_id: looseUuid,
+    bank_institution_id: looseUuid,
+    bank_name: looseString,
+    last_four: looseString,
+}).nullish().catch(null).default(null);
+
 /** The fields alone, without the unwrapping — exported for focused testing. */
 export const extractionFieldsSchema = z.object({
     type: looseString,
     title: looseString,
     amount: looseNumber,
     currency: looseString,
+    merchant_name: looseString,
     institution_id: looseUuid,
     institution_name: looseString,
     category_id: looseUuid,
@@ -59,13 +78,16 @@ export const extractionFieldsSchema = z.object({
     date: looseString,
     tags: looseTags,
     notes: looseString,
+    source: looseSource,
+    destination: looseDestination,
 });
 
 const EXTRACTION_KEYS = [
     "type", "title", "amount", "currency",
-    "institution_id", "institution_name", "category_id", "category_name",
+    "merchant_name", "institution_id", "institution_name", "category_id", "category_name",
     "account_id", "account_name", "account_number",
     "is_credit_card", "date", "tags", "notes",
+    "source", "destination",
 ] as const;
 
 const WRAPPER_KEYS = ["data", "json", "output", "result", "body"] as const;
