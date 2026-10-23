@@ -91,8 +91,10 @@ export function TransactionAiWizard({ extraction, method, sourceText, onDiscard 
 
             if (result.success) {
                 toast.success("Transacción creada correctamente", { id: "ai-capture-success" });
+                // Sin router.refresh(): el listado es dinámico y la navegación
+                // ya lo trae fresco. Pedirlo además refrescado lo cargaba dos
+                // veces y alargaba la espera tras guardar.
                 router.push("/financial/transactions");
-                router.refresh();
                 return true;
             }
 

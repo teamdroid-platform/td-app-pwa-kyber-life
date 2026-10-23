@@ -15,6 +15,7 @@ import type { MissingField, WizardMode, WizardScreen, WizardValues } from "../..
 import type { BankAccount, BankCard } from "@/domain/entities/bank";
 import type { ScannedAccountView } from "@/application/services/bank-service";
 import { AccountsTrail } from "@/presentation/bank/components/ScannedAccountsPanel";
+import { trailBesideChoice } from "../../../lib/payment-trail";
 import { PaymentIdentityLine } from "@/presentation/bank/components/PaymentIdentityLine";
 
 const MAX_NOTES = 200;
@@ -219,6 +220,14 @@ export function SummaryStep({
         cards,
     );
 
+    // Lo elegido manda sobre lo detectado, lado por lado: una lectura sin
+    // registrar no puede tapar la cuenta que el usuario acaba de elegir.
+    const trail = trailBesideChoice(bankAccounts, {
+        source: [values.bankCardId, values.bankSourceAccountId],
+        destination: values.bankDestinationAccountId,
+    });
+    const trailHas = (role: "SOURCE" | "DESTINATION") => trail.some((a) => a.role === role);
+
     return (
         <>
             <SummaryHero
@@ -298,8 +307,33 @@ export function SummaryStep({
                         responde a la misma pregunta con más detalle. Si no, la
                         cuenta elegida; y el texto genérico atenuado, porque
                         significa que no hay nada atado. */}
-                    {bankAccounts.length > 0
-                        ? <AccountsTrail accounts={bankAccounts} />
+                    {trail.length > 0
+                        ? (
+                            <span className="flex flex-col gap-1.5">
+                                {trailHas("SOURCE")
+                                    ? <AccountsTrail accounts={trail.filter((a) => a.role === "SOURCE")} />
+                                    : (
+                                        <PaymentIdentityLine
+                                            accountId={values.bankSourceAccountId}
+                                            cardId={values.bankCardId}
+                                            accounts={accounts}
+                                            cards={cards}
+                                            arrows
+                                            fallback={null}
+                                        />
+                                    )}
+                                {trailHas("DESTINATION")
+                                    ? <AccountsTrail accounts={trail.filter((a) => a.role === "DESTINATION")} />
+                                    : (
+                                        <PaymentIdentityLine
+                                            destinationAccountId={values.bankDestinationAccountId}
+                                            accounts={accounts}
+                                            cards={cards}
+                                            fallback={null}
+                                        />
+                                    )}
+                            </span>
+                        )
                         : (
                             <PaymentIdentityLine
                                 accountId={values.bankSourceAccountId}

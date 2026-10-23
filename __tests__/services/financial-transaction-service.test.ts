@@ -20,6 +20,7 @@ describe("FinancialTransactionService", () => {
 
         transactionRepoMock = {
             findByOwnerId: jest.fn(),
+            findDuplicateCandidates: jest.fn().mockResolvedValue([]),
             create: jest.fn(),
             update: jest.fn(),
             findById: jest.fn(),
@@ -40,7 +41,7 @@ describe("FinancialTransactionService", () => {
 
     describe("createTransaction", () => {
         it("should create a new transaction and write an audit log", async () => {
-            transactionRepoMock.findByOwnerId.mockResolvedValue([]);
+            transactionRepoMock.findDuplicateCandidates.mockResolvedValue([]);
             transactionRepoMock.create.mockImplementation(async (tx: any) => tx);
             auditLogRepoMock.create.mockResolvedValue({} as any);
 
@@ -69,7 +70,7 @@ describe("FinancialTransactionService", () => {
         });
 
         it("should default merchant to the institution name when no merchant is provided", async () => {
-            transactionRepoMock.findByOwnerId.mockResolvedValue([]);
+            transactionRepoMock.findDuplicateCandidates.mockResolvedValue([]);
             transactionRepoMock.create.mockImplementation(async (tx: any) => tx);
             auditLogRepoMock.create.mockResolvedValue({} as any);
 
@@ -89,7 +90,7 @@ describe("FinancialTransactionService", () => {
         });
 
         it("should keep an explicit merchant over the institution name", async () => {
-            transactionRepoMock.findByOwnerId.mockResolvedValue([]);
+            transactionRepoMock.findDuplicateCandidates.mockResolvedValue([]);
             transactionRepoMock.create.mockImplementation(async (tx: any) => tx);
             auditLogRepoMock.create.mockResolvedValue({} as any);
 
@@ -120,7 +121,7 @@ describe("FinancialTransactionService", () => {
                 date: "2026-05-18T12:00:00Z", // Same day
                 merchant: "test", // Case insensitive match
             };
-            transactionRepoMock.findByOwnerId.mockResolvedValue([existingTx]);
+            transactionRepoMock.findDuplicateCandidates.mockResolvedValue([existingTx]);
             transactionRepoMock.create.mockImplementation(async (tx: any) => tx);
             auditLogRepoMock.create.mockResolvedValue({} as any);
 
@@ -152,7 +153,7 @@ describe("FinancialTransactionService", () => {
                 transactionRepoMock, auditLogRepoMock, institutionRepoMock as any, categoryRepoMock as any
             );
 
-            transactionRepoMock.findByOwnerId.mockResolvedValue([]);
+            transactionRepoMock.findDuplicateCandidates.mockResolvedValue([]);
             transactionRepoMock.create.mockImplementation(async (tx: any) => tx);
             auditLogRepoMock.create.mockResolvedValue({} as any);
 
@@ -177,7 +178,7 @@ describe("FinancialTransactionService", () => {
                 transactionRepoMock, auditLogRepoMock, institutionRepoMock as any, categoryRepoMock as any
             );
 
-            transactionRepoMock.findByOwnerId.mockResolvedValue([]);
+            transactionRepoMock.findDuplicateCandidates.mockResolvedValue([]);
             transactionRepoMock.create.mockImplementation(async (tx: any) => tx);
             auditLogRepoMock.create.mockResolvedValue({} as any);
 

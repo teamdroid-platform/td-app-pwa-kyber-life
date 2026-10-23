@@ -154,9 +154,15 @@ export function toWizardValues(extraction: AiExtraction, { fallbackDate }: ToWiz
  */
 export function toCaptureAccountViews(extraction: AiExtraction): ScannedAccountView[] {
     const views: ScannedAccountView[] = [];
+    const type = normalizeTransactionType(extraction.type);
+    // De quién es cada lado depende del movimiento: el origen de un ingreso es
+    // quien paga y el destino de un gasto es el comercio. Afirmar «tuya» ahí
+    // contradecía lo dicho; sin dato, la pregunta queda abierta.
+    const sourceIsMine = type !== "INCOME";
+    const destinationIsMine = type !== "EXPENSE";
 
     const source = extraction.source;
-    if (source && !source.card_id && !source.account_id) {
+    if (source && !source.card_id && !source.account_id && mentionsAnAccount(source)) {
         const isCard = source.card_type || source.kind === "card";
         const raw = [source.bank_name, source.card_type, source.last_four ? `****${source.last_four}` : null]
             .filter(Boolean)
@@ -171,13 +177,13 @@ export function toCaptureAccountViews(extraction: AiExtraction): ScannedAccountV
             resolution: "PENDING",
             match: null,
             institutionHint: source.bank_name ?? null,
-            ownership: "MINE",
+            ownership: sourceIsMine ? "MINE" : null,
             decision: null,
         });
     }
 
     const destination = extraction.destination;
-    if (destination && !destination.account_id) {
+    if (destination && !destination.account_id && mentionsAnAccount(destination)) {
         const raw = [destination.bank_name, destination.last_four ? `****${destination.last_four}` : null]
             .filter(Boolean)
             .join(" ") || "Destino detectado";
@@ -191,12 +197,24 @@ export function toCaptureAccountViews(extraction: AiExtraction): ScannedAccountV
             resolution: "PENDING",
             match: null,
             institutionHint: destination.bank_name ?? null,
-            ownership: "MINE",
+            ownership: destinationIsMine ? "MINE" : null,
             decision: null,
         });
     }
 
     return views;
+}
+
+/**
+ * Si el texto nombró de verdad una cuenta: un banco o unos dígitos.
+ *
+ * El extractor devuelve el objeto aunque no haya oído nada, con todos los
+ * campos en null. Tratarlo como una cuenta detectada pintaba un «Sin
+ * registrar» fantasma en el resumen, que además tapaba la cuenta que sí se
+ * había elegido.
+ */
+function mentionsAnAccount(side: { bank_name?: string | null; last_four?: string | null }): boolean {
+    return !!(side.bank_name?.trim() || side.last_four?.trim());
 }
 
 // ─── What the values mean against the user's own catalogs ────

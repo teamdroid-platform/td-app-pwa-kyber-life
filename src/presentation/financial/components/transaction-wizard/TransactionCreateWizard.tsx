@@ -122,8 +122,10 @@ export function TransactionCreateWizard() {
             if (result.success) {
                 toast.success("Transacción creada correctamente", { id: "tx-create-success" });
                 await financialOfflineStore.drafts.clear();
+                // Sin router.refresh(): el listado es dinámico y la navegación
+                // ya lo trae fresco. Pedirlo además refrescado lo cargaba dos
+                // veces y alargaba la espera tras guardar.
                 router.push("/financial/transactions");
-                router.refresh();
                 return true;
             }
             toast.error(result.error || "No se pudo crear la transacción", { id: "tx-create-error" });

@@ -21,6 +21,18 @@ export interface DashboardRangeFilter {
 export interface IFinancialTransactionRepository extends IRepository<FinancialTransaction> {
     findByOwnerId(userId: UUID): Promise<FinancialTransaction[]>;
     /**
+     * The only rows that can share a duplicate fingerprint with a new
+     * transaction: same owner, type and amount, on the same day.
+     *
+     * Creating a transaction used to load the user's whole history — every
+     * column, the scanner payloads included — just to compare four fields.
+     * This narrows it in SQL to the handful that could possibly match.
+     */
+    findDuplicateCandidates(
+        userId: UUID,
+        criteria: { type: string; amount: number; day: string },
+    ): Promise<FinancialTransaction[]>;
+    /**
      * Transactions for the dashboards, already narrowed **in SQL** by owner,
      * date range and status — instead of pulling the whole history and
      * filtering it in memory.
