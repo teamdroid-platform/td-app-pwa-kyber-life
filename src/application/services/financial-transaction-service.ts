@@ -81,57 +81,42 @@ export class FinancialTransactionService {
     // ── Create ───────────────────────────────────────────────
 
     async createTransaction(dto: CreateFinancialTransactionDTO): Promise<FinancialTransaction> {
-        const existingTransactions = await this.transactionRepo.findByOwnerId(dto.ownerUserId);
-        const duplicateIds = findDuplicates(dto, existingTransactions);
-        const hasDuplicate = duplicateIds.length > 0;
-
-        let finalInstitutionId = dto.institutionId ?? null;
-        let finalCategoryId = dto.categoryId ?? null;
         const now = new Date().toISOString();
+        // The merchant the row will be stored with. The duplicate fingerprint
+        // has to be computed on the same value: comparing `dto.merchant` —
+        // empty for every manual, voice and text capture — against the stored
+        // institution name meant those captures never matched anything.
+        const merchant = dto.merchant ?? dto.institutionName ?? null;
 
-        if (!finalInstitutionId && dto.institutionName && this.institutionRepo) {
-            const institutions = await this.institutionRepo.findByOwnerId(dto.ownerUserId);
-            const existing = institutions.find(i => i.name.toLowerCase() === dto.institutionName!.toLowerCase() && !i.isDeleted);
-            if (existing) {
-                finalInstitutionId = existing.id!;
-            } else {
-                const newInst = await this.institutionRepo.create({
-                    id: crypto.randomUUID(), ownerUserId: dto.ownerUserId, name: dto.institutionName, institutionTypeId: null, isDeleted: false, createdAt: now, updatedAt: now
-                });
-                finalInstitutionId = newInst.id!;
-            }
-        }
-
-        if (!finalCategoryId && dto.categoryName && this.categoryRepo) {
-            const categories = await this.categoryRepo.findAllBaseAndUser(dto.ownerUserId);
-            const existing = categories.find(c => c.name.toLowerCase() === dto.categoryName!.toLowerCase() && !c.isDeleted);
-            if (existing) {
-                finalCategoryId = existing.id!;
-            } else {
-                const newCat = await this.categoryRepo.create({
-                    id: crypto.randomUUID(), ownerUserId: dto.ownerUserId, name: dto.categoryName, isDeleted: false, createdAt: now, updatedAt: now
-                });
-                finalCategoryId = newCat.id!;
-            }
-        }
-
-        // Todo lo que escribe una transacción pasa por el mismo punto: crea el
-        // emisor si hace falta y liga lo que ya se sepa. Los saldos no se tocan
-        // porque no se guardan: se derivan de estas mismas transacciones.
-        const bankLinks = this.bankService
-            ? await this.bankService.syncTransactionBankLinks(dto.ownerUserId, {
-                merchant: dto.merchant ?? dto.institutionName ?? null,
-                currency: dto.currency,
-                type: dto.type,
-                paidWithCredit: dto.paidWithCredit ?? false,
-                institutionKind: dto.bankInstitutionKind ?? null,
-                ownership: dto.scannedOwnership ?? null,
-                bankSourceAccountId: dto.bankSourceAccountId ?? null,
-                bankDestinationAccountId: dto.bankDestinationAccountId ?? null,
-                bankCardId: dto.bankCardId ?? null,
-                bankInstitutionId: dto.bankInstitutionId ?? null,
-            })
-            : null;
+        // None of these lookups depends on another, so they run together: in
+        // series they were five round trips before the insert even started.
+        const [duplicateIds, finalInstitutionId, finalCategoryId, bankLinks] = await Promise.all([
+            this.transactionRepo
+                .findDuplicateCandidates(dto.ownerUserId, {
+                    type: dto.type, amount: Number(dto.amount), day: dto.date.substring(0, 10),
+                })
+                .then(candidates => findDuplicates({ ...dto, merchant }, candidates)),
+            this.resolveInstitutionId(dto.ownerUserId, dto.institutionId ?? null, dto.institutionName, now),
+            this.resolveCategoryId(dto.ownerUserId, dto.categoryId ?? null, dto.categoryName, now),
+            // Todo lo que escribe una transacción pasa por el mismo punto: crea el
+            // emisor si hace falta y liga lo que ya se sepa. Los saldos no se tocan
+            // porque no se guardan: se derivan de estas mismas transacciones.
+            this.bankService
+                ? this.bankService.syncTransactionBankLinks(dto.ownerUserId, {
+                    merchant,
+                    currency: dto.currency,
+                    type: dto.type,
+                    paidWithCredit: dto.paidWithCredit ?? false,
+                    institutionKind: dto.bankInstitutionKind ?? null,
+                    ownership: dto.scannedOwnership ?? null,
+                    bankSourceAccountId: dto.bankSourceAccountId ?? null,
+                    bankDestinationAccountId: dto.bankDestinationAccountId ?? null,
+                    bankCardId: dto.bankCardId ?? null,
+                    bankInstitutionId: dto.bankInstitutionId ?? null,
+                })
+                : Promise.resolve(null),
+        ]);
+        const hasDuplicate = duplicateIds.length > 0;
 
         const transaction: FinancialTransaction = {
             id: crypto.randomUUID(),
@@ -145,7 +130,7 @@ export class FinancialTransactionService {
             // institution. When a manual transaction provides only an institution
             // name (no explicit merchant), fall back to it so the card shows the
             // institution immediately — matching the edit and scan flows.
-            merchant: dto.merchant ?? dto.institutionName ?? null,
+            merchant,
             description: dto.description,
             categoryId: finalCategoryId,
             institutionId: finalInstitutionId,
@@ -175,6 +160,34 @@ export class FinancialTransactionService {
         });
 
         return created;
+    }
+
+    /** The institution's id: the one given, an existing one by name, or a new one. */
+    private async resolveInstitutionId(
+        userId: UUID, given: UUID | null, name: string | null | undefined, now: string,
+    ): Promise<UUID | null> {
+        if (given || !name || !this.institutionRepo) return given;
+        const institutions = await this.institutionRepo.findByOwnerId(userId);
+        const existing = institutions.find(i => i.name.toLowerCase() === name.toLowerCase() && !i.isDeleted);
+        if (existing) return existing.id!;
+        const created = await this.institutionRepo.create({
+            id: crypto.randomUUID(), ownerUserId: userId, name, institutionTypeId: null, isDeleted: false, createdAt: now, updatedAt: now,
+        });
+        return created.id!;
+    }
+
+    /** The category's id: the one given, an existing one by name, or a new one. */
+    private async resolveCategoryId(
+        userId: UUID, given: UUID | null, name: string | null | undefined, now: string,
+    ): Promise<UUID | null> {
+        if (given || !name || !this.categoryRepo) return given;
+        const categories = await this.categoryRepo.findAllBaseAndUser(userId);
+        const existing = categories.find(c => c.name.toLowerCase() === name.toLowerCase() && !c.isDeleted);
+        if (existing) return existing.id!;
+        const created = await this.categoryRepo.create({
+            id: crypto.randomUUID(), ownerUserId: userId, name, isDeleted: false, createdAt: now, updatedAt: now,
+        });
+        return created.id!;
     }
 
     // ── Update ───────────────────────────────────────────────

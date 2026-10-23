@@ -17,6 +17,11 @@ export interface PaymentIdentityLineProps {
     cards: readonly BankCard[];
     /** Qué mostrar cuando no hay nada atado. */
     fallback: React.ReactNode;
+    /**
+     * Forzar las flechas de origen y destino. Hace falta cuando la línea va
+     * junto a un recorrido detectado, que siempre las lleva.
+     */
+    arrows?: boolean;
 }
 
 /**
@@ -36,7 +41,7 @@ export interface PaymentIdentityLineProps {
  * el usuario eligiera la cuenta a la que entró el dinero.
  */
 export function PaymentIdentityLine({
-    accountId, cardId, destinationAccountId, accounts, cards, fallback,
+    accountId, cardId, destinationAccountId, accounts, cards, fallback, arrows,
 }: PaymentIdentityLineProps) {
     const card = cardId ? cards.find(c => c.id === cardId) : undefined;
     const source = card ?? (accountId ? accounts.find(a => a.id === accountId) : undefined);
@@ -48,7 +53,7 @@ export function PaymentIdentityLine({
 
     // La flecha solo aparece cuando hay algo que distinguir: con un único
     // origen —el caso de siempre— no añade información, solo ruido.
-    const withArrows = !!destination;
+    const withArrows = arrows ?? !!destination;
 
     return (
         <span className="flex min-w-0 flex-col gap-1">

@@ -139,6 +139,36 @@ export class SupabaseFinancialTransactionRepository implements IFinancialTransac
         return data.map(row => this.mapToEntity(row));
     }
 
+    async findDuplicateCandidates(
+        userId: UUID, criteria: { type: string; amount: number; day: string },
+    ): Promise<FinancialTransaction[]> {
+        const supabase = await createClient();
+        // Same calendar day as the fingerprint reads it: the first ten
+        // characters of the stored wall-clock date.
+        const next = new Date(`${criteria.day}T00:00:00.000Z`);
+        next.setUTCDate(next.getUTCDate() + 1);
+        const { data, error } = await supabase
+            .from('financial_transactions')
+            // Only what the fingerprint compares, plus the status it filters on.
+            .select('id, owner_user_id, type, status, amount, date, merchant')
+            .eq('owner_user_id', userId)
+            .eq('type', criteria.type)
+            .eq('amount', criteria.amount)
+            .gte('date', `${criteria.day}T00:00:00.000Z`)
+            .lt('date', next.toISOString());
+
+        if (error || !data) return [];
+        return data.map(row => ({
+            id: row.id,
+            ownerUserId: row.owner_user_id,
+            type: row.type,
+            status: row.status,
+            amount: Number(row.amount),
+            date: row.date,
+            merchant: row.merchant,
+        }) as FinancialTransaction);
+    }
+
     async findForDashboard(userId: UUID, filter?: DashboardRangeFilter): Promise<FinancialTransaction[]> {
         const supabase = await createClient();
         let query = supabase

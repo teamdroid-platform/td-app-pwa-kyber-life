@@ -120,6 +120,15 @@ export class InMemoryFinancialTransactionRepository extends InMemoryRepository<F
     async findRecent(userId: UUID, limit: number): Promise<FinancialTransaction[]> {
         return (await this.findByOwnerId(userId)).slice(0, limit);
     }
+    async findDuplicateCandidates(
+        userId: UUID, criteria: { type: string; amount: number; day: string },
+    ): Promise<FinancialTransaction[]> {
+        const cents = Math.round(criteria.amount * 100);
+        return (await this.findByOwnerId(userId)).filter(t =>
+            t.type === criteria.type
+            && Math.round(Number(t.amount) * 100) === cents
+            && t.date.substring(0, 10) === criteria.day);
+    }
     async findForDashboard(userId: UUID, filter?: DashboardRangeFilter): Promise<FinancialTransaction[]> {
         const statuses: readonly string[] = filter?.statuses ?? DASHBOARD_ACTIVE_STATUSES;
         return (await this.findByOwnerId(userId)).filter(t => {
