@@ -16,9 +16,15 @@ interface StatementPanelProps {
     cardId: string;
     /** Deuda total de la tarjeta: el tope de lo que este estado puede pedir. */
     debt: number;
+    /**
+     * Si este es el estado que toca pagar. Solo ese ofrece el botón: un pago
+     * abona primero al estado más antiguo que aún debe, así que el botón en
+     * cualquier otro registraría un pago que no le llega.
+     */
+    payable?: boolean;
 }
 
-export function StatementPanel({ statement, cardId, debt }: StatementPanelProps) {
+export function StatementPanel({ statement, cardId, debt, payable = true }: StatementPanelProps) {
     const router = useRouter();
     const [paying, setPaying] = useState(false);
     const [editingTotal, setEditingTotal] = useState(false);
@@ -125,7 +131,7 @@ export function StatementPanel({ statement, cardId, debt }: StatementPanelProps)
                 <Row label="Cubierto por saldo a favor" value={money(credit)} tone="good" />
             )}
 
-            {due > 0 && (
+            {payable && due > 0 && (
                 <Button onClick={handlePay} disabled={paying} className="mt-1 w-full">
                     {paying ? "Registrando…" : `Marcar ${money(due)} como pagado`}
                 </Button>

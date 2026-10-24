@@ -217,7 +217,7 @@ describe("StatementPanel — saldo a favor de periodos anteriores", () => {
             computedAmount: 461.81, totalAmount: null, paidAmount: 0, status: "OPEN",
             createdAt: "2026-09-21T00:00:00Z", updatedAt: "2026-09-21T00:00:00Z", isDeleted: false,
         };
-        const base = detail({ debt, openStatement: statement } as never);
+        const base = detail({ debt, openStatement: statement, payableStatement: statement } as never);
         return { ...base, statements: [statement] } as unknown as BankCardDetail;
     }
 
@@ -240,5 +240,90 @@ describe("StatementPanel — saldo a favor de periodos anteriores", () => {
         render(<CardDetailClient initialData={conSaldoAFavor(0)} />);
 
         expect(screen.queryByRole("button", { name: /como pagado/i })).toBeNull();
+    });
+});
+
+describe("CardDetailClient — selector de período", () => {
+    function stmt(id: string, start: string, end: string, due: string, computed: number, status: string) {
+        return {
+            id, ownerUserId: "u1", cardId: "card-1", periodStart: start, periodEnd: end, dueDate: due,
+            computedAmount: computed, totalAmount: null, paidAmount: 0, status,
+            createdAt: "2026-10-05T00:00:00Z", updatedAt: "2026-10-05T00:00:00Z", isDeleted: false,
+        };
+    }
+    function mov(id: string, amount: number, date: string, description: string) {
+        return {
+            transactionId: id, ownerUserId: "u1", date, accountId: null, cardId: "card-1",
+            direction: "CHARGE", amount, currency: "USD", description, merchant: null, categoryId: null,
+        };
+    }
+
+    // Como la Mastercard real: período en curso vacío, el anterior cerrado y
+    // pendiente, y uno más viejo sin estado de cuenta.
+    function conPeriodos(): BankCardDetail {
+        const abierto = stmt("abierto", "2026-10-21", "2026-11-20", "2026-11-28", 0, "OPEN");
+        const cerrado = stmt("cerrado", "2026-09-21", "2026-10-20", "2026-10-28", 801.71, "CLOSED");
+        return {
+            ...detail({ debt: 737.55, openStatement: abierto, payableStatement: cerrado } as never),
+            statements: [abierto, cerrado],
+            movements: [
+                mov("t1", 76.92, "2026-10-04T14:34:00.000Z", "Hospedaje en Quito"),
+                mov("t2", 19.99, "2026-08-30T10:00:00.000Z", "Suscripción Gemini"),
+            ],
+            periodMovements: [],
+            periods: [
+                { periodStart: "2026-10-21", periodEnd: "2026-11-20", dueDate: "2026-11-28", statement: abierto, isCurrent: true },
+                { periodStart: "2026-09-21", periodEnd: "2026-10-20", dueDate: "2026-10-28", statement: cerrado, isCurrent: false },
+                { periodStart: "2026-08-21", periodEnd: "2026-09-20", dueDate: "2026-09-28", statement: null, isCurrent: false },
+            ],
+        } as unknown as BankCardDetail;
+    }
+
+    it("abre en el período en curso", () => {
+        render(<CardDetailClient initialData={conPeriodos()} />);
+        expect(screen.getByText("En curso")).toBeInTheDocument();
+        expect(screen.getByText("Sin consumos ni pagos en este período.")).toBeInTheDocument();
+    });
+
+    it("con la flecha va al período anterior y enseña sus movimientos", () => {
+        render(<CardDetailClient initialData={conPeriodos()} />);
+        fireEvent.click(screen.getByRole("button", { name: "Período anterior" }));
+
+        expect(screen.getByText("Cerrado")).toBeInTheDocument();
+        expect(screen.getByText("Hospedaje en Quito")).toBeInTheDocument();
+        expect(screen.queryByText("Suscripción Gemini")).toBeNull();
+    });
+
+    it("un período sin estado de cuenta muestra sus movimientos y lo explica", () => {
+        render(<CardDetailClient initialData={conPeriodos()} />);
+        fireEvent.click(screen.getByRole("button", { name: "Período anterior" }));
+        fireEvent.click(screen.getByRole("button", { name: "Período anterior" }));
+
+        expect(screen.getByText("Sin estado")).toBeInTheDocument();
+        expect(screen.getByText("Suscripción Gemini")).toBeInTheDocument();
+        expect(screen.getByText(/no\s+tiene estado de cuenta/i)).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "Período anterior" })).toBeDisabled();
+    });
+
+    it("solo el estado que toca pagar ofrece marcarlo como pagado", () => {
+        render(<CardDetailClient initialData={conPeriodos()} />);
+        expect(screen.queryByRole("button", { name: /como pagado/i })).toBeNull();
+
+        fireEvent.click(screen.getByRole("button", { name: "Período anterior" }));
+        expect(screen.getByRole("button", { name: /como pagado/i })).toBeInTheDocument();
+    });
+
+    it("el vencimiento de arriba es el del estado que se debe", () => {
+        render(<CardDetailClient initialData={conPeriodos()} />);
+        expect(screen.getByText(/Vence 28 oct/)).toBeInTheDocument();
+    });
+
+    it("tocar un estado anterior lleva a ese período", () => {
+        Element.prototype.scrollIntoView = jest.fn();
+        render(<CardDetailClient initialData={conPeriodos()} />);
+        fireEvent.click(screen.getByText(/pendiente/));
+
+        expect(screen.getByText("Cerrado")).toBeInTheDocument();
+        expect(screen.getByText("Hospedaje en Quito")).toBeInTheDocument();
     });
 });

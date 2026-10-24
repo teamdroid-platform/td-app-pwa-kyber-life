@@ -19,7 +19,7 @@ const detail: BankCardDetail = {
     card: {
         id: "c1", ownerUserId: "u", institutionId: "i1",         cardType: "CREDIT", lastFour: "8361", currency: "USD", creditLimit: 3000,
         statementDay: 20, dueDay: 28, status: "ACTIVE", isUnconfirmed: false,
-        debt: 842.15, availableCredit: 2157.85, openStatement: statement,
+        debt: 842.15, availableCredit: 2157.85, openStatement: statement, payableStatement: statement,
         institutionName: "Banco del Austro", ...STAMPS,
     },
     statements: [statement],

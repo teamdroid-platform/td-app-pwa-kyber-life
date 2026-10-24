@@ -143,3 +143,65 @@ export function allocatePayment(
     const toStatement = round2(Math.max(0, Math.min(amount, due)));
     return { toStatement, toDebt: round2(amount - toStatement) };
 }
+
+/** Si una fecha (ISO) cae dentro de un período de corte, ambos extremos incluidos. */
+export function inStatementPeriod(date: string, periodStart: string, periodEnd: string): boolean {
+    return date >= `${periodStart}T00:00:00Z` && date <= `${periodEnd}T23:59:59Z`;
+}
+
+/**
+ * Lo que la app calcula para un período: la suma de sus consumos.
+ *
+ * Se recalcula al leer y no se fija al abrir el estado: los consumos llegan
+ * durante todo el período —el escaneo, una captura tardía—, y un monto fijado
+ * el primer día dejaba el estado muy por debajo de lo gastado.
+ */
+export function computePeriodCharges(
+    movements: readonly BankMovement[], periodStart: string, periodEnd: string,
+): number {
+    return round2(movements
+        .filter(m => m.direction === "CHARGE" && inStatementPeriod(m.date, periodStart, periodEnd))
+        .reduce((sum, m) => sum + Number(m.amount), 0));
+}
+
+/**
+ * El estado de cuenta que toca pagar: el más antiguo que aún debe algo.
+ *
+ * Un estado cerrado sin pagar es justamente lo que vence: el período se cierra
+ * el día de corte y se paga días después. Mirar solo el abierto dejaba ese
+ * estado fuera de los pagos y anunciaba el vencimiento del mes siguiente.
+ */
+export function payableStatement(
+    statements: readonly BankCardStatement[],
+): BankCardStatement | null {
+    return [...statements]
+        .filter(s => !s.isDeleted && computeStatementDue(s) > 0.004)
+        .sort((a, b) => a.periodStart.localeCompare(b.periodStart))[0] ?? null;
+}
+
+export interface CardPeriodRange {
+    periodStart: string;
+    periodEnd: string;
+    dueDate: string;
+}
+
+/**
+ * Los períodos de corte de una tarjeta, del actual hacia atrás, hasta el que
+ * contiene `earliest` (el primer movimiento). Tope de `max` para que una fecha
+ * vieja no genere cientos de períodos vacíos.
+ */
+export function cardPeriodsBack(
+    statementDay: number, dueDay: number, today: Date, earliest: string | null, max = 36,
+): CardPeriodRange[] {
+    const periods: CardPeriodRange[] = [];
+    let reference = today;
+    for (let i = 0; i < max; i++) {
+        const period = statementPeriodFor(statementDay, dueDay, reference);
+        periods.push(period);
+        if (!earliest || earliest.slice(0, 10) >= period.periodStart) break;
+        const dayBefore = new Date(`${period.periodStart}T00:00:00Z`);
+        dayBefore.setUTCDate(dayBefore.getUTCDate() - 1);
+        reference = dayBefore;
+    }
+    return periods;
+}
