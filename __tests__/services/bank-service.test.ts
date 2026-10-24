@@ -202,8 +202,11 @@ describe("payCard (sobre estado de cuenta)", () => {
     }
 
     it("registra el pago en la tarjeta y salda el estado", async () => {
-        const { service, statements, card, statement } = await cardWithOpenStatement();
-        await statements.update({ ...statement, computedAmount: 611.4 });
+        const { service, statements, transactions, card, statement } = await cardWithOpenStatement();
+        // El monto del estado sale de los consumos del período, no se fija a mano.
+        await transactions.create(tx({
+            amount: 611.4, date: "2026-08-22T00:00:00Z", bankCardId: card.id, paidWithCredit: true,
+        }));
 
         const created = await service.payCard(USER, card.id, 611.4, "2026-08-26T00:00:00Z");
 
@@ -215,8 +218,11 @@ describe("payCard (sobre estado de cuenta)", () => {
     });
 
     it("un pago parcial deja el estado abierto", async () => {
-        const { service, statements, card, statement } = await cardWithOpenStatement();
-        await statements.update({ ...statement, computedAmount: 611.4 });
+        const { service, statements, transactions, card, statement } = await cardWithOpenStatement();
+        // El monto del estado sale de los consumos del período, no se fija a mano.
+        await transactions.create(tx({
+            amount: 611.4, date: "2026-08-22T00:00:00Z", bankCardId: card.id, paidWithCredit: true,
+        }));
 
         await service.payCard(USER, card.id, 200, "2026-08-26T00:00:00Z");
 
@@ -231,7 +237,6 @@ describe("payCard (sobre estado de cuenta)", () => {
         await transactions.create(tx({
             amount: 300, date: "2026-08-22T00:00:00Z", bankCardId: card.id, paidWithCredit: true,
         }));
-        await statements.update({ ...statement, computedAmount: 300 });
 
         await service.payCard(USER, card.id, 300, "2026-08-26T00:00:00Z");
 
@@ -273,7 +278,9 @@ describe("payCard", () => {
             computedAmount: 180, totalAmount: null, paidAmount: 0, status: "OPEN",
             createdAt: NOW, updatedAt: NOW, isDeleted: false,
         } as never);
-        await transactions.create(tx({ amount: 500, bankCardId: card.id, paidWithCredit: true }));
+        // 180 de consumos en el período del estado y 320 de antes: deuda 500.
+        await transactions.create(tx({ amount: 180, bankCardId: card.id, paidWithCredit: true }));
+        await transactions.create(tx({ amount: 320, date: "2026-07-15T00:00:00Z", bankCardId: card.id, paidWithCredit: true }));
 
         const payment = await service.payCard(USER, card.id, 200, NOW);
 
@@ -350,7 +357,8 @@ describe("deleteCardPayment", () => {
             computedAmount: 180, totalAmount: null, paidAmount: 0, status: "OPEN",
             createdAt: NOW, updatedAt: NOW, isDeleted: false,
         } as never);
-        await ctx.transactions.create(tx({ amount: 500, bankCardId: card.id, paidWithCredit: true }));
+        await ctx.transactions.create(tx({ amount: 180, bankCardId: card.id, paidWithCredit: true }));
+        await ctx.transactions.create(tx({ amount: 320, date: "2026-07-15T00:00:00Z", bankCardId: card.id, paidWithCredit: true }));
         return { ...ctx, card };
     }
 

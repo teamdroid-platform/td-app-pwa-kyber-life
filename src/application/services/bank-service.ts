@@ -20,6 +20,7 @@ import type {
 import {
     computeAccountBalance, computeCardDebt, computeAvailableCredit,
     runningBalances, statementPeriodFor, allocatePayment,
+    computePeriodCharges, computeStatementDue, payableStatement, cardPeriodsBack, inStatementPeriod,
 } from "@/domain/services/bank-balance";
 import { isIncomeType } from "@/domain/services/financial-balance";
 import {
@@ -103,7 +104,23 @@ export interface BankAccountWithBalance extends BankAccount {
 export interface BankCardWithDebt extends BankCard {
     debt: number;
     availableCredit: number | null;
+    /** El estado del período en curso. */
     openStatement?: BankCardStatement | null;
+    /**
+     * El estado que toca pagar: el más antiguo que aún debe algo. Suele ser el
+     * recién cerrado, no el abierto; de él salen el vencimiento y el abono.
+     */
+    payableStatement?: BankCardStatement | null;
+}
+
+/** Un período de corte de la tarjeta, con su estado de cuenta si existe. */
+export interface CardPeriodView {
+    periodStart: string;
+    periodEnd: string;
+    dueDate: string;
+    /** Null para los meses anteriores a que la tarjeta tuviera estados. */
+    statement: BankCardStatement | null;
+    isCurrent: boolean;
 }
 
 export interface BankOverview {
@@ -139,6 +156,11 @@ export interface BankCardDetail {
     statements: BankCardStatement[];
     movements: BankMovement[];
     periodMovements: BankMovement[];
+    /**
+     * Todos los períodos de corte, del actual hacia atrás hasta el primer
+     * movimiento. Vacío si la tarjeta no tiene día de corte.
+     */
+    periods: CardPeriodView[];
     /**
      * Los pagos que no dicen de qué cuenta salieron, por id de transacción.
      * Solo cuentan las transacciones: un pago registrado desde Bancos no
@@ -994,7 +1016,7 @@ export class BankService {
         const countableCards = cards.filter(c => !c.isUnconfirmed && c.cardType === "CREDIT");
 
         const dueDates = countableCards
-            .map(c => c.openStatement?.dueDate)
+            .map(c => c.payableStatement?.dueDate ?? c.openStatement?.dueDate)
             .filter((d): d is string => Boolean(d))
             .sort();
 
@@ -1051,12 +1073,15 @@ export class BankService {
         ]);
 
         const withDebt = namedByInstitution(await this.withDebt(card, movements), institutions);
+        // Releídos: `withDebt` acaba de poner al día sus montos.
+        const freshStatements = card.cardType === "CREDIT"
+            ? await this.statements.findByCardId(cardId)
+            : statements;
         const open = withDebt.openStatement;
         const periodMovements = open
-            ? movements.filter(m =>
-                m.date >= `${open.periodStart}T00:00:00Z` &&
-                m.date <= `${open.periodEnd}T23:59:59Z`)
+            ? movements.filter(m => inStatementPeriod(m.date, open.periodStart, open.periodEnd))
             : [];
+        const periods = this.cardPeriods(card, freshStatements, movements);
 
         const paymentIds = movements
             .filter(m => m.direction === "PAYMENT" && !m.cardPaymentId)
@@ -1067,7 +1092,8 @@ export class BankService {
             .map(t => t!.id);
 
         return {
-            card: withDebt, statements, movements, periodMovements, paymentsWithoutSource,
+            card: withDebt, statements: freshStatements, movements, periodMovements, periods,
+            paymentsWithoutSource,
         };
     }
 
@@ -1215,7 +1241,10 @@ export class BankService {
         if (!card || card.ownerUserId !== userId) throw new Error("Tarjeta no encontrada");
         if (card.cardType !== "CREDIT") throw new Error("Solo se puede pagar una tarjeta de crédito");
 
-        const openStatement = await this.statements.findOpenForCard(cardId);
+        // El abono va al estado que toca pagar —el cerrado que vence, si aún
+        // debe algo—, no al abierto: ese no vence hasta el mes que viene.
+        const own = await this.movements.find(userId, { cardId });
+        const openStatement = payableStatement(await this.freshStatements(card, own));
         const { toStatement } = allocatePayment(amount, openStatement);
 
         const payment = await payments.create({
@@ -1695,14 +1724,87 @@ export class BankService {
     ): Promise<BankCardWithDebt> {
         const own = movements.filter(m => m.cardId === card.id);
         const debt = computeCardDebt(own);
-        const openStatement = card.cardType === "CREDIT"
-            ? await this.statements.findOpenForCard(card.id)
-            : null;
+        const statements = card.cardType === "CREDIT" ? await this.freshStatements(card, own) : [];
+        const today = new Date().toISOString().slice(0, 10);
+        // El del período en curso aunque ya esté pagado: es el que la pantalla
+        // usa para saber que la tarjeta tiene ciclo.
+        const openStatement = statements.find(s => s.periodStart <= today && s.periodEnd >= today)
+            ?? statements.find(s => s.status === "OPEN")
+            ?? null;
         return {
             ...card,
             debt,
             availableCredit: computeAvailableCredit(card.creditLimit, debt),
             openStatement,
+            payableStatement: payableStatement(statements),
         };
+    }
+
+    /**
+     * Los estados de la tarjeta con su monto calculado al día.
+     *
+     * El monto se fijaba al abrir el estado y no volvía a moverse, así que
+     * cada consumo registrado después —por escaneo o a mano— quedaba fuera:
+     * un estado de $801,71 decía $461,81. Ahora se recalcula con los consumos
+     * del período al leerlo, y se guarda solo si cambió. El estado sigue al
+     * monto: un estado «pagado» al que le llegó un consumo vuelve a deber.
+     */
+    private async freshStatements(
+        card: BankCard, own: readonly BankMovement[],
+    ): Promise<BankCardStatement[]> {
+        const statements = (await this.statements.findByCardId(card.id)).filter(s => !s.isDeleted);
+        const today = new Date().toISOString().slice(0, 10);
+
+        return Promise.all(statements.map(async statement => {
+            const computedAmount = computePeriodCharges(own, statement.periodStart, statement.periodEnd);
+            const next = { ...statement, computedAmount };
+            const due = computeStatementDue(next);
+            const status = statement.status === "PAID" && due > 0.004
+                ? (statement.periodEnd < today ? "CLOSED" : "OPEN")
+                : statement.status !== "PAID" && Number(statement.paidAmount) > 0 && due <= 0.004
+                    ? "PAID"
+                    : statement.status;
+
+            const changed = Math.abs(computedAmount - Number(statement.computedAmount)) > 0.004
+                || status !== statement.status;
+            return changed ? this.statements.update({ ...next, status }) : statement;
+        }));
+    }
+
+    /** Los períodos de corte para el selector del detalle, del actual hacia atrás. */
+    private cardPeriods(
+        card: BankCard, statements: readonly BankCardStatement[], movements: readonly BankMovement[],
+    ): CardPeriodView[] {
+        if (card.cardType !== "CREDIT" || !card.statementDay || !card.dueDay) return [];
+
+        const earliest = movements.reduce<string | null>(
+            (min, m) => (min === null || m.date < min ? m.date : min), null);
+        const ranges = cardPeriodsBack(card.statementDay, card.dueDay, new Date(), earliest);
+        const byStart = new Map(statements.filter(s => !s.isDeleted).map(s => [s.periodStart, s]));
+
+        const periods: CardPeriodView[] = ranges.map((range, index) => {
+            const statement = byStart.get(range.periodStart) ?? null;
+            byStart.delete(range.periodStart);
+            return {
+                ...range,
+                // El estado manda en las fechas: si el ciclo cambió después, sus
+                // fechas son las que el banco usó.
+                ...(statement ? {
+                    periodStart: statement.periodStart,
+                    periodEnd: statement.periodEnd,
+                    dueDate: statement.dueDate,
+                } : {}),
+                statement,
+                isCurrent: index === 0,
+            };
+        });
+        // Estados de un ciclo anterior (se cambió el día de corte): también se ven.
+        for (const statement of byStart.values()) {
+            periods.push({
+                periodStart: statement.periodStart, periodEnd: statement.periodEnd,
+                dueDate: statement.dueDate, statement, isCurrent: false,
+            });
+        }
+        return periods.sort((a, b) => b.periodStart.localeCompare(a.periodStart));
     }
 }

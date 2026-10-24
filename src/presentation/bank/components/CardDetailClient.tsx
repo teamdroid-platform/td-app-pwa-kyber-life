@@ -1,17 +1,18 @@
 "use client";
 
+import { useRef, useState } from "react";
 import { cardLabel } from "@/lib/bank-identity-label";
 import Link from "next/link";
-import { ChevronLeft, Inbox } from "lucide-react";
+import { ChevronLeft, ChevronRight, Inbox } from "lucide-react";
 import { formatBankNumber } from "@/lib/format-bank-number";
 import { StatementPanel } from "./StatementPanel";
 import { PayCardSheet } from "./PayCardSheet";
 import { MovementRow } from "./MovementRow";
 import { DeleteCardPaymentButton } from "./DeleteCardPaymentButton";
 import { money, shortDate } from "../lib/format-money";
-import { computeStatementDue } from "@/domain/services/bank-balance";
+import { computeStatementDue, inStatementPeriod } from "@/domain/services/bank-balance";
 import { cn } from "@/lib/utils";
-import type { BankCardDetail } from "@/application/services/bank-service";
+import type { BankCardDetail, CardPeriodView } from "@/application/services/bank-service";
 import type { BankMovement } from "@/domain/entities/bank";
 
 /**
@@ -41,8 +42,21 @@ function daysUntil(date: string): number {
     return Math.ceil(diff / 86_400_000);
 }
 
+/** Cómo está un período, en una palabra. */
+function periodStatus(period: CardPeriodView): { label: string; tone: string } {
+    if (period.isCurrent) return { label: "En curso", tone: "border-indigo-500/30 bg-indigo-500/10 text-indigo-500" };
+    if (!period.statement) return { label: "Sin estado", tone: "border-border bg-muted text-muted-foreground" };
+    return computeStatementDue(period.statement) <= 0
+        ? { label: "Pagado", tone: "border-emerald-500/30 bg-emerald-500/10 text-emerald-500" }
+        : { label: "Cerrado", tone: "border-amber-500/30 bg-amber-500/10 text-amber-500" };
+}
+
 export function CardDetailClient({ initialData }: { initialData: BankCardDetail }) {
     const { card, statements, movements, periodMovements } = initialData;
+    const periods = initialData.periods ?? [];
+    // 0 = el período en curso; cuanto mayor, más atrás en el tiempo.
+    const [selected, setSelected] = useState(0);
+    const selectorRef = useRef<HTMLDivElement>(null);
     const withoutSource = new Set(initialData.paymentsWithoutSource ?? []);
     const number = formatBankNumber(card);
     const open = card.openStatement;
@@ -53,14 +67,32 @@ export function CardDetailClient({ initialData }: { initialData: BankCardDetail 
         : null;
 
     const closed = statements.filter(s => s.id !== open?.id);
-    const remaining = open ? daysUntil(open.dueDate) : null;
+    // Lo que vence es el estado que aún se debe —normalmente el recién
+    // cerrado—, no el abierto, que vence el mes que viene.
+    const payable = card.payableStatement ?? null;
+    const dueStatement = payable ?? open;
+    const remaining = dueStatement ? daysUntil(dueStatement.dueDate) : null;
 
     // Sin día de corte no hay estado de cuenta, y sin estado no hay «periodo»:
     // la lista del periodo salía vacía aunque la tarjeta tuviera meses de
     // consumos y pagos encima, y la deuda de arriba no tenía nada que la
     // explicara. En ese caso se enseña la historia entera, por meses.
-    const hasCycle = !!open;
+    const hasCycle = periods.length > 0 || !!open;
     const history = hasCycle ? [] : groupByMonth(movements);
+
+    const period: CardPeriodView | null = periods[selected] ?? null;
+    const shownMovements = period
+        ? movements
+            .filter(m => inStatementPeriod(m.date, period.periodStart, period.periodEnd))
+            .sort((a, b) => b.date.localeCompare(a.date))
+        : periodMovements;
+
+    const showPeriod = (statementId: string) => {
+        const index = periods.findIndex(p => p.statement?.id === statementId);
+        if (index < 0) return;
+        setSelected(index);
+        selectorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    };
 
     const renderMovement = (movement: BankMovement) => (
         <MovementRow
@@ -111,9 +143,9 @@ export function CardDetailClient({ initialData }: { initialData: BankCardDetail 
                         )}
                     </div>
                     <div className="flex flex-wrap gap-2">
-                        {open && remaining !== null && (
+                        {dueStatement && remaining !== null && (
                             <span className="rounded-full border border-amber-500/30 bg-amber-500/15 px-2.5 py-0.5 text-[11px] text-amber-200">
-                                Vence {shortDate(`${open.dueDate}T00:00:00Z`)}
+                                Vence {shortDate(`${dueStatement.dueDate}T00:00:00Z`)}
                                 {remaining >= 0 ? ` · en ${remaining} días` : " · vencido"}
                             </span>
                         )}
@@ -149,22 +181,85 @@ export function CardDetailClient({ initialData }: { initialData: BankCardDetail 
                 </section>
             )}
 
-            {open && <StatementPanel statement={open} cardId={card.id} debt={card.debt} />}
+            {period && (
+                <div ref={selectorRef} className="flex scroll-mt-20 items-center gap-2">
+                    <button
+                        type="button"
+                        onClick={() => setSelected(i => Math.min(periods.length - 1, i + 1))}
+                        disabled={selected >= periods.length - 1}
+                        aria-label="Período anterior"
+                        className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border text-muted-foreground transition-colors hover:text-foreground disabled:opacity-30"
+                    >
+                        <ChevronLeft className="h-4 w-4" />
+                    </button>
+                    <div className="flex min-w-0 flex-1 flex-col items-center">
+                        <span className="truncate text-sm font-semibold tabular-nums">
+                            {shortDate(`${period.periodStart}T00:00:00Z`)} – {shortDate(`${period.periodEnd}T00:00:00Z`)}
+                        </span>
+                        <span className={cn(
+                            "mt-0.5 rounded-full border px-2 py-px text-[10px] font-medium",
+                            periodStatus(period).tone,
+                        )}>
+                            {periodStatus(period).label}
+                        </span>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => setSelected(i => Math.max(0, i - 1))}
+                        disabled={selected === 0}
+                        aria-label="Período siguiente"
+                        className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border text-muted-foreground transition-colors hover:text-foreground disabled:opacity-30"
+                    >
+                        <ChevronRight className="h-4 w-4" />
+                    </button>
+                </div>
+            )}
+
+            {period?.statement ? (
+                <StatementPanel
+                    key={period.statement.id}
+                    statement={period.statement}
+                    cardId={card.id}
+                    debt={card.debt}
+                    payable={payable?.id === period.statement.id}
+                />
+            ) : period ? (
+                <section className="flex flex-col gap-2.5 rounded-2xl border bg-card p-4">
+                    <div className="flex justify-between gap-3 text-sm">
+                        <span className="text-muted-foreground">Consumos</span>
+                        <span className="font-semibold tabular-nums">
+                            {money(shownMovements.filter(m => m.direction === "CHARGE").reduce((sum, m) => sum + m.amount, 0))}
+                        </span>
+                    </div>
+                    <div className="flex justify-between gap-3 text-sm">
+                        <span className="text-muted-foreground">Pagos</span>
+                        <span className="font-semibold tabular-nums text-emerald-500">
+                            {money(shownMovements.filter(m => m.direction === "PAYMENT").reduce((sum, m) => sum + m.amount, 0))}
+                        </span>
+                    </div>
+                    <p className="text-xs leading-relaxed text-muted-foreground">
+                        Este período es anterior a que la tarjeta tuviera día de corte, así que no
+                        tiene estado de cuenta: solo se listan sus movimientos.
+                    </p>
+                </section>
+            ) : open ? (
+                <StatementPanel statement={open} cardId={card.id} debt={card.debt} payable={payable?.id === open.id} />
+            ) : null}
 
             {hasCycle ? (
                 <section className="flex flex-col gap-2">
                     <h2 className="pt-1 text-[11px] uppercase tracking-wide text-muted-foreground">
-                        Consumos del período
+                        Consumos y pagos del período
                     </h2>
-                    {periodMovements.length === 0 ? (
+                    {shownMovements.length === 0 ? (
                         <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed bg-muted/30 py-10 text-center">
                             <Inbox className="h-8 w-8 opacity-20" />
                             <p className="text-sm text-muted-foreground">
-                                Sin consumos en este período.
+                                Sin consumos ni pagos en este período.
                             </p>
                         </div>
                     ) : (
-                        periodMovements.map(renderMovement)
+                        shownMovements.map(renderMovement)
                     )}
                 </section>
             ) : (
@@ -203,7 +298,12 @@ export function CardDetailClient({ initialData }: { initialData: BankCardDetail 
                 <section className="flex flex-col gap-2 rounded-2xl border bg-card p-4">
                     <h2 className="text-sm font-semibold">Estados anteriores</h2>
                     {closed.map(s => (
-                        <div key={s.id} className="flex justify-between gap-3 text-sm">
+                        <button
+                            key={s.id}
+                            type="button"
+                            onClick={() => showPeriod(s.id)}
+                            className="flex justify-between gap-3 rounded-lg text-left text-sm transition-colors hover:bg-muted/50"
+                        >
                             <span className="min-w-0 truncate text-muted-foreground">
                                 {shortDate(`${s.periodStart}T00:00:00Z`)} – {shortDate(`${s.periodEnd}T00:00:00Z`)}
                             </span>
@@ -213,9 +313,11 @@ export function CardDetailClient({ initialData }: { initialData: BankCardDetail 
                             )}>
                                 {computeStatementDue(s) <= 0
                                     ? `${money(s.paidAmount)} pagado`
-                                    : `${money(computeStatementDue(s))} pendiente`}
+                                    // Mismo tope que el panel: con saldo a favor se
+                                    // debe menos que lo que suma el estado.
+                                    : `${money(Math.min(computeStatementDue(s), Math.max(0, card.debt)))} pendiente`}
                             </span>
-                        </div>
+                        </button>
                     ))}
                 </section>
             )}
