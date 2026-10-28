@@ -184,6 +184,31 @@ export class BankIdentificationService {
         return touched;
     }
 
+    /**
+     * Suelta las observaciones atadas a una cuenta o tarjeta que se elimina.
+     *
+     * Vuelven a «sin decidir» para que la próxima vez se identifiquen contra lo
+     * que existe. Si se quedaban atadas, un escaneo con ese número seguía
+     * ligando la transacción a la identidad eliminada.
+     */
+    async releaseIdentity(
+        userId: UUID, target: { accountId?: UUID; cardId?: UUID },
+    ): Promise<number> {
+        const linked = (await this.observations.findByOwnerId(userId)).filter(o =>
+            (target.accountId && o.accountId === target.accountId)
+            || (target.cardId && o.cardId === target.cardId));
+
+        for (const observation of linked) {
+            await this.observations.update({
+                ...observation,
+                accountId: null, cardId: null,
+                resolution: "PENDING",
+                updatedAt: new Date().toISOString(),
+            });
+        }
+        return linked.length;
+    }
+
     /** Una observación concreta del usuario, o `null` si no es suya. */
     async findObservation(userId: UUID, id: UUID): Promise<BankNumberObservation | null> {
         const observation = await this.observations.findById(id);
