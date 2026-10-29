@@ -261,7 +261,16 @@ export interface ScannedTransactionInput {
      * cualquier inferencia desde el nombre.
      */
     institutionKind?: BankInstitution["kind"] | null;
+    /**
+     * El tipo de movimiento. Dice de quién es el origen: en un gasto, una
+     * transferencia o un retiro el dinero sale del usuario, así que el número
+     * de origen es suyo aunque antes se haya visto como destino.
+     */
+    type?: string | null;
 }
+
+/** Movimientos en los que el dinero sale del usuario: su origen es propio. */
+const OUTFLOW_TYPES = new Set(["EXPENSE", "PAYMENT", "TRANSFER", "WITHDRAWAL", "FEE", "TAX"]);
 
 /** Lo que una escritura de transacción le da al módulo Bancos. */
 export interface TransactionBankSyncInput {
@@ -461,6 +470,7 @@ export class BankService {
             paidWithCredit: input.paidWithCredit ?? false,
             institutionKind: input.institutionKind ?? null,
             ownership: input.ownership ?? null,
+            type: input.type ?? null,
         };
 
         // Sin números que identificar, lo único que puede nacer es el emisor.
@@ -702,6 +712,13 @@ export class BankService {
             if (!raw) continue;
 
             let observation = await this.identification.observe(userId, raw);
+            // Una lectura que quedó pendiente —ambigua entre dos tarjetas, o sin
+            // nada con qué compararla— se vuelve a mirar con lo que existe hoy:
+            // si la ambigüedad se resolvió (se eliminó la tarjeta sobrante, se
+            // registró la cuenta), el escaneo ya puede ligarla.
+            if (observation.resolution === "PENDING") {
+                observation = await this.identification.reobserve(userId, raw);
+            }
             const isOrigin = isOriginEntry(entry);
 
             // De quién es la cuenta. Lo que el usuario declaró manda; a falta de
@@ -717,6 +734,18 @@ export class BankService {
             // desaparecía del movimiento.
             if (declared === "MINE" && observation.resolution === "EXTERNAL") {
                 observation = await this.identification.reopen(userId, observation.id);
+            }
+
+            // «De un tercero» se deduce cuando un número solo se ha visto como
+            // destino, y esa deducción falla con lo propio: un pago A tu tarjeta
+            // la trae de destino y la dejaba marcada como ajena para siempre.
+            // Cada consumo posterior con esa tarjeta de origen se guardaba sin
+            // tarjeta y sin crédito. El origen de un gasto es la prueba de lo
+            // contrario —el dinero salió de ahí—, así que se vuelve a identificar.
+            if (!declared && isOrigin && OUTFLOW_TYPES.has((scan.type ?? "").toUpperCase())
+                && observation.resolution === "EXTERNAL") {
+                await this.identification.reopen(userId, observation.id);
+                observation = await this.identification.reobserve(userId, raw);
             }
 
             if (isMine && await this.canAutoCreate(userId, observation)) {
@@ -765,7 +794,11 @@ export class BankService {
             // Vale para cualquier lado — quien te transfiere es tan tercero como
             // aquel a quien le transfieres.
             if (!isMine) {
-                if (observation.resolution === "PENDING") {
+                // Solo es de un tercero si no se parece a nada del usuario. Si
+                // encaja con una cuenta o tarjeta suya —su propia tarjeta en un
+                // pago, por ejemplo— queda pendiente para la conciliación, en
+                // vez de marcarse ajena en silencio.
+                if (observation.resolution === "PENDING" && !(await this.resemblesOwnIdentity(userId, raw))) {
                     observation = await this.identification.markExternal(userId, observation.id);
                 }
                 links.bankCounterpartyObservationId = observation.id;
@@ -822,6 +855,7 @@ export class BankService {
                 merchant: transaction.merchant ?? scan.merchant ?? null,
                 currency: transaction.currency,
                 paidWithCredit: transaction.paidWithCredit ?? false,
+                type: transaction.type,
             });
 
             const gotSomething = links.bankSourceAccountId
@@ -856,6 +890,12 @@ export class BankService {
      * y mirar solo el final la descartaba, aunque cuatro dígitos en posiciones
      * conocidas la distinguen igual de bien que los cuatro últimos.
      */
+    /** Si un número podría ser de alguna cuenta o tarjeta del usuario. */
+    private async resemblesOwnIdentity(userId: UUID, raw: string): Promise<boolean> {
+        const candidates = await this.identification.identityCandidates(userId);
+        return resolveFingerprint(parseBankNumber(raw), candidates).candidateIds.length > 0;
+    }
+
     private async canAutoCreate(
         userId: UUID, observation: BankNumberObservation,
     ): Promise<boolean> {
@@ -1561,7 +1601,8 @@ export class BankService {
 
     async deleteAccount(userId: UUID, id: UUID): Promise<void> {
         await this.requireAccount(userId, id);
-        return this.accounts.delete(id);
+        await this.accounts.delete(id);
+        await this.identification.releaseIdentity(userId, { accountId: id });
     }
 
     /**
@@ -1674,7 +1715,11 @@ export class BankService {
 
     async deleteCard(userId: UUID, id: UUID): Promise<void> {
         await this.requireCard(userId, id);
-        return this.cards.delete(id);
+        await this.cards.delete(id);
+        // Una tarjeta inventada por el escáner (••0361 en vez de ••8361) volvía
+        // ambiguo cada número de la verdadera; al eliminarla, sus lecturas
+        // vuelven a identificarse contra lo que queda.
+        await this.identification.releaseIdentity(userId, { cardId: id });
     }
 
     /**
