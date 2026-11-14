@@ -33,6 +33,15 @@ interface FormSheetProps {
     contentClassName?: string;
     /** className for the scrollable body (only used with the `footer` prop). */
     bodyClassName?: string;
+    /**
+     * Whether opening the sheet focuses its first field (Radix's default).
+     *
+     * Turn it off for sheets whose job is to pick from a list: their first
+     * field is a search box, and on a phone focusing it raises the keyboard
+     * over the very options the user came to see. Focus then goes to the sheet
+     * itself, so keyboard and screen-reader users still land inside it.
+     */
+    autoFocusFirstField?: boolean;
     children: React.ReactNode;
 }
 
@@ -52,12 +61,19 @@ export function FormSheet({
     footer,
     contentClassName,
     bodyClassName,
+    autoFocusFirstField = true,
     children,
 }: FormSheetProps) {
     return (
         <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
             {trigger && <ResponsiveDialogTrigger asChild>{trigger}</ResponsiveDialogTrigger>}
-            <ResponsiveDialogContent className={cn("sm:max-w-[480px]", contentClassName)}>
+            <ResponsiveDialogContent
+                className={cn("sm:max-w-[480px]", contentClassName)}
+                onOpenAutoFocus={autoFocusFirstField ? undefined : (event) => {
+                    event.preventDefault();
+                    (event.currentTarget as HTMLElement | null)?.focus();
+                }}
+            >
                 <ResponsiveDialogHeader>
                     <ResponsiveDialogTitle>{title}</ResponsiveDialogTitle>
                     {description && (
