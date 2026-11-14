@@ -92,6 +92,8 @@ export function MergeIntoSheet({ open, onOpenChange, source, sourceCounts, optio
             title={`Unificar «${source.name}»`}
             description="Elige a dónde pasan sus cuentas y tarjetas. Al terminar, esta institución se archiva."
             bodyClassName="space-y-2 py-3"
+            // Se elige de la lista; sin esto el teclado tapaba las opciones.
+            autoFocusFirstField={false}
             footer={
                 <Button className="w-full" onClick={handleMerge} disabled={merging || !target}>
                     {merging

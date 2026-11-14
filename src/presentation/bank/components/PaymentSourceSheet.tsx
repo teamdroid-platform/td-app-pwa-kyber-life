@@ -209,6 +209,9 @@ export function PaymentSourceSheet({
             title={title}
             bodyClassName="space-y-3 py-3"
             footer={createFooter}
+            // Se abre para elegir de la lista: el buscador es opcional, y con
+            // el foco en él el teclado tapaba las cuentas.
+            autoFocusFirstField={false}
         >
             {!isEmpty && (
                 <div className="relative">
